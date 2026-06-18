@@ -1,0 +1,1528 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Howl, Howler } from 'howler';
+import * as musicMetadata from 'music-metadata-browser';
+import { directoryOpen } from 'browser-fs-access';
+
+// Supported formats
+const SUPPORTED_FORMATS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'alac', 'aiff', 'opus'];
+const defaultArtwork = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const DB_NAME = 'iweb-music-player';
+const STORE_NAME = 'settings';
+const HANDLE_KEY = 'directory-handle';
+const TRACKS_KEY = 'tracks-list';
+const FAVORITES_KEY = 'favorites-list';
+const PLAYLISTS_KEY = 'playlists-data';
+const LAST_PLAYED_KEY = 'last-played-state';
+
+function isSupportedAudio(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  return SUPPORTED_FORMATS.includes(ext);
+}
+
+function getDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export default function Music({ showModal: propShowModal, setShowModal: propSetShowModal }) {
+  // --- React State ---
+  const [library, setLibrary] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [playlists, setPlaylists] = useState({});
+  const [activeView, setActiveView] = useState('home'); // 'home', 'search', 'playlist'
+  const [currentPlaylistId, setCurrentPlaylistId] = useState('all'); // 'all', 'favorites', custom playlist name
+  
+  // Navigation History
+  const [history, setHistory] = useState([{ view: 'home', playlistId: null }]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Directory and status
+  const [dirHandle, setDirHandle] = useState(null);
+  const [statusText, setStatusText] = useState('No folder loaded.');
+  
+  // Playback State
+  const [currentTrack, setCurrentTrack] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [isRepeat, setIsRepeat] = useState('off'); // 'off', 'one', 'all'
+  const [outputDevice, setOutputDevice] = useState('speakers'); // speakers, buds, headphones
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // UI state
+  const [localShowModal, setLocalShowModal] = useState(false);
+  const showModal = propShowModal !== undefined ? propShowModal : localShowModal;
+  const setShowModal = propSetShowModal !== undefined ? propSetShowModal : setLocalShowModal;
+  const [islandState, setIslandState] = useState('collapsed'); // 'collapsed', 'hovered', 'expanded'
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+  const [contextMenuTrackId, setContextMenuTrackId] = useState(null);
+  const [contextMenuPlaylistKey, setContextMenuPlaylistKey] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // --- Refs for continuous playback and objects ---
+  const soundRef = useRef(null);
+  const playlistRef = useRef([]);
+  const currentIndexRef = useRef(-1);
+  const progressIntervalRef = useRef(null);
+
+  // Sync state reference to playlistRef
+  useEffect(() => {
+    playlistRef.current = getPlaylistTracks(currentPlaylistId);
+  }, [currentPlaylistId, library, favorites, playlists]);
+
+  // Load playlists & tracks from DB on startup
+  useEffect(() => {
+    initDatabase();
+    checkAudioOutputDevice();
+    
+    // Set Howler global volume
+    Howler.volume(volume / 100);
+
+    return () => {
+      stopProgressTimer();
+      if (soundRef.current) {
+        soundRef.current.unload();
+      }
+    };
+  }, []);
+
+  const initDatabase = async () => {
+    try {
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+
+      const tracksReq = store.get(TRACKS_KEY);
+      const favsReq = store.get(FAVORITES_KEY);
+      const playlistsReq = store.get(PLAYLISTS_KEY);
+      const handleReq = store.get(HANDLE_KEY);
+      const playbackReq = store.get(LAST_PLAYED_KEY);
+
+      const tracks = await new Promise(r => tracksReq.onsuccess = () => r(tracksReq.result || []));
+      const favs = await new Promise(r => favsReq.onsuccess = () => r(favsReq.result || []));
+      const pl = await new Promise(r => playlistsReq.onsuccess = () => r(playlistsReq.result || {}));
+      const handle = await new Promise(r => handleReq.onsuccess = () => r(handleReq.result || null));
+      const playback = await new Promise(r => playbackReq.onsuccess = () => r(playbackReq.result || null));
+
+      setFavorites(favs);
+      setPlaylists(pl);
+      setDirHandle(handle);
+
+      const convertedTracks = tracks.map(t => {
+        let artwork = defaultArtwork;
+        if (t.artworkBlob) {
+          artwork = URL.createObjectURL(t.artworkBlob);
+        }
+        return {
+          ...t,
+          artwork,
+          file: null
+        };
+      });
+
+      setLibrary(convertedTracks);
+
+      if (convertedTracks.length > 0) {
+        setStatusText('Library loaded. Click play or Rescan to connect files.');
+      }
+
+      // Try silent auto-reconnect if handle exists and permissions are granted
+      if (handle) {
+        try {
+          const modeOpt = { mode: 'read' };
+          const hasPermission = await handle.queryPermission(modeOpt) === 'granted';
+          if (hasPermission) {
+            reconnectFiles(handle, convertedTracks);
+          }
+        } catch (e) {
+          console.error("Silent auto-reconnect failed:", e);
+        }
+      }
+
+      // Restore last playback state
+      if (playback && convertedTracks.length > 0) {
+        const lastIdx = convertedTracks.findIndex(t => t.id === playback.trackId);
+        if (lastIdx >= 0) {
+          currentIndexRef.current = lastIdx;
+          const track = convertedTracks[lastIdx];
+          setCurrentTrack(track);
+          setElapsed(playback.seekTime);
+          setDuration(track.duration);
+        }
+      }
+    } catch (e) {
+      console.error("Startup DB load failed:", e);
+    }
+  };
+
+  const reconnectFiles = async (handle, currentLibrary) => {
+    try {
+      const filesList = await scanDirectoryRecursive(handle);
+      const fileMap = new Map(filesList.map(f => [f.path, f.file]));
+      
+      const updated = currentLibrary.map(track => {
+        if (fileMap.has(track.path)) {
+          track.file = fileMap.get(track.path);
+        }
+        return track;
+      });
+
+      setLibrary(updated);
+      setStatusText(`Library connected (${updated.length} tracks).`);
+      return true;
+    } catch (err) {
+      console.error("File reconnection failed:", err);
+      return false;
+    }
+  };
+
+  const ensureFilesConnected = async () => {
+    if (library.length === 0) return false;
+    const connected = library.some(t => t.file !== null);
+    if (connected) return true;
+
+    if (!dirHandle) {
+      alert("Please open the Music Library and select a folder first.");
+      return false;
+    }
+
+    try {
+      const permission = await dirHandle.requestPermission({ mode: 'read' });
+      if (permission === 'granted') {
+        setStatusText("Connecting files...");
+        const ok = await reconnectFiles(dirHandle, library);
+        return ok;
+      }
+    } catch (err) {
+      console.error("Permission request error:", err);
+    }
+    alert("Folder access permission denied. Please grant permission to play local tracks.");
+    return false;
+  };
+
+  const scanDirectoryRecursive = async (handle, path = '') => {
+    let list = [];
+    for await (const entry of handle.values()) {
+      if (entry.kind === 'file') {
+        if (isSupportedAudio(entry.name)) {
+          try {
+            const file = await entry.getFile();
+            list.push({
+              file,
+              path: path ? `${path}/${entry.name}` : entry.name
+            });
+          } catch (e) {
+            console.error("Failed to read file:", entry.name, e);
+          }
+        }
+      } else if (entry.kind === 'directory') {
+        const sub = await scanDirectoryRecursive(entry, path ? `${path}/${entry.name}` : entry.name);
+        list.push(...sub);
+      }
+    }
+    return list;
+  };
+
+  const extractMetadata = async (fileObj) => {
+    const file = fileObj.file;
+    let title = file.name;
+    let artist = 'Unknown Artist';
+    let album = 'Unknown Album';
+    let duration = 0;
+    let artwork = defaultArtwork;
+    let artworkBlob = null;
+
+    try {
+      const metadata = await musicMetadata.parseBlob(file);
+      if (metadata.common) {
+        if (metadata.common.title) title = metadata.common.title;
+        if (metadata.common.artist) artist = metadata.common.artist;
+        if (metadata.common.album) album = metadata.common.album;
+        
+        if (metadata.common.picture && metadata.common.picture.length > 0) {
+          const pic = metadata.common.picture[0];
+          artworkBlob = new Blob([pic.data], { type: pic.format });
+          artwork = URL.createObjectURL(artworkBlob);
+        }
+      }
+      if (metadata.format && metadata.format.duration) {
+        duration = metadata.format.duration;
+      }
+    } catch (err) {
+      console.error('Metadata parsing error:', file.name, err);
+    }
+
+    return {
+      id: `${file.name}-${file.size}`,
+      file,
+      path: fileObj.path,
+      title,
+      artist,
+      album,
+      duration,
+      artwork,
+      artworkBlob
+    };
+  };
+
+  const handleSelectFolder = async () => {
+    try {
+      setStatusText("Selecting folder...");
+      let filesList = [];
+      let handle = null;
+
+      if ('showDirectoryPicker' in window) {
+        handle = await window.showDirectoryPicker();
+        const db = await getDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(handle, HANDLE_KEY);
+        setDirHandle(handle);
+        filesList = await scanDirectoryRecursive(handle);
+      } else {
+        // browser-fs-access fallback
+        const files = await directoryOpen({ recursive: true });
+        filesList = files.filter(f => isSupportedAudio(f.name)).map(f => ({
+          file: f,
+          path: f.webkitRelativePath || f.name
+        }));
+      }
+
+      setStatusText(`Scanning ${filesList.length} files...`);
+
+      const newLibrary = [];
+      for (const fileObj of filesList) {
+        const track = await extractMetadata(fileObj);
+        newLibrary.push(track);
+      }
+
+      setLibrary(newLibrary);
+      playlistRef.current = newLibrary;
+      setCurrentPlaylistId('all');
+
+      // Save to IndexedDB
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const serialized = newLibrary.map(t => ({
+        id: t.id,
+        path: t.path,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        duration: t.duration,
+        artworkBlob: t.artworkBlob
+      }));
+      store.put(serialized, TRACKS_KEY);
+
+      setStatusText(`Loaded ${newLibrary.length} tracks.`);
+    } catch (e) {
+      console.error("Folder scan error:", e);
+      setStatusText("Folder selection failed.");
+    }
+  };
+
+  const handleRescan = async () => {
+    if (!dirHandle) {
+      alert("No directory loaded. Please select a folder first.");
+      return;
+    }
+    try {
+      setStatusText("Verifying permission...");
+      const permission = await dirHandle.requestPermission({ mode: 'read' });
+      if (permission !== 'granted') {
+        alert("Permission denied to folder.");
+        return;
+      }
+
+      setStatusText("Scanning directory...");
+      const filesList = await scanDirectoryRecursive(dirHandle);
+      setStatusText(`Comparing ${filesList.length} files...`);
+
+      const existingMap = new Map(library.map(t => [t.path, t]));
+      const updatedLibrary = [];
+
+      for (const fileObj of filesList) {
+        const existing = existingMap.get(fileObj.path);
+        if (existing) {
+          existing.file = fileObj.file;
+          updatedLibrary.push(existing);
+          existingMap.delete(fileObj.path);
+        } else {
+          const track = await extractMetadata(fileObj);
+          updatedLibrary.push(track);
+        }
+      }
+
+      setLibrary(updatedLibrary);
+      
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const serialized = updatedLibrary.map(t => ({
+        id: t.id,
+        path: t.path,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        duration: t.duration,
+        artworkBlob: t.artworkBlob
+      }));
+      store.put(serialized, TRACKS_KEY);
+
+      setStatusText(`Library updated. Total tracks: ${updatedLibrary.length}.`);
+    } catch (err) {
+      console.error("Rescan failed:", err);
+      setStatusText("Rescan failed.");
+    }
+  };
+
+  // --- Playback Controls ---
+  const playTrack = async (index, playlistTracks = playlistRef.current) => {
+    if (playlistTracks.length === 0) return;
+    let idx = index;
+    if (idx < 0) idx = 0;
+    if (idx >= playlistTracks.length) idx = playlistTracks.length - 1;
+
+    const connected = await ensureFilesConnected();
+    if (!connected) return;
+
+    if (soundRef.current) {
+      soundRef.current.unload();
+    }
+
+    currentIndexRef.current = idx;
+    const track = playlistTracks[idx];
+    setCurrentTrack(track);
+
+    if (!track.file) {
+      console.warn("Track file not found.");
+      return;
+    }
+
+    const objectURL = URL.createObjectURL(track.file);
+    const ext = track.file.name.split('.').pop().toLowerCase();
+
+    const newSound = new Howl({
+      src: [objectURL],
+      format: [ext],
+      html5: false,
+      volume: 0, // Fade-in
+      onload: () => {
+        setDuration(newSound.duration());
+      },
+      onplay: () => {
+        setIsPlaying(true);
+        startProgressTimer();
+        newSound.fade(newSound.volume(), isMuted ? 0 : volume / 100, 600);
+      },
+      onpause: () => {
+        setIsPlaying(false);
+        stopProgressTimer();
+      },
+      onstop: () => {
+        setIsPlaying(false);
+        stopProgressTimer();
+      },
+      onend: () => {
+        handleTrackEnd();
+      }
+    });
+
+    soundRef.current = newSound;
+    newSound.play();
+  };
+
+  const handlePlayPause = () => {
+    const sound = soundRef.current;
+    if (sound) {
+      if (sound.playing()) {
+        const currentVol = sound.volume();
+        sound.fade(currentVol, 0, 300);
+        sound.once('fade', () => {
+          if (sound.volume() === 0) {
+            sound.pause();
+          }
+        });
+        
+        // Save state on pause
+        savePlaybackState(currentTrack.id, sound.seek() || 0);
+      } else {
+        sound.off('fade');
+        sound.play();
+      }
+    } else if (playlistRef.current.length > 0) {
+      const idx = currentIndexRef.current >= 0 ? currentIndexRef.current : 0;
+      playTrack(idx);
+    }
+  };
+
+  const handleNext = () => {
+    const list = playlistRef.current;
+    if (list.length === 0) return;
+
+    if (isShuffle) {
+      const rand = Math.floor(Math.random() * list.length);
+      playTrack(rand);
+    } else {
+      let nextIdx = currentIndexRef.current + 1;
+      if (nextIdx >= list.length) {
+        nextIdx = isRepeat === 'all' ? 0 : list.length - 1;
+      }
+      playTrack(nextIdx);
+    }
+  };
+
+  const handlePrev = () => {
+    const list = playlistRef.current;
+    if (list.length === 0) return;
+
+    let prevIdx = currentIndexRef.current - 1;
+    if (prevIdx < 0) {
+      prevIdx = isRepeat === 'all' ? list.length - 1 : 0;
+    }
+    playTrack(prevIdx);
+  };
+
+  const handleTrackEnd = () => {
+    if (isRepeat === 'one') {
+      playTrack(currentIndexRef.current);
+    } else {
+      handleNext();
+    }
+  };
+
+  const handleSeek = (pct) => {
+    const sound = soundRef.current;
+    if (sound && sound.state() === 'loaded') {
+      const target = sound.duration() * pct;
+      sound.seek(target);
+      setElapsed(target);
+      savePlaybackState(currentTrack.id, target);
+    }
+  };
+
+  const savePlaybackState = async (trackId, seekTime) => {
+    try {
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put({ trackId, seekTime }, LAST_PLAYED_KEY);
+    } catch (e) {
+      console.error("Failed to save playback state:", e);
+    }
+  };
+
+  const startProgressTimer = () => {
+    stopProgressTimer();
+    let lastSave = Date.now();
+    progressIntervalRef.current = setInterval(() => {
+      const sound = soundRef.current;
+      if (sound && sound.playing() && !isDragging) {
+        const seek = sound.seek() || 0;
+        setElapsed(seek);
+        
+        // Save state every 10 seconds during playback
+        const now = Date.now();
+        if (now - lastSave >= 10000) {
+          savePlaybackState(currentTrack.id, seek);
+          lastSave = now;
+        }
+      }
+    }, 250);
+  };
+
+  const stopProgressTimer = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  };
+
+  const handleVolumeChange = (e) => {
+    const val = parseInt(e.target.value, 10);
+    setVolume(val);
+    if (soundRef.current) {
+      soundRef.current.volume(isMuted ? 0 : val / 100);
+    }
+    Howler.volume(isMuted ? 0 : val / 100);
+  };
+
+  const handleToggleMute = () => {
+    const nextMute = !isMuted;
+    setIsMuted(nextMute);
+    const targetVol = nextMute ? 0 : volume / 100;
+    if (soundRef.current) {
+      soundRef.current.volume(targetVol);
+    }
+    Howler.volume(targetVol);
+  };
+
+  const checkAudioOutputDevice = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputs = devices.filter(d => d.kind === 'audiooutput');
+      
+      let type = 'speakers';
+      for (const d of outputs) {
+        const label = d.label.toLowerCase();
+        if (label.includes('headphone') || label.includes('headset') || label.includes('wired')) {
+          type = 'headphones';
+        }
+        if (label.includes('buds') || label.includes('airpods') || label.includes('bluetooth') || label.includes('wireless')) {
+          type = 'buds';
+        }
+      }
+      setOutputDevice(type);
+    } catch (e) {
+      setOutputDevice('speakers');
+    }
+  };
+
+  const getPlaylistTracks = (playlistId) => {
+    if (playlistId === 'all') return library;
+    if (playlistId === 'favorites') {
+      return library.filter(t => favorites.includes(t.id));
+    }
+    const ids = playlists[playlistId] || [];
+    return library.filter(t => ids.includes(t.id));
+  };
+
+  // --- View Actions ---
+  const applyView = (view, playlistId) => {
+    setActiveView(view);
+    setCurrentPlaylistId(playlistId);
+  };
+
+  const handleNavigateTo = (view, playlistId) => {
+    // Truncate history forward
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push({ view, playlistId });
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    applyView(view, playlistId);
+  };
+
+  const handleGoBack = () => {
+    if (historyIndex > 0) {
+      const nextIdx = historyIndex - 1;
+      setHistoryIndex(nextIdx);
+      const state = history[nextIdx];
+      applyView(state.view, state.playlistId);
+    }
+  };
+
+  const handleGoForward = () => {
+    if (historyIndex < history.length - 1) {
+      const nextIdx = historyIndex + 1;
+      setHistoryIndex(nextIdx);
+      const state = history[nextIdx];
+      applyView(state.view, state.playlistId);
+    }
+  };
+
+  const handleCreatePlaylist = async () => {
+    const name = prompt("Enter a name for your new playlist:");
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    if (playlists[trimmed]) {
+      alert("A playlist with that name already exists.");
+      return;
+    }
+
+    const updated = { ...playlists, [trimmed]: [] };
+    setPlaylists(updated);
+    
+    // Save to DB
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(updated, PLAYLISTS_KEY);
+
+    handleNavigateTo('playlist', trimmed);
+  };
+
+  const handleDeletePlaylist = async (e, name) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete the playlist "${name}"?`)) {
+      const updated = { ...playlists };
+      delete updated[name];
+      setPlaylists(updated);
+
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(updated, PLAYLISTS_KEY);
+
+      if (currentPlaylistId === name) {
+        handleNavigateTo('home');
+      }
+    }
+  };
+
+  const toggleFavoriteTrack = async (e, trackId) => {
+    e.stopPropagation();
+    let updated;
+    const idx = favorites.indexOf(trackId);
+    if (idx >= 0) {
+      updated = favorites.filter(id => id !== trackId);
+    } else {
+      updated = [...favorites, trackId];
+    }
+
+    setFavorites(updated);
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(updated, FAVORITES_KEY);
+  };
+
+  const showPlaylistContextMenu = (e, trackId, playlistKey) => {
+    e.stopPropagation();
+    setContextMenuTrackId(trackId);
+    setContextMenuPlaylistKey(playlistKey);
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    setShowContextMenu(true);
+  };
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const hide = () => setShowContextMenu(false);
+    if (showContextMenu) {
+      window.addEventListener('click', hide);
+    }
+    return () => window.removeEventListener('click', hide);
+  }, [showContextMenu]);
+
+  const handleAddTrackToPlaylist = async (playlistName) => {
+    if (!contextMenuTrackId) return;
+    const pTracks = playlists[playlistName] || [];
+    if (pTracks.includes(contextMenuTrackId)) {
+      alert(`Song is already in playlist "${playlistName}"`);
+      return;
+    }
+
+    const updatedPlaylists = {
+      ...playlists,
+      [playlistName]: [...pTracks, contextMenuTrackId]
+    };
+
+    setPlaylists(updatedPlaylists);
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(updatedPlaylists, PLAYLISTS_KEY);
+    alert(`Added to playlist "${playlistName}"`);
+  };
+
+  const handleRemoveTrackFromPlaylist = async () => {
+    if (!contextMenuTrackId || !contextMenuPlaylistKey) return;
+    
+    if (contextMenuPlaylistKey === 'favorites') {
+      const updated = favorites.filter(id => id !== contextMenuTrackId);
+      setFavorites(updated);
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(updated, FAVORITES_KEY);
+    } else {
+      const pTracks = playlists[contextMenuPlaylistKey] || [];
+      const updatedList = pTracks.filter(id => id !== contextMenuTrackId);
+      const updatedPlaylists = {
+        ...playlists,
+        [contextMenuPlaylistKey]: updatedList
+      };
+      setPlaylists(updatedPlaylists);
+
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(updatedPlaylists, PLAYLISTS_KEY);
+    }
+  };
+
+  // Format MM:SS
+  const formatSecs = (secs) => {
+    if (isNaN(secs) || secs === null) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const handlePlayAll = (shuffle = false) => {
+    const list = getPlaylistTracks(currentPlaylistId);
+    if (list.length === 0) return;
+
+    playlistRef.current = list;
+    setIsShuffle(shuffle);
+
+    if (shuffle) {
+      const rand = Math.floor(Math.random() * list.length);
+      playTrack(rand, list);
+    } else {
+      playTrack(0, list);
+    }
+  };
+
+  // Filtered search tracks
+  const getFilteredSearchTracks = () => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return [];
+    return library.filter(t => {
+      return (t.title || '').toLowerCase().includes(query) ||
+             (t.artist || '').toLowerCase().includes(query) ||
+             (t.album || '').toLowerCase().includes(query);
+    });
+  };
+
+  // Dynamic Island toggles
+  const handleIslandClick = (e) => {
+    // If user clicked inside control rows, ignore card toggle
+    if (e.target.closest('.expanded-control-btn') || e.target.closest('.expanded-slider')) {
+      return;
+    }
+    
+    const isArtwork = e.target.classList.contains('island-art') || e.target.classList.contains('island-art-large');
+    const isText = e.target.id === 'island-hovered-title' || e.target.id === 'island-expanded-title' || e.target.classList.contains('island-title') || e.target.classList.contains('expanded-title');
+    
+    if (islandState === 'expanded') {
+      if (isArtwork || isText) {
+        setShowModal(true);
+      } else {
+        setIslandState('collapsed');
+      }
+    } else if (islandState === 'collapsed') {
+      if (isArtwork) {
+        handlePlayPause();
+      } else {
+        setIslandState('expanded');
+      }
+    } else { // hovered
+      if (isArtwork || isText) {
+        setShowModal(true);
+      } else {
+        setIslandState('expanded');
+      }
+    }
+  };
+
+  // --- Output Device Render Helper ---
+  const renderDeviceIcon = () => {
+    if (outputDevice === 'buds') {
+      return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15.5c-1.38 0-2.5-1.12-2.5-2.5V13c0-1.1.9-2 2-2h1V7.5c0-1.38-1.12-2.5-2.5-2.5S6.5 6.12 6.5 7.5c0 .28-.22.5-.5.5s-.5-.22-.5-.5C5.5 5.01 7.51 3 10 3s4.5 2.01 4.5 4.5V11h1c1.1 0 2 .9 2 2v2c0 1.38-1.12 2.5-2.5 2.5h-1c-.28 0-.5-.22-.5-.5V13c0-.28-.22-.5-.5-.5h-2c-.28 0-.5.22-.5.5v4c0 .28-.22.5-.5.5h-1z"/></svg>;
+    }
+    if (outputDevice === 'headphones') {
+      return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>;
+    }
+    return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/></svg>;
+  };
+
+  const activeTrack = currentTrack || (library.length > 0 ? library[0] : null);
+
+  return (
+    <>
+      {/* ── Apple-Style Dynamic Island Music Player ── */}
+      {library.length > 0 && (
+        <div 
+          className={`dynamic-island-container active`} 
+          id="dynamic-island"
+          onMouseEnter={() => { if (islandState === 'collapsed') setIslandState('hovered'); }}
+          onMouseLeave={() => { if (islandState === 'hovered') setIslandState('collapsed'); }}
+        >
+          <div 
+            className={`dynamic-island-pill ${islandState}`} 
+            id="island-pill"
+            onClick={handleIslandClick}
+          >
+            {/* 1. Collapsed State Content */}
+            {islandState === 'collapsed' && activeTrack && (
+              <div className="island-collapsed-content">
+                <img 
+                  className="island-art" 
+                  id="island-collapsed-art"
+                  src={activeTrack.artwork} 
+                  alt="Artwork" 
+                  title="Click to open Library"
+                />
+                <span className="island-elapsed-time" id="island-collapsed-elapsed">
+                  {formatSecs(elapsed)}
+                </span>
+                <div className={`island-waveform ${isPlaying ? 'playing' : ''}`} id="island-collapsed-waveform">
+                  <span className="wave-bar"></span>
+                  <span className="wave-bar"></span>
+                  <span className="wave-bar"></span>
+                  <span className="wave-bar"></span>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Hovered State Content */}
+            {islandState === 'hovered' && activeTrack && (
+              <div className="island-hovered-content">
+                <img 
+                  className="island-art" 
+                  id="island-hovered-art"
+                  src={activeTrack.artwork} 
+                  alt="Artwork" 
+                  title="Click to open Library"
+                />
+                <div className="island-info">
+                  <span className="island-title" id="island-hovered-title">
+                    {activeTrack.title}
+                  </span>
+                  <span className="island-artist" id="island-hovered-artist">
+                    {activeTrack.artist}
+                  </span>
+                </div>
+                <div className={`island-waveform ${isPlaying ? 'playing' : ''}`} id="island-hovered-waveform">
+                  <span className="wave-bar"></span>
+                  <span className="wave-bar"></span>
+                  <span className="wave-bar"></span>
+                  <span className="wave-bar"></span>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Clicked/Expanded State Content */}
+            {islandState === 'expanded' && activeTrack && (
+              <div className="island-expanded-content">
+                <div className="expanded-top-row">
+                  <img 
+                    className="island-art-large" 
+                    id="island-expanded-art"
+                    src={activeTrack.artwork} 
+                    alt="Artwork" 
+                    title="Click to open Library"
+                  />
+                  <div className="expanded-info">
+                    <span className="expanded-title" id="island-expanded-title">
+                      {activeTrack.title}
+                    </span>
+                    <span className="expanded-artist" id="island-expanded-artist">
+                      {activeTrack.artist}
+                    </span>
+                  </div>
+                  <div className={`expanded-waveform ${isPlaying ? 'playing' : ''}`} id="island-expanded-waveform">
+                    <span className="wave-bar"></span>
+                    <span className="wave-bar"></span>
+                    <span className="wave-bar"></span>
+                    <span className="wave-bar"></span>
+                    <span className="wave-bar"></span>
+                  </div>
+                </div>
+                <div className="expanded-progress-row">
+                  <span className="expanded-time-elapsed" id="island-expanded-elapsed">
+                    {formatSecs(elapsed)}
+                  </span>
+                  <div className="slider-wrapper">
+                    <input 
+                      type="range" 
+                      className="expanded-slider"
+                      id="island-expanded-progress" 
+                      min="0" 
+                      max="100" 
+                      value={duration > 0 ? (elapsed / duration) * 100 : 0}
+                      step="0.1"
+                      onChange={(e) => handleSeek(parseFloat(e.target.value) / 100)}
+                      onMouseDown={() => setIsDragging(true)}
+                      onMouseUp={() => setIsDragging(false)}
+                      style={{
+                        background: `linear-gradient(to right, rgb(255, 255, 255) 0%, rgb(255, 255, 255) ${duration > 0 ? (elapsed / duration) * 100 : 0}%, rgba(255, 255, 255, 0.16) ${duration > 0 ? (elapsed / duration) * 100 : 0}%, rgba(255, 255, 255, 0.16) 100%)`
+                      }}
+                    />
+                  </div>
+                  <span className="expanded-time-remaining" id="island-expanded-remaining">
+                    -{formatSecs(duration - elapsed)}
+                  </span>
+                </div>
+                <div className="expanded-controls-row">
+                  <div className="controls-spacer"></div>
+
+                  <div className="controls-center">
+                    <button className="expanded-control-btn btn-prev" title="Previous" onClick={handlePrev}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 18V6l-8.5 6 8.5 6zm8.5 0V6L12 12l8.5 6z" />
+                      </svg>
+                    </button>
+                    <button className="expanded-control-btn btn-play" title="Play/Pause" onClick={handlePlayPause}>
+                      {isPlaying ? (
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                        </svg>
+                      ) : (
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      )}
+                    </button>
+                    <button className="expanded-control-btn btn-next" title="Next" onClick={handleNext}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 6v12l8.5-6L12 6zM3.5 6v12L12 12 3.5 6z" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <button className="expanded-control-btn btn-output" title="Output Audio Source" onClick={checkAudioOutputDevice}>
+                    {renderDeviceIcon()}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* ── Music Player Library Modal ── */}
+      <div 
+        id="music-player-modal" 
+        className="remove-bg-window"
+        style={{ display: showModal ? 'block' : 'none' }}
+      >
+        <div className="remove-bg-content music-overhaul-modal">
+          {/* macOS window dots */}
+          <div className="window-controls">
+            <span className="window-dot dot-close" onClick={() => setShowModal(false)}></span>
+            <span className="window-dot dot-minimize"></span>
+            <span className="window-dot dot-maximize"></span>
+          </div>
+          <div className="music-app-layout">
+            {/* Left Sidebar */}
+            <aside className="music-sidebar">
+              <nav className="sidebar-nav">
+                <div 
+                  className={`nav-item ${activeView === 'home' ? 'active' : ''}`}
+                  onClick={() => handleNavigateTo('home')}
+                >
+                  <svg className="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                  </svg>
+                  <span>Home</span>
+                </div>
+                <div 
+                  className={`nav-item ${activeView === 'search' ? 'active' : ''}`}
+                  onClick={() => handleNavigateTo('search')}
+                >
+                  <svg className="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <span>Search</span>
+                </div>
+              </nav>
+
+              <div className="sidebar-section">
+                <div className="section-header">
+                  <span>Your Library</span>
+                  <div className="section-actions">
+                    <button className="section-btn" id="playlist-create-btn" title="Create Playlist" onClick={handleCreatePlaylist}>
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <ul className="sidebar-playlist-list" id="sidebar-playlists">
+                  <li 
+                    className={`playlist-item ${currentPlaylistId === 'favorites' && activeView === 'playlist' ? 'active' : ''}`}
+                    onClick={() => handleNavigateTo('playlist', 'favorites')}
+                  >
+                    <span className="playlist-color-box fav-box">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      </svg>
+                    </span>
+                    <div className="playlist-info">
+                      <span className="playlist-name">Favorites</span>
+                      <span className="playlist-desc">Playlist • You</span>
+                    </div>
+                  </li>
+
+                  {Object.keys(playlists).map((name) => (
+                    <li 
+                      key={name}
+                      className={`playlist-item ${currentPlaylistId === name && activeView === 'playlist' ? 'active' : ''}`}
+                      onClick={() => handleNavigateTo('playlist', name)}
+                    >
+                      <span className="playlist-color-box custom-box">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                          <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/>
+                        </svg>
+                      </span>
+                      <div className="playlist-info">
+                        <span className="playlist-name">{name}</span>
+                        <span className="playlist-desc">Playlist • You</span>
+                      </div>
+                      <button 
+                        className="playlist-item-delete" 
+                        title="Delete Playlist"
+                        onClick={(e) => handleDeletePlaylist(e, name)}
+                      >
+                        &times;
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="music-main-content">
+              <header className="main-header">
+                <div className="header-navigation">
+                  <button className="nav-arrow" title="Go back" onClick={handleGoBack} disabled={historyIndex <= 0}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                      <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                    </svg>
+                  </button>
+                  <button className="nav-arrow" title="Go forward" onClick={handleGoForward} disabled={historyIndex >= history.length - 1}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                      <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                    </svg>
+                  </button>
+                  <span className="header-title" id="current-view-title">
+                    {activeView === 'home' ? 'Home' : activeView === 'search' ? 'Search' : currentPlaylistId === 'favorites' ? 'Favorites' : currentPlaylistId === 'all' ? 'All Songs' : currentPlaylistId}
+                  </span>
+                </div>
+
+                <div className="header-folder-actions">
+                  <button id="music-modal-select-folder" className="header-action-btn" onClick={handleSelectFolder}>
+                    Select Folder
+                  </button>
+                  {dirHandle && (
+                    <button id="music-modal-rescan" className="header-action-btn" onClick={handleRescan}>
+                      Rescan
+                    </button>
+                  )}
+                  <span id="music-modal-status" className="header-status-text">
+                    {statusText}
+                  </span>
+                </div>
+              </header>
+
+              <div className="music-views-container">
+                {/* 1. Home View */}
+                {activeView === 'home' && (
+                  <div className="music-view active" id="view-home">
+                    <h2 className="view-section-title">Library Overview</h2>
+                    <div className="home-grid">
+                      <div className="home-card" id="card-all-songs" onClick={() => handleNavigateTo('playlist', 'all')}>
+                        <div className="card-artwork-placeholder gradient-all">
+                          <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                          </svg>
+                        </div>
+                        <h3>All Songs</h3>
+                        <p>Everything in your library ({library.length})</p>
+                      </div>
+                      <div className="home-card" id="card-favorites" onClick={() => handleNavigateTo('playlist', 'favorites')}>
+                        <div className="card-artwork-placeholder gradient-fav">
+                          <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                          </svg>
+                        </div>
+                        <h3>Favorites</h3>
+                        <p>Songs you marked as favorite ({library.filter(t => favorites.includes(t.id)).length})</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Search View */}
+                {activeView === 'search' && (
+                  <div className="music-view active" id="view-search">
+                    <div className="search-input-wrapper">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
+                      <input 
+                        type="text" 
+                        id="music-search-field"
+                        placeholder="Search for songs, artists, or albums..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <div className="search-results-section">
+                      <h2 className="view-section-title" id="search-results-header">
+                        {searchQuery ? `Search results (${getFilteredSearchTracks().length})` : 'Start searching'}
+                      </h2>
+                      <div className="music-track-list search-results-list">
+                        {getFilteredSearchTracks().map((track) => {
+                          const idxInLib = library.findIndex(t => t.id === track.id);
+                          const isFav = favorites.includes(track.id);
+                          return (
+                            <div 
+                              key={track.id} 
+                              className={`track-row ${currentTrack && currentTrack.id === track.id ? 'active-track' : ''}`}
+                              onClick={() => {
+                                playTrack(idxInLib, library);
+                              }}
+                              style={{
+                                background: 'rgba(255,255,255,0.04)',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '8px'
+                              }}
+                            >
+                              <div className="track-row-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <img 
+                                  className="track-row-art" 
+                                  src={track.artwork} 
+                                  style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }}
+                                  onError={(e) => e.target.src = defaultArtwork}
+                                />
+                                <div className="track-row-details" style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span className="track-row-title" style={{ color: '#fff', fontWeight: '500' }}>{track.title}</span>
+                                  <span className="track-row-artist-album" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+                                    {track.artist} • {track.album}
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
+                                <button 
+                                  className={`btn-row-action btn-fav ${isFav ? 'heart-active' : ''}`} 
+                                  title="Favorite"
+                                  onClick={(e) => toggleFavoriteTrack(e, track.id)}
+                                >
+                                  <svg viewBox="0 0 24 24" width="16" height="16" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                  </svg>
+                                </button>
+                                <button className="btn-row-action btn-more" title="Add to Playlist" onClick={(e) => showPlaylistContextMenu(e, track.id, 'all')}>
+                                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                  </svg>
+                                </button>
+                                <span className="track-row-duration" style={{ marginLeft: '10px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
+                                  {formatSecs(track.duration)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Playlist / Album View */}
+                {activeView === 'playlist' && (
+                  <div className="music-view active" id="view-playlist">
+                    <div className="playlist-header-block">
+                      <img 
+                        className="playlist-cover-art" 
+                        id="playlist-view-cover"
+                        src={getPlaylistTracks(currentPlaylistId).length > 0 ? getPlaylistTracks(currentPlaylistId)[0].artwork : defaultArtwork}
+                        style={{
+                          background: currentPlaylistId === 'favorites' ? 'linear-gradient(135deg, #ff2a5f, #ff7e5f)' : 'transparent'
+                        }}
+                        alt="Cover"
+                      />
+                      <div className="playlist-metadata-details">
+                        <span className="playlist-category" id="playlist-view-category">
+                          {currentPlaylistId === 'favorites' ? 'Playlist' : 'Collection'}
+                        </span>
+                        <h1 className="playlist-title-large" id="playlist-view-title">
+                          {currentPlaylistId === 'favorites' ? 'Favorites' : currentPlaylistId === 'all' ? 'All Songs' : currentPlaylistId}
+                        </h1>
+                        <div className="playlist-creator-row">
+                          <span className="playlist-creator-name" id="playlist-view-artist">
+                            {currentPlaylistId === 'favorites' ? 'You' : 'Various Artists'}
+                          </span>
+                          <span className="bullet-sep">•</span>
+                          <span className="playlist-release-year" id="playlist-view-year">2026</span>
+                        </div>
+                        <div className="playlist-stats" id="playlist-view-stats">
+                          {getPlaylistTracks(currentPlaylistId).length} songs
+                        </div>
+
+                        <p className="playlist-description" id="playlist-view-desc">
+                          {currentPlaylistId === 'favorites' 
+                            ? 'Your absolute favorites, collected in one place. Press Play to listen.'
+                            : 'Explore and listen to tracks loaded directly from your folder structure.'}
+                        </p>
+
+                        <div className="playlist-actions-row">
+                          <button className="playlist-pill-btn btn-play-all" id="playlist-play-btn" onClick={() => handlePlayAll(false)}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                            <span>Play</span>
+                          </button>
+                          <button className="playlist-pill-btn btn-shuffle-all" id="playlist-shuffle-btn" onClick={() => handlePlayAll(true)}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.54 5.46 20 18 7.46l2.04 2.04V4h-5.54zm.35 11.06l-1.41 1.41L18 20l5.54-5.54-1.41-1.41-4.13 4.13-3.14-3.12z" />
+                            </svg>
+                            <span>Shuffle</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="tracks-table-container">
+                      <table className="tracks-table">
+                        <thead>
+                          <tr>
+                            <th className="col-index">#</th>
+                            <th className="col-title">Title</th>
+                            <th className="col-album">Album</th>
+                            <th className="col-actions"></th>
+                            <th className="col-duration">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="music-track-list" id="playlist-tracks-body">
+                          {getPlaylistTracks(currentPlaylistId).length === 0 ? (
+                            <tr>
+                              <td colSpan="5" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '40px' }}>
+                                No songs in this list.
+                              </td>
+                            </tr>
+                          ) : (
+                            getPlaylistTracks(currentPlaylistId).map((track, idx) => {
+                              const isFav = favorites.includes(track.id);
+                              const idxInLib = library.findIndex(t => t.id === track.id);
+                              const isActive = currentTrack && currentTrack.id === track.id;
+                              return (
+                                <tr 
+                                  key={track.id} 
+                                  className={isActive ? 'active-row' : ''}
+                                  onClick={() => playTrack(idxInLib, library)}
+                                >
+                                  <td className="col-index">{idx + 1}</td>
+                                  <td className="col-title">
+                                    <img className="table-track-art" src={track.artwork} onError={(e) => e.target.src = defaultArtwork} alt="" />
+                                    <div className="table-track-details">
+                                      <span className="table-track-title">{track.title}</span>
+                                      <span className="table-track-artist">{track.artist}</span>
+                                    </div>
+                                  </td>
+                                  <td className="col-album">{track.album}</td>
+                                  <td className="col-actions">
+                                    <button 
+                                      className={`btn-row-action btn-fav ${isFav ? 'heart-active' : ''}`} 
+                                      title="Favorite"
+                                      onClick={(e) => toggleFavoriteTrack(e, track.id)}
+                                    >
+                                      <svg viewBox="0 0 24 24" width="15" height="15" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                      </svg>
+                                    </button>
+                                    <button className="btn-row-action btn-more" title="Add to Playlist" onClick={(e) => showPlaylistContextMenu(e, track.id, currentPlaylistId)}>
+                                      <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                      </svg>
+                                    </button>
+                                  </td>
+                                  <td className="col-duration">{formatSecs(track.duration)}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </main>
+          </div>
+
+          {/* Bottom Playback Control Bar */}
+          <footer className="music-bottom-bar">
+            {/* Left: Active Track Details */}
+            <div className="bottom-active-track">
+              {activeTrack ? (
+                <>
+                  <img className="bottom-track-art" id="bottom-bar-art" src={activeTrack.artwork} onError={(e) => e.target.src = defaultArtwork} alt="" />
+                  <div className="bottom-track-info">
+                    <span className="bottom-track-title" id="bottom-bar-title">{activeTrack.title}</span>
+                    <span className="bottom-track-artist" id="bottom-bar-artist">{activeTrack.artist}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <img className="bottom-track-art" id="bottom-bar-art" src={defaultArtwork} alt="" />
+                  <div className="bottom-track-info">
+                    <span className="bottom-track-title" id="bottom-bar-title">No Track Selected</span>
+                    <span className="bottom-track-artist" id="bottom-bar-artist">Select a folder to start</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Center: Controls & Seek */}
+            <div className="bottom-playback-center">
+              <div className="bottom-controls-row">
+                <button 
+                  className={`bottom-control-btn ${isShuffle ? 'shuffle-active' : ''}`} 
+                  id="bottom-bar-shuffle" 
+                  title="Shuffle"
+                  onClick={() => setIsShuffle(!isShuffle)}
+                  style={{ color: isShuffle ? '#1db954' : 'inherit' }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.54 5.46 20 18 7.46l2.04 2.04V4h-5.54zm.35 11.06l-1.41 1.41L18 20l5.54-5.54-1.41-1.41-4.13 4.13-3.14-3.12z" />
+                  </svg>
+                </button>
+                <button className="bottom-control-btn" id="bottom-bar-prev" title="Previous" onClick={handlePrev}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                  </svg>
+                </button>
+                <button className="bottom-control-btn play-pause-btn" id="bottom-bar-play" title="Play/Pause" onClick={handlePlayPause}>
+                  {isPlaying ? (
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                </button>
+                <button className="bottom-control-btn" id="bottom-bar-next" title="Next" onClick={handleNext}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z" />
+                  </svg>
+                </button>
+                <button 
+                  className={`bottom-control-btn ${isRepeat !== 'off' ? 'repeat-active' : ''}`} 
+                  id="bottom-bar-repeat" 
+                  title={`Repeat: ${isRepeat}`}
+                  onClick={() => {
+                    const states = ['off', 'all', 'one'];
+                    const next = states[(states.indexOf(isRepeat) + 1) % states.length];
+                    setIsRepeat(next);
+                  }}
+                  style={{ color: isRepeat !== 'off' ? '#1db954' : 'inherit' }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+                  </svg>
+                  {isRepeat === 'one' && <span style={{ fontSize: '8px', position: 'absolute', top: '12px', left: '10px' }}>1</span>}
+                </button>
+              </div>
+
+              <div className="bottom-seek-row">
+                <span className="seek-time elapsed-time" id="bottom-bar-elapsed">
+                  {formatSecs(elapsed)}
+                </span>
+                <div className="seek-slider-wrapper">
+                  <input 
+                    type="range" 
+                    className="seek-slider" 
+                    id="bottom-bar-progress" 
+                    min="0" 
+                    max="100" 
+                    value={duration > 0 ? (elapsed / duration) * 100 : 0}
+                    step="0.1"
+                    onChange={(e) => handleSeek(parseFloat(e.target.value) / 100)}
+                    onMouseDown={() => setIsDragging(true)}
+                    onMouseUp={() => setIsDragging(false)}
+                    style={{
+                      background: `linear-gradient(to right, rgb(255, 255, 255) 0%, rgb(255, 255, 255) ${duration > 0 ? (elapsed / duration) * 100 : 0}%, rgba(255, 255, 255, 0.16) ${duration > 0 ? (elapsed / duration) * 100 : 0}%, rgba(255, 255, 255, 0.16) 100%)`
+                    }}
+                  />
+                </div>
+                <span className="seek-time total-time" id="bottom-bar-duration">
+                  {formatSecs(duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Extras & Volume */}
+            <div className="bottom-playback-right">
+              <div className="volume-control-wrapper">
+                <button className="bottom-control-btn volume-btn" id="bottom-bar-volume-btn" title="Mute/Unmute" onClick={handleToggleMute}>
+                  {isMuted || volume === 0 ? (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                    </svg>
+                  )}
+                </button>
+                <input 
+                  type="range" 
+                  className="volume-slider" 
+                  id="bottom-bar-volume" 
+                  min="0" 
+                  max="100" 
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  style={{
+                    background: `linear-gradient(to right, rgb(255, 255, 255) 0%, rgb(255, 255, 255) ${volume}%, rgba(255, 255, 255, 0.16) ${volume}%, rgba(255, 255, 255, 0.16) 100%)`
+                  }}
+                />
+              </div>
+            </div>
+          </footer>
+
+          {/* Playlist Add Context Menu Popup */}
+          {showContextMenu && (
+            <div 
+              id="playlist-context-menu" 
+              className="music-context-menu"
+              style={{
+                display: 'block',
+                position: 'fixed',
+                left: `${contextMenuPos.x}px`,
+                top: `${contextMenuPos.y}px`
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="context-header">Add to Playlist</div>
+              <div className="context-list">
+                {/* Remove action */}
+                {(favorites.includes(contextMenuTrackId) || (contextMenuPlaylistKey && contextMenuPlaylistKey !== 'all')) && (
+                  <>
+                    <div 
+                      className="context-item remove-action" 
+                      style={{ color: '#ff5f56' }}
+                      onClick={handleRemoveTrackFromPlaylist}
+                    >
+                      <span>Remove</span>
+                    </div>
+                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                  </>
+                )}
+                {/* Custom Playlists list */}
+                {Object.keys(playlists).map(name => {
+                  if (name === contextMenuPlaylistKey) return null;
+                  return (
+                    <div 
+                      key={name}
+                      className="context-item"
+                      onClick={() => handleAddTrackToPlaylist(name)}
+                    >
+                      {name}
+                    </div>
+                  );
+                })}
+                {Object.keys(playlists).length === 0 && (
+                  <div className="context-no-playlists">
+                    No custom playlists. Click + in sidebar to create.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

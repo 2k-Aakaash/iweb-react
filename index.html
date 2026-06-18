@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest-pwa.json" />
+    <link 
+      rel="icon" 
+      href="https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100" 
+      type="image/svg+xml" 
+    />
+    <title>iWeb</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator && !window.chrome?.runtime?.id) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/pwa-service-worker.js')
+            .then(reg => console.log('PWA Service Worker registered:', reg))
+            .catch(err => console.error('Service Worker registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>

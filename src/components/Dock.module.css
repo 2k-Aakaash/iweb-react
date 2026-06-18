@@ -1,0 +1,279 @@
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  border-radius: 24px;
+  padding: 10px 20px;
+  z-index: 9999;
+
+  /* --- Liquid Glass Base --- */
+  isolation: isolate;
+  background: rgba(18, 18, 18, 0.342);
+  backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
+    url(#displacementFilter);
+  -webkit-backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
+    url(#displacementFilter);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 18px 55px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateX(-50%) translateZ(0);
+}
+
+/* highlight sheen like your liquidBtn */
+.dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+  box-shadow:
+    inset 6px 6px 0px -6px rgba(255, 255, 255, 0.7),
+    inset 0 0 10px 1px rgba(255, 255, 255, 0.45);
+  opacity: 0.9;
+}
+
+/* optional: top glass gradient glow */
+.dock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.8;
+}
+
+/* keep list above */
+.list {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.app {
+  width: 60px;
+  height: 60px;
+  position: relative;
+  transition: width, height, margin-top;
+  transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+  transition-duration: 100ms;
+}
+
+.link {
+  margin-top: 8px;
+  width: 70%;
+  height: 70%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  overflow: visible;
+  color: #fff;
+  text-decoration: none;
+  position: relative;
+}
+
+.app img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  image-rendering: auto;
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 6px 12px;
+  border-radius: 10px;
+  height: auto;
+  width: max-content;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 14px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(18, 18, 18, 0.342);
+  backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
+    url(#displacementFilter);
+  -webkit-backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
+    url(#displacementFilter);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint;
+  transition:
+    transform 180ms ease-out,
+    background 180ms ease;
+}
+
+/* Shine highlight like Apple */
+.tooltip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0.03) 55%,
+    rgba(255, 255, 255, 0.02)
+  );
+  opacity: 0.9;
+}
+
+/* show tooltip */
+.app:hover .tooltip,
+.app:focus-within .tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Main hover magnification */
+.app:hover {
+  width: 90px;
+  height: 90px;
+  margin-top: -30px;
+}
+
+/* Right side scaling */
+.app:hover + .app {
+  width: calc(80px + var(--dock-offset-right, 0px));
+  height: calc(80px + var(--dock-offset-right, 0px));
+  margin-top: calc(-20px + var(--dock-offset-right, 0px) * -1);
+}
+
+.app:hover + .app + .app {
+  width: calc(70px + var(--dock-offset-right, 0px));
+  height: calc(70px + var(--dock-offset-right, 0px));
+  margin-top: calc(-10px + var(--dock-offset-right, 0px) * -1);
+}
+
+/* Left side scaling (requires :has support) */
+.app:has(+ .app:hover) {
+  width: calc(80px + var(--dock-offset-left, 0px));
+  height: calc(80px + var(--dock-offset-left, 0px));
+  margin-top: calc(-20px + var(--dock-offset-left, 0px) * -1);
+}
+
+.app:has(+ .app + .app:hover) {
+  width: calc(70px + var(--dock-offset-left, 0px));
+  height: calc(70px + var(--dock-offset-left, 0px));
+  margin-top: calc(-10px + var(--dock-offset-left, 0px) * -1);
+}
+
+/* Add button */
+.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.addBtn {
+  width: 70%;
+  height: 70%;
+  border: 0;
+  margin-top: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.2s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.addBtn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.addIcon {
+  width: 24px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.8);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.addBtn:hover .addIcon {
+  transform: rotate(90deg);
+  color: #ffffff;
+}
+
+/* iOS Jiggle / Wobble Edit State */
+@keyframes jiggle {
+  0% { transform: rotate(-1.5deg) translateY(0); }
+  50% { transform: rotate(1.5deg) translateY(-1px); }
+  100% { transform: rotate(-1.5deg) translateY(0); }
+}
+
+.jiggling {
+  animation: jiggle 0.22s infinite ease-in-out;
+}
+
+.deleteBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  left: auto;
+  background: #ff5f56;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 16px;
+  line-height: 18px;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deleteBadge:hover {
+  background: #ff3b30;
+  transform: scale(1.1);
+}
+
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
