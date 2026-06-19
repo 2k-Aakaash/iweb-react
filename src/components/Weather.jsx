@@ -96,11 +96,11 @@ export default function Weather() {
         (position) => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
-          const reverseGeocodeUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&email=admin@iweb-dashboard.local`;
+          const reverseGeocodeUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
           fetch(reverseGeocodeUrl)
             .then(res => res.json())
             .then(geo => {
-              const city = geo.address.city || geo.address.town || geo.address.village || geo.address.suburb || "Current Location";
+              const city = geo.city || geo.locality || geo.principalSubdivision || "Current Location";
               fetchWeatherData(lat, lon, city);
             })
             .catch(() => {
@@ -272,7 +272,7 @@ export default function Weather() {
 
   if (!weatherData) {
     return (
-      <div className="weather-container" style={{ background: 'rgba(0,0,0,0.1)' }}>
+      <div className="weather-container" style={{ background: 'linear-gradient(to top, rgba(20, 24, 45, 0.85), rgba(10, 11, 20, 0.9))' }}>
         <div id="weatherInfo">
           <p className="weather-error">Loading Weather...</p>
         </div>
@@ -283,7 +283,7 @@ export default function Weather() {
   const timeseries = weatherData.properties.timeseries || [];
   if (timeseries.length === 0) {
     return (
-      <div className="weather-container">
+      <div className="weather-container" style={{ background: 'linear-gradient(to top, rgba(20, 24, 45, 0.85), rgba(10, 11, 20, 0.9))' }}>
         <div id="weatherInfo">
           <p className="weather-error">No forecast data available.</p>
         </div>

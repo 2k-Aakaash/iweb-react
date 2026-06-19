@@ -59,6 +59,10 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState('off'); // 'off', 'one', 'all'
   const [outputDevice, setOutputDevice] = useState('speakers'); // speakers, buds, headphones
+  const [rememberPlayback, setRememberPlayback] = useState(true);
+  const [silentAutoReconnect, setSilentAutoReconnect] = useState(true);
+  const [enableHoverExpand, setEnableHoverExpand] = useState(true);
+  const [displayLyrics, setDisplayLyrics] = useState(false);
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,6 +89,30 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     playlistRef.current = getPlaylistTracks(currentPlaylistId);
   }, [currentPlaylistId, library, favorites, playlists]);
 
+  // Alternating page title between song name and "iWeb" every 5 seconds when playing
+  useEffect(() => {
+    if (isPlaying && currentTrack) {
+      let showSongTitle = true;
+      const originalTitle = "iWeb";
+      const songTitle = `🎶 ${currentTrack.title}`;
+
+      // Set initial
+      document.title = songTitle;
+
+      const interval = setInterval(() => {
+        showSongTitle = !showSongTitle;
+        document.title = showSongTitle ? songTitle : originalTitle;
+      }, 5000);
+
+      return () => {
+        clearInterval(interval);
+        document.title = "iWeb"; // Restore on cleanup
+      };
+    } else {
+      document.title = "iWeb";
+    }
+  }, [isPlaying, currentTrack]);
+
   // Load playlists & tracks from DB on startup
   useEffect(() => {
     initDatabase();
@@ -101,6 +129,62 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     };
   }, []);
 
+  // Click outside dynamic island to collapse it
+  useEffect(() => {
+    let added = false;
+    const handleClickOutside = (e) => {
+      const island = document.getElementById('dynamic-island');
+      if (island && !island.contains(e.target)) {
+        setIslandState('collapsed');
+      }
+    };
+    let timer;
+    if (islandState !== 'collapsed') {
+      timer = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+        added = true;
+      }, 0);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+      if (added) document.removeEventListener('click', handleClickOutside);
+      else document.removeEventListener('click', handleClickOutside);
+    };
+  }, [islandState]);
+
+  // Listen to custom events from search bar setting triggers
+  useEffect(() => {
+    const handleOpenMusic = () => {
+      setShowModal(true);
+      setActiveView('home');
+    };
+    
+    const handleOpenSettings = () => {
+      setShowModal(true);
+      setActiveView('settings');
+    };
+
+    const handleSelectFolderEvent = () => {
+      handleSelectFolder();
+    };
+
+    const handleRescanEvent = () => {
+      handleRescan();
+    };
+
+    window.addEventListener('music:open', handleOpenMusic);
+    window.addEventListener('music:openSettings', handleOpenSettings);
+    window.addEventListener('music:selectFolder', handleSelectFolderEvent);
+    window.addEventListener('music:rescan', handleRescanEvent);
+
+    return () => {
+      window.removeEventListener('music:open', handleOpenMusic);
+      window.removeEventListener('music:openSettings', handleOpenSettings);
+      window.removeEventListener('music:selectFolder', handleSelectFolderEvent);
+      window.removeEventListener('music:rescan', handleRescanEvent);
+    };
+  }, [library, dirHandle]);
+
   const initDatabase = async () => {
     try {
       const db = await getDB();
@@ -112,16 +196,42 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       const playlistsReq = store.get(PLAYLISTS_KEY);
       const handleReq = store.get(HANDLE_KEY);
       const playbackReq = store.get(LAST_PLAYED_KEY);
+      const settingsReq = store.get('music-settings');
 
-      const tracks = await new Promise(r => tracksReq.onsuccess = () => r(tracksReq.result || []));
-      const favs = await new Promise(r => favsReq.onsuccess = () => r(favsReq.result || []));
-      const pl = await new Promise(r => playlistsReq.onsuccess = () => r(playlistsReq.result || {}));
-      const handle = await new Promise(r => handleReq.onsuccess = () => r(handleReq.result || null));
-      const playback = await new Promise(r => playbackReq.onsuccess = () => r(playbackReq.result || null));
+      // Create promises for parallel awaiting of onsuccess event triggers
+      const tracksPromise = new Promise(r => tracksReq.onsuccess = () => r(tracksReq.result || []));
+      const favsPromise = new Promise(r => favsReq.onsuccess = () => r(favsReq.result || []));
+      const plPromise = new Promise(r => playlistsReq.onsuccess = () => r(playlistsReq.result || {}));
+      const handlePromise = new Promise(r => handleReq.onsuccess = () => r(handleReq.result || null));
+      const playbackPromise = new Promise(r => playbackReq.onsuccess = () => r(playbackReq.result || null));
+      const settingsPromise = new Promise(r => settingsReq.onsuccess = () => r(settingsReq.result || null));
+
+      const [tracks, favs, pl, handle, playback, settings] = await Promise.all([
+        tracksPromise, favsPromise, plPromise, handlePromise, playbackPromise, settingsPromise
+      ]);
 
       setFavorites(favs);
       setPlaylists(pl);
       setDirHandle(handle);
+
+      let autoReconnectEnabled = true;
+
+      if (settings) {
+        if (settings.volume !== undefined) {
+          setVolume(settings.volume);
+          Howler.volume(settings.volume / 100);
+        }
+        if (settings.outputDevice !== undefined) setOutputDevice(settings.outputDevice);
+        if (settings.rememberPlayback !== undefined) setRememberPlayback(settings.rememberPlayback);
+        if (settings.isShuffle !== undefined) setIsShuffle(settings.isShuffle);
+        if (settings.isRepeat !== undefined) setIsRepeat(settings.isRepeat);
+        if (settings.silentAutoReconnect !== undefined) {
+          setSilentAutoReconnect(settings.silentAutoReconnect);
+          autoReconnectEnabled = settings.silentAutoReconnect;
+        }
+        if (settings.enableHoverExpand !== undefined) setEnableHoverExpand(settings.enableHoverExpand);
+        if (settings.displayLyrics !== undefined) setDisplayLyrics(settings.displayLyrics);
+      }
 
       const convertedTracks = tracks.map(t => {
         let artwork = defaultArtwork;
@@ -142,7 +252,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       }
 
       // Try silent auto-reconnect if handle exists and permissions are granted
-      if (handle) {
+      if (handle && autoReconnectEnabled) {
         try {
           const modeOpt = { mode: 'read' };
           const hasPermission = await handle.queryPermission(modeOpt) === 'granted';
@@ -517,6 +627,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   };
 
   const savePlaybackState = async (trackId, seekTime) => {
+    if (!rememberPlayback) return;
     try {
       const db = await getDB();
       const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -552,13 +663,82 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     }
   };
 
+  const handleUpdateSetting = async (key, val) => {
+    if (key === 'volume') {
+      setVolume(val);
+      if (soundRef.current) {
+        soundRef.current.volume(isMuted ? 0 : val / 100);
+      }
+      Howler.volume(isMuted ? 0 : val / 100);
+    } else if (key === 'outputDevice') {
+      setOutputDevice(val);
+    } else if (key === 'rememberPlayback') {
+      setRememberPlayback(val);
+      if (!val) {
+        try {
+          const db = await getDB();
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).delete(LAST_PLAYED_KEY);
+        } catch (e) {}
+      }
+    } else if (key === 'isShuffle') {
+      setIsShuffle(val);
+    } else if (key === 'isRepeat') {
+      setIsRepeat(val);
+    } else if (key === 'silentAutoReconnect') {
+      setSilentAutoReconnect(val);
+    } else if (key === 'enableHoverExpand') {
+      setEnableHoverExpand(val);
+    } else if (key === 'displayLyrics') {
+      setDisplayLyrics(val);
+    }
+
+    try {
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const getReq = store.get('music-settings');
+      getReq.onsuccess = () => {
+        const currentSettings = getReq.result || {};
+        currentSettings[key] = val;
+        store.put(currentSettings, 'music-settings');
+      };
+    } catch (e) {
+      console.error("Failed to save setting:", e);
+    }
+  };
+
+  const handleClearLibrary = async () => {
+    if (window.confirm("Are you sure you want to clear your music library and all playlists?")) {
+      if (soundRef.current) {
+        soundRef.current.stop();
+        soundRef.current.unload();
+        soundRef.current = null;
+      }
+      setLibrary([]);
+      setFavorites([]);
+      setPlaylists({});
+      setDirHandle(null);
+      setCurrentTrack(null);
+      setElapsed(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setStatusText("Library cleared.");
+      
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(TRACKS_KEY);
+      store.delete(FAVORITES_KEY);
+      store.delete(PLAYLISTS_KEY);
+      store.delete(HANDLE_KEY);
+      store.delete(LAST_PLAYED_KEY);
+    }
+  };
+
   const handleVolumeChange = (e) => {
     const val = parseInt(e.target.value, 10);
-    setVolume(val);
-    if (soundRef.current) {
-      soundRef.current.volume(isMuted ? 0 : val / 100);
-    }
-    Howler.volume(isMuted ? 0 : val / 100);
+    handleUpdateSetting('volume', val);
   };
 
   const handleToggleMute = () => {
@@ -586,9 +766,9 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
           type = 'buds';
         }
       }
-      setOutputDevice(type);
+      handleUpdateSetting('outputDevice', type);
     } catch (e) {
-      setOutputDevice('speakers');
+      handleUpdateSetting('outputDevice', 'speakers');
     }
   };
 
@@ -797,9 +977,8 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     if (islandState === 'expanded') {
       if (isArtwork || isText) {
         setShowModal(true);
-      } else {
-        setIslandState('collapsed');
       }
+      // Do not collapse when clicking inside the expanded state (user can click outside to collapse)
     } else if (islandState === 'collapsed') {
       if (isArtwork) {
         handlePlayPause();
@@ -835,8 +1014,8 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
         <div 
           className={`dynamic-island-container active`} 
           id="dynamic-island"
-          onMouseEnter={() => { if (islandState === 'collapsed') setIslandState('hovered'); }}
-          onMouseLeave={() => { if (islandState === 'hovered') setIslandState('collapsed'); }}
+          onMouseEnter={() => { if (enableHoverExpand && islandState === 'collapsed') setIslandState('hovered'); }}
+          onMouseLeave={() => { setIslandState('collapsed'); }}
         >
           <div 
             className={`dynamic-island-pill ${islandState}`} 
@@ -1016,6 +1195,16 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                   </svg>
                   <span>Search</span>
                 </div>
+                <div 
+                  className={`nav-item ${activeView === 'settings' ? 'active' : ''}`}
+                  onClick={() => handleNavigateTo('settings')}
+                >
+                  <svg className="nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                  <span>Settings</span>
+                </div>
               </nav>
 
               <div className="sidebar-section">
@@ -1087,19 +1276,11 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                     </svg>
                   </button>
                   <span className="header-title" id="current-view-title">
-                    {activeView === 'home' ? 'Home' : activeView === 'search' ? 'Search' : currentPlaylistId === 'favorites' ? 'Favorites' : currentPlaylistId === 'all' ? 'All Songs' : currentPlaylistId}
+                    {activeView === 'home' ? 'Home' : activeView === 'search' ? 'Search' : activeView === 'settings' ? 'Settings' : currentPlaylistId === 'favorites' ? 'Favorites' : currentPlaylistId === 'all' ? 'All Songs' : currentPlaylistId}
                   </span>
                 </div>
 
                 <div className="header-folder-actions">
-                  <button id="music-modal-select-folder" className="header-action-btn" onClick={handleSelectFolder}>
-                    Select Folder
-                  </button>
-                  {dirHandle && (
-                    <button id="music-modal-rescan" className="header-action-btn" onClick={handleRescan}>
-                      Rescan
-                    </button>
-                  )}
                   <span id="music-modal-status" className="header-status-text">
                     {statusText}
                   </span>
@@ -1213,6 +1394,142 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                           );
                         })}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Settings View */}
+                {activeView === 'settings' && (
+                  <div className="music-view active" id="view-settings">
+                    <h2 className="view-section-title">Settings</h2>
+                    <div className="settings-container" style={{ padding: '10px 0', color: '#fff', maxHeight: 'calc(100% - 40px)', overflowY: 'auto' }}>
+                      
+                      {/* Section 1: Library & Folders */}
+                      <div className="settings-section" style={{ marginBottom: '24px' }}>
+                        <h3 style={{ fontSize: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', marginBottom: '12px', fontWeight: '600' }}>Library Management</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          <button className="settings-action-btn" onClick={handleSelectFolder} style={{
+                            background: '#1db954', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px'
+                          }}>
+                            Select Music Folder
+                          </button>
+                          {dirHandle && (
+                            <button className="settings-action-btn" onClick={handleRescan} style={{
+                              background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px'
+                            }}>
+                              Rescan Folder
+                            </button>
+                          )}
+                          <button className="settings-action-btn" onClick={handleClearLibrary} style={{
+                            background: '#ff5f56', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px'
+                          }}>
+                            Clear Library
+                          </button>
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>
+                          Status: {statusText}
+                        </p>
+                      </div>
+
+                      {/* Section 2: Audio & Playback Options */}
+                      <div className="settings-section" style={{ marginBottom: '24px' }}>
+                        <h3 style={{ fontSize: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', marginBottom: '12px', fontWeight: '600' }}>Audio & Playback</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          
+                          {/* Audio Device */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', fontSize: '14px' }}>Audio Output Device</div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Choose your active listening device type</div>
+                            </div>
+                            <select 
+                              value={outputDevice} 
+                              onChange={(e) => handleUpdateSetting('outputDevice', e.target.value)}
+                              style={{
+                                background: '#282828', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
+                              }}
+                            >
+                              <option value="speakers">Speakers</option>
+                              <option value="buds">Earbuds</option>
+                              <option value="headphones">Headphones</option>
+                            </select>
+                          </div>
+
+                          {/* Default Volume */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', fontSize: '14px' }}>Default Startup Volume</div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Initial playback volume level ({volume}%)</div>
+                            </div>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="100" 
+                              value={volume}
+                              onChange={(e) => handleUpdateSetting('volume', parseInt(e.target.value))}
+                              style={{ width: '120px', cursor: 'pointer' }}
+                            />
+                          </div>
+
+                          {/* Remember Playback State */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', fontSize: '14px' }}>Remember Playback State</div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Save active track and seek location between sessions</div>
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={rememberPlayback}
+                              onChange={(e) => handleUpdateSetting('rememberPlayback', e.target.checked)}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                          </div>
+
+                          {/* Silent Auto-Reconnect */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', fontSize: '14px' }}>Silent Auto-Reconnect</div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Attempt reconnection of files automatically on page load</div>
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={silentAutoReconnect}
+                              onChange={(e) => handleUpdateSetting('silentAutoReconnect', e.target.checked)}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                          </div>
+
+                          {/* Enable Hover Expand */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', fontSize: '14px' }}>Enable Hover Expand</div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Expand dynamic island pill on mouse hover</div>
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={enableHoverExpand}
+                              onChange={(e) => handleUpdateSetting('enableHoverExpand', e.target.checked)}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                          </div>
+
+                          {/* Display Lyrics Panel */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', fontSize: '14px' }}>Display Lyrics Panel</div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Show visual lyrics helper overlay</div>
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={displayLyrics}
+                              onChange={(e) => handleUpdateSetting('displayLyrics', e.target.checked)}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                          </div>
+
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 )}
@@ -1369,7 +1686,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                   className={`bottom-control-btn ${isShuffle ? 'shuffle-active' : ''}`} 
                   id="bottom-bar-shuffle" 
                   title="Shuffle"
-                  onClick={() => setIsShuffle(!isShuffle)}
+                  onClick={() => handleUpdateSetting('isShuffle', !isShuffle)}
                   style={{ color: isShuffle ? '#1db954' : 'inherit' }}
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -1404,7 +1721,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                   onClick={() => {
                     const states = ['off', 'all', 'one'];
                     const next = states[(states.indexOf(isRepeat) + 1) % states.length];
-                    setIsRepeat(next);
+                    handleUpdateSetting('isRepeat', next);
                   }}
                   style={{ color: isRepeat !== 'off' ? '#1db954' : 'inherit' }}
                 >

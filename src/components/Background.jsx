@@ -12,6 +12,7 @@ export default function Background({
   customName,
   clockFont,
   onChangeBgRef,
+  onChangeBgUploadRef,
   onOpenMusicLibrary
 }) {
   const [backgrounds, setBackgrounds] = useState([]);
@@ -40,6 +41,15 @@ export default function Background({
       onChangeBgRef.current = changeBackgroundManually;
     }
   }, [backgrounds, currentIndex, dbIds]);
+
+  // Expose file upload trigger to parent (for dock Change BG button)
+  useEffect(() => {
+    if (onChangeBgUploadRef) {
+      onChangeBgUploadRef.current = () => {
+        if (fileInputRef.current) fileInputRef.current.click();
+      };
+    }
+  }, [onChangeBgUploadRef]);
 
   // Initialize IndexedDB and migrate legacy base64 data
   useEffect(() => {
@@ -155,12 +165,18 @@ export default function Background({
       if (idx >= 0) {
         setCurrentIndex(idx);
         applyBackground(urls[idx]);
+      } else if (urls.length === 0) {
+        // Fallback default premium landscape wallpaper so blur always has something to render on initial run
+        const defaultBg = "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=2560";
+        applyBackground(defaultBg);
       }
     };
   };
 
   const applyBackground = (url) => {
     document.body.style.backgroundImage = `url('${url}')`;
+    // Set CSS var so ::before fake-blur layers (extension-safe glass) can reference the same image
+    document.documentElement.style.setProperty('--page-bg-url', `url('${url}')`);
     extractAverageColor(url);
   };
 
@@ -316,6 +332,7 @@ export default function Background({
         if (remainingBgs.length === 0) {
           localStorage.removeItem('lastUsedBackgroundId');
           document.body.style.backgroundImage = '';
+          document.documentElement.style.removeProperty('--page-bg-url');
           onClockColorChange(''); // Reset color
           setCurrentIndex(0);
         } else {
@@ -350,6 +367,7 @@ export default function Background({
         <button 
           id="customization-button" 
           className="custom-button"
+          style={{ display: showCustomization ? 'none' : 'block' }}
           onClick={() => setShowCustomization(!showCustomization)}
         >
           Customization ✨

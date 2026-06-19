@@ -2,53 +2,87 @@
   position: fixed;
   left: 50%;
   bottom: 16px;
-  transform: translateX(-50%);
   border-radius: 24px;
   padding: 10px 20px;
-  z-index: 9999;
+  z-index: 200;
 
-  /* --- Liquid Glass Base --- */
-  isolation: isolate;
-  background: rgba(18, 18, 18, 0.342);
-  backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
-    url(#displacementFilter);
-  -webkit-backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
-    url(#displacementFilter);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow:
-    0 18px 55px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 
   will-change: transform;
   backface-visibility: hidden;
   transform: translateX(-50%) translateZ(0);
+  overflow: visible;
 }
 
-/* highlight sheen like your liquidBtn */
-.dock::before {
-  content: "";
+.dockBg {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   border-radius: inherit;
-  pointer-events: none;
   overflow: hidden;
+  pointer-events: none;
+
+  /* --- Premium Liquid Glass Base --- */
+  background: rgba(14, 14, 20, 0.40);
+  /* backdrop-filter works in normal browser tabs — falls back to ::before blur in extension */
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
-    inset 6px 6px 0px -6px rgba(255, 255, 255, 0.7),
-    inset 0 0 10px 1px rgba(255, 255, 255, 0.45);
-  opacity: 0.9;
+    0 22px 60px rgba(0, 0, 0, 0.5),
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+
+  will-change: filter, backdrop-filter;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
-/* optional: top glass gradient glow */
-.dock::after {
+/*
+  EXTENSION-SAFE FAKE BACKDROP BLUR
+  ───────────────────────────────────
+  Uses standard CSS filter: blur() on a layer pointing to the same wallpaper
+  to bypass the backdrop-filter sandbox limitation in Chrome Extensions.
+*/
+.dockBg::before {
+  content: "";
+  position: absolute;
+  inset: -40px; /* expands to prevent white blur edge artifacts */
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: var(--page-bg-url, none);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  filter: blur(20px);
+  will-change: transform, filter;
+  transform: translate3d(0, 0, 0);
+  z-index: -1;
+}
+
+/* Top catch-light sheen — simulates curved glass refraction */
+.dockBg::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   border-radius: inherit;
   pointer-events: none;
-  overflow: hidden;
-  opacity: 0.8;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.03) 45%,
+    transparent 100%
+  );
+  box-shadow:
+    inset 6px 6px 0px -6px rgba(255, 255, 255, 0.75),
+    inset 0 0 14px 1px rgba(255, 255, 255, 0.40),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.32);
+  opacity: 0.9;
 }
 
 /* keep list above */
@@ -56,9 +90,11 @@
   position: relative;
   z-index: 1;
   display: flex;
+  align-items: center;
   list-style-type: none;
   padding: 0;
   margin: 0;
+  gap: 0;
 }
 
 .app {
@@ -95,7 +131,68 @@
   image-rendering: auto;
 }
 
-/* Tooltip */
+/* ── macOS-style vertical separator ── */
+.separator {
+  width: 1px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 8px;
+  align-self: center;
+  flex-shrink: 0;
+  border-radius: 1px;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
+/* ── Action items (Add / Change BG) ── */
+.action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actionBtn {
+  width: 70%;
+  height: 70%;
+  border: 0;
+  margin-top: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.2s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  position: relative;
+  padding: 10px;
+}
+
+.actionBtn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.actionIcon {
+  width: 22px;
+  height: 22px;
+  color: rgba(255, 255, 255, 0.8);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Add app rotates on hover — uses data-action attribute for precise targeting */
+.action[data-action="add"] .actionBtn:hover .actionIcon {
+  transform: rotate(90deg);
+  color: #ffffff;
+}
+
+/* Change BG scales on hover */
+.action[data-action="bg"] .actionBtn:hover .actionIcon {
+  transform: scale(1.15);
+  color: #ffffff;
+}
+
+/* ── Tooltip ── */
 .tooltip {
   position: absolute;
   top: -48px;
@@ -114,22 +211,16 @@
   font-size: 13px;
   line-height: 14px;
   color: rgba(255, 255, 255, 0.92);
-  background: rgba(18, 18, 18, 0.342);
-  backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
-    url(#displacementFilter);
-  -webkit-backdrop-filter: brightness(1.1) blur(6px) saturate(160%)
-    url(#displacementFilter);
+  background: rgba(18, 18, 18, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  will-change: transform, opacity;
-  transform: translateZ(0);
+  will-change: transform, opacity, filter, backdrop-filter;
   backface-visibility: hidden;
   contain: paint;
-  transition:
-    transform 180ms ease-out,
-    background 180ms ease;
 }
 
 /* Shine highlight like Apple */
@@ -150,82 +241,50 @@
 
 /* show tooltip */
 .app:hover .tooltip,
-.app:focus-within .tooltip {
+.app:focus-within .tooltip,
+.action:hover .tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
 /* Main hover magnification */
-.app:hover {
+.app:not(.action):hover {
   width: 90px;
   height: 90px;
   margin-top: -30px;
 }
 
 /* Right side scaling */
-.app:hover + .app {
+.app:not(.action):hover + .app:not(.action) {
   width: calc(80px + var(--dock-offset-right, 0px));
   height: calc(80px + var(--dock-offset-right, 0px));
   margin-top: calc(-20px + var(--dock-offset-right, 0px) * -1);
 }
 
-.app:hover + .app + .app {
+.app:not(.action):hover + .app + .app:not(.action) {
   width: calc(70px + var(--dock-offset-right, 0px));
   height: calc(70px + var(--dock-offset-right, 0px));
   margin-top: calc(-10px + var(--dock-offset-right, 0px) * -1);
 }
 
 /* Left side scaling (requires :has support) */
-.app:has(+ .app:hover) {
+.app:not(.action):has(+ .app:not(.action):hover) {
   width: calc(80px + var(--dock-offset-left, 0px));
   height: calc(80px + var(--dock-offset-left, 0px));
   margin-top: calc(-20px + var(--dock-offset-left, 0px) * -1);
 }
 
-.app:has(+ .app + .app:hover) {
+.app:not(.action):has(+ .app + .app:not(.action):hover) {
   width: calc(70px + var(--dock-offset-left, 0px));
   height: calc(70px + var(--dock-offset-left, 0px));
   margin-top: calc(-10px + var(--dock-offset-left, 0px) * -1);
 }
 
-/* Add button */
-.add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.addBtn {
-  width: 70%;
-  height: 70%;
-  border: 0;
+/* action buttons don't magnify */
+.action:hover {
+  width: 60px;
+  height: 60px;
   margin-top: 0;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s, transform 0.2s;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-.addBtn:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.addIcon {
-  width: 24px;
-  height: 24px;
-  color: rgba(255, 255, 255, 0.8);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.addBtn:hover .addIcon {
-  transform: rotate(90deg);
-  color: #ffffff;
 }
 
 /* iOS Jiggle / Wobble Edit State */
@@ -260,6 +319,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-top: 0;
 }
 
 .deleteBadge:hover {

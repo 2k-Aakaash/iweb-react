@@ -10,7 +10,7 @@ const scaleValue = (value, from, to) => {
   return Math.floor(capped * scale + to[0]);
 };
 
-export default function Dock({ bookmarks = [], setBookmarks }) {
+export default function Dock({ bookmarks = [], setBookmarks, onChangeBg }) {
   const [isJiggling, setIsJiggling] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState({ show: false, bookmark: null });
@@ -18,6 +18,7 @@ export default function Dock({ bookmarks = [], setBookmarks }) {
   const [newUrl, setNewUrl] = useState("");
 
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [faviconSteps, setFaviconSteps] = useState({});
 
   const dockRef = useRef(null);
   const longPressTimer = useRef(null);
@@ -90,6 +91,7 @@ export default function Dock({ bookmarks = [], setBookmarks }) {
     e.dataTransfer.effectAllowed = "move";
   };
 
+  // Drag and Drop reordering over
   const handleDragOver = (e, index) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
@@ -168,11 +170,30 @@ export default function Dock({ bookmarks = [], setBookmarks }) {
 
   return (
     <>
-      <nav ref={dockRef} className={styles.dock} onMouseLeave={handleMouseLeave}>
+      <nav
+        ref={dockRef}
+        className={styles.dock}
+        data-glass="dock"
+        onMouseLeave={handleMouseLeave}
+      >
+        <div className={styles.dockBg} />
         <ul className={styles.list}>
+          {/* ── Bookmark Icons Section ── */}
           {bookmarks.map((app, index) => {
             const domain = getWebsiteDomain(app.url);
-            const favUrl = `https://www.google.com/s2/favicons?sz=256&domain_url=https://${domain}`;
+            const step = faviconSteps[app.url] || 0;
+
+            let src;
+            if (step === 0) {
+              src = `https://www.google.com/s2/favicons?sz=256&domain_url=https://${domain}`;
+            } else if (step === 1) {
+              src = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+            } else if (step === 2) {
+              src = `https://${domain}/favicon.ico`;
+            } else {
+              src = defaultFavicon;
+            }
+
             return (
               <li
                 key={app.websiteName}
@@ -205,9 +226,15 @@ export default function Dock({ bookmarks = [], setBookmarks }) {
                   onTouchEnd={handlePressEnd}
                 >
                   <img
-                    src={favUrl}
-                    onError={(e) => {
-                      e.currentTarget.src = defaultFavicon;
+                    src={src}
+                    onLoad={(e) => {
+                      // Google S2 returns a 16x16 globe icon when a favicon is not found
+                      if (step === 0 && e.currentTarget.naturalWidth === 16 && e.currentTarget.naturalHeight === 16) {
+                        setFaviconSteps((prev) => ({ ...prev, [app.url]: 1 }));
+                      }
+                    }}
+                    onError={() => {
+                      setFaviconSteps((prev) => ({ ...prev, [app.url]: step + 1 }));
                     }}
                     alt={app.websiteName}
                     draggable={false}
@@ -220,27 +247,58 @@ export default function Dock({ bookmarks = [], setBookmarks }) {
             );
           })}
 
-          {/* Add Button */}
-          <li className={`${styles.app} ${styles.add}`} onMouseMove={handleAppHover}>
+          {/* ── macOS-style vertical separator ── */}
+          {bookmarks.length > 0 && (
+            <li className={styles.separator} aria-hidden="true" />
+          )}
+
+          {/* ── Add App Button ── */}
+          <li className={`${styles.app} ${styles.action}`} data-action="add" onMouseMove={handleAppHover}>
             <button
               type="button"
-              className={styles.addBtn}
+              className={styles.actionBtn}
               title="Add app"
               onClick={() => setShowAddModal(true)}
             >
-              <svg 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
                 strokeLinejoin="round"
-                className={styles.addIcon}
+                className={styles.actionIcon}
               >
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
               <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Add app</span>
+            </button>
+          </li>
+
+          {/* ── Change Background Button ── */}
+          <li className={`${styles.app} ${styles.action}`} data-action="bg" onMouseMove={handleAppHover}>
+            <button
+              type="button"
+              className={styles.actionBtn}
+              title="Change background"
+              onClick={onChangeBg}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={styles.actionIcon}
+              >
+                {/* Mountains / landscape wallpaper icon */}
+                <rect x="3" y="3" width="18" height="18" rx="3" ry="3" />
+                <polyline points="3 16 8 11 12 14 16 9 21 14" />
+                <circle cx="8.5" cy="7.5" r="1.5" />
+              </svg>
+              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Change BG</span>
             </button>
           </li>
         </ul>
