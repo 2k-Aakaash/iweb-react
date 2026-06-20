@@ -4125,8 +4125,6 @@ body{
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* GPU 3D rendering acceleration for all blurs / backdrop-filters in the UI */
-.link-button,
 .drag-n-drop-button,
 .add-bookmark,
 .box,
@@ -4137,9 +4135,7 @@ body{
 .remove-bg-content,
 .custom-button,
 .font-container,
-#add-note-btn,
-#search-form,
-.search-modal-content {
+#add-note-btn {
   will-change: transform, filter, backdrop-filter;
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
@@ -4154,9 +4150,7 @@ body{
 .remove-bg-content::before,
 .custom-button::before,
 .font-container::before,
-#add-note-btn::before,
-#search-form::before,
-.search-modal-content::before {
+#add-note-btn::before {
   content: "";
   position: absolute;
   inset: -40px;
@@ -4179,11 +4173,19 @@ body{
 .box,
 .confirmation-dialog,
 .remove-bg-content,
-.custom-button,
-.font-container,
-#search-form,
-.search-modal-content {
+.custom-button {
   position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Ensure the fixed-position elements clip the expanded blur area while remaining fixed */
+.font-container {
+  position: fixed !important;
+  overflow: hidden !important;
+}
+
+#add-note-btn {
+  position: fixed !important;
   overflow: hidden !important;
 }
 

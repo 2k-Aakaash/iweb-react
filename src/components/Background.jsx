@@ -367,7 +367,6 @@ export default function Background({
         <button 
           id="customization-button" 
           className="custom-button"
-          style={{ display: showCustomization ? 'none' : 'block' }}
           onClick={() => setShowCustomization(!showCustomization)}
         >
           Customization ✨
