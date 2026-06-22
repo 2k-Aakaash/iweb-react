@@ -7,6 +7,7 @@ import Music from './components/Music';
 import Notes from './components/Notes';
 import { SearchBar } from './search/components/SearchBar';
 import { SearchResult } from './search/components/SearchResult';
+import SettingsModal from './components/SettingsModal';
 
 export default function App() {
   const [customName, setCustomName] = useState('');
@@ -14,6 +15,7 @@ export default function App() {
   const [clockColor, setClockColor] = useState('');
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const changeBgRef = useRef(null);
   // Ref that Background.jsx will expose to trigger its file input (upload new BG)
@@ -93,6 +95,7 @@ export default function App() {
         bookmarks={bookmarks}
         setBookmarks={setBookmarks}
         onChangeBg={() => changeBgRef.current?.()}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {/* 5. Notes Section */}
@@ -111,6 +114,17 @@ export default function App() {
       />
 
       <SearchResult isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      <SettingsModal 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)}
+        customName={customName}
+        setCustomName={setCustomName}
+        clockFont={clockFont}
+        setClockFont={setClockFont}
+        bookmarks={bookmarks}
+        setBookmarks={setBookmarks}
+      />
 
       <style>{`
         #clock {

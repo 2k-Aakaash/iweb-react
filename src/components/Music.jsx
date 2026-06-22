@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Howl, Howler } from 'howler';
 import * as musicMetadata from 'music-metadata-browser';
 import { directoryOpen } from 'browser-fs-access';
+import Fuse from 'fuse.js';
+import { Index } from 'flexsearch';
+import { parseSearchIntent } from '../libs/intentParser';
 
 // Supported formats
 const SUPPORTED_FORMATS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'alac', 'aiff', 'opus'];
@@ -66,6 +69,15 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
+  const [toast, setToast] = useState(null);
+  const [matchedArtistInfo, setMatchedArtistInfo] = useState(null);
+  const [aiFilteredTracks, setAiFilteredTracks] = useState(null);
+
+  // Search Indexes
+  const flexSearchRef = useRef(null);
+  const fuseSearchRef = useRef(null);
 
   // UI state
   const [localShowModal, setLocalShowModal] = useState(false);
@@ -89,28 +101,101 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     playlistRef.current = getPlaylistTracks(currentPlaylistId);
   }, [currentPlaylistId, library, favorites, playlists]);
 
-  // Alternating page title between song name and "iWeb" every 5 seconds when playing
+  // Build search indexes when library updates
   useEffect(() => {
-    if (isPlaying && currentTrack) {
-      let showSongTitle = true;
-      const originalTitle = "iWeb";
-      const songTitle = `🎶 ${currentTrack.title}`;
-
-      // Set initial
-      document.title = songTitle;
-
-      const interval = setInterval(() => {
-        showSongTitle = !showSongTitle;
-        document.title = showSongTitle ? songTitle : originalTitle;
-      }, 5000);
-
-      return () => {
-        clearInterval(interval);
-        document.title = "iWeb"; // Restore on cleanup
-      };
-    } else {
-      document.title = "iWeb";
+    if (library.length === 0) {
+      flexSearchRef.current = null;
+      fuseSearchRef.current = null;
+      return;
     }
+
+    try {
+      // 1. Build FlexSearch Index
+      const flexIndex = new Index({
+        tokenize: 'forward',
+        resolution: 9
+      });
+      library.forEach((track, idx) => {
+        const textToSearch = `${track.title || ''} ${track.artist || ''} ${track.album || ''} ${track.genre || ''}`.toLowerCase();
+        flexIndex.add(idx, textToSearch);
+      });
+      flexSearchRef.current = flexIndex;
+
+      // 2. Build Fuse.js Index for typo tolerance
+      const fuseIndex = new Fuse(library, {
+        keys: ['artist', 'title', 'album'],
+        threshold: 0.4,
+        ignoreLocation: true,
+        minMatchCharLength: 2
+      });
+      fuseSearchRef.current = fuseIndex;
+    } catch (e) {
+      console.error("Failed to build search indexes:", e);
+    }
+  }, [library]);
+
+  // Alternating page title between song name and "iWeb <Time>" every 5 seconds when playing, otherwise showing time
+  useEffect(() => {
+    const getFormattedTime = () => {
+      const now = new Date();
+      let hours = now.getHours();
+      let minutes = now.getMinutes();
+      hours = hours % 12 || 12;
+      minutes = minutes < 10 ? `0${minutes}` : minutes;
+      return `${hours}:${minutes}`;
+    };
+
+    let showSongTitle = true;
+    let lastTimeStr = getFormattedTime();
+
+    const updateTitle = () => {
+      const timeStr = getFormattedTime();
+      const timeTitle = `iWeb ${timeStr}`;
+
+      if (isPlaying && currentTrack) {
+        const songTitle = `🎶 ${currentTrack.title}`;
+        document.title = showSongTitle ? songTitle : timeTitle;
+      } else {
+        document.title = timeTitle;
+      }
+      lastTimeStr = timeStr;
+    };
+
+    // Initial update
+    updateTitle();
+
+    let secondsCounter = 0;
+    const interval = setInterval(() => {
+      const currentTimeStr = getFormattedTime();
+      let needsUpdate = false;
+
+      // 1. Time change check (every minute)
+      if (currentTimeStr !== lastTimeStr) {
+        needsUpdate = true;
+      }
+
+      // 2. Playback alternation check (every 5 seconds)
+      if (isPlaying && currentTrack) {
+        secondsCounter += 1;
+        if (secondsCounter >= 5) {
+          showSongTitle = !showSongTitle;
+          secondsCounter = 0;
+          needsUpdate = true;
+        }
+      } else {
+        secondsCounter = 0;
+        showSongTitle = true; // reset to show song title first when playback starts
+      }
+
+      if (needsUpdate) {
+        updateTitle();
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      document.title = "iWeb"; // Restore default
+    };
   }, [isPlaying, currentTrack]);
 
   // Load playlists & tracks from DB on startup
@@ -377,6 +462,20 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       console.error('Metadata parsing error:', file.name, err);
     }
 
+    // Smart filename parsing fallback when artist is 'Unknown Artist'
+    if (artist === 'Unknown Artist') {
+      const cleanName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      const dashIdx = cleanName.indexOf(' - ');
+      if (dashIdx > 0) {
+        artist = cleanName.substring(0, dashIdx).trim();
+        const extractedTitle = cleanName.substring(dashIdx + 3).trim();
+        // If we didn't get a title from ID3 metadata (i.e. it defaulted to file.name), use the cleaner extracted title
+        if (title === file.name) {
+          title = extractedTitle;
+        }
+      }
+    }
+
     return {
       id: `${file.name}-${file.size}`,
       file,
@@ -424,6 +523,24 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       playlistRef.current = newLibrary;
       setCurrentPlaylistId('all');
 
+      // Group by folders and generate playlists automatically
+      const updatedPlaylists = { ...playlists };
+      const folderGroups = {};
+      newLibrary.forEach(track => {
+        const parts = track.path.split('/');
+        if (parts.length > 1) {
+          const folderName = parts.slice(0, -1).join('/');
+          if (!folderGroups[folderName]) {
+            folderGroups[folderName] = [];
+          }
+          folderGroups[folderName].push(track.id);
+        }
+      });
+      Object.keys(folderGroups).forEach(folderName => {
+        updatedPlaylists[folderName] = folderGroups[folderName];
+      });
+      setPlaylists(updatedPlaylists);
+
       // Save to IndexedDB
       const db = await getDB();
       const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -438,6 +555,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
         artworkBlob: t.artworkBlob
       }));
       store.put(serialized, TRACKS_KEY);
+      store.put(updatedPlaylists, PLAYLISTS_KEY);
 
       setStatusText(`Loaded ${newLibrary.length} tracks.`);
     } catch (e) {
@@ -479,6 +597,24 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       }
 
       setLibrary(updatedLibrary);
+
+      // Group by folders and generate playlists automatically
+      const updatedPlaylists = { ...playlists };
+      const folderGroups = {};
+      updatedLibrary.forEach(track => {
+        const parts = track.path.split('/');
+        if (parts.length > 1) {
+          const folderName = parts.slice(0, -1).join('/');
+          if (!folderGroups[folderName]) {
+            folderGroups[folderName] = [];
+          }
+          folderGroups[folderName].push(track.id);
+        }
+      });
+      Object.keys(folderGroups).forEach(folderName => {
+        updatedPlaylists[folderName] = folderGroups[folderName];
+      });
+      setPlaylists(updatedPlaylists);
       
       const db = await getDB();
       const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -493,6 +629,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
         artworkBlob: t.artworkBlob
       }));
       store.put(serialized, TRACKS_KEY);
+      store.put(updatedPlaylists, PLAYLISTS_KEY);
 
       setStatusText(`Library updated. Total tracks: ${updatedLibrary.length}.`);
     } catch (err) {
@@ -953,15 +1090,305 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     }
   };
 
-  // Filtered search tracks
+  const showToastAlert = (message, submessage) => {
+    setToast({ message, submessage });
+  };
+
+  // Toast auto-dismissal
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  // Generate suggestions matching query
+  const generateSuggestions = (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchSuggestions([]);
+      setFocusedSuggestionIndex(-1);
+      return;
+    }
+
+    const normQuery = query.toLowerCase().trim();
+    const uniqueArtists = new Set();
+    const uniqueAlbums = new Set();
+    const uniqueTitles = new Set();
+
+    const testMatchAndAdd = (track) => {
+      const artist = track.artist || '';
+      const album = track.album || '';
+      const title = track.title || '';
+
+      if (artist.toLowerCase().includes(normQuery)) uniqueArtists.add(artist);
+      if (album.toLowerCase().includes(normQuery)) uniqueAlbums.add(album);
+      if (title.toLowerCase().includes(normQuery)) uniqueTitles.add(title);
+    };
+
+    // 1. FlexSearch matches
+    if (flexSearchRef.current) {
+      const hits = flexSearchRef.current.search(normQuery, 50);
+      hits.forEach(hit => {
+        const idx = typeof hit === 'string' ? parseInt(hit, 10) : hit;
+        if (!isNaN(idx) && idx >= 0 && idx < library.length) {
+          testMatchAndAdd(library[idx]);
+        }
+      });
+    }
+
+    // 2. Fuse.js matches (typo tolerance)
+    if (fuseSearchRef.current) {
+      const results = fuseSearchRef.current.search(normQuery);
+      results.forEach(res => {
+        if (res.item) {
+          testMatchAndAdd(res.item);
+        }
+      });
+    }
+
+    const list = [];
+    
+    // Prioritize Artists
+    Array.from(uniqueArtists).slice(0, 3).forEach(art => {
+      list.push({ type: 'Artist', text: art });
+    });
+    
+    // Suggest Albums
+    Array.from(uniqueAlbums).slice(0, 3).forEach(alb => {
+      list.push({ type: 'Album', text: alb });
+    });
+    
+    // Suggest Song Titles
+    Array.from(uniqueTitles).slice(0, 5).forEach(tit => {
+      list.push({ type: 'Song', text: tit });
+    });
+
+    setSearchSuggestions(list.slice(0, 8));
+    setFocusedSuggestionIndex(-1);
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    generateSuggestions(val);
+    
+    if (!val.trim()) {
+      setAiFilteredTracks(null);
+      setMatchedArtistInfo(null);
+    }
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedSuggestionIndex(prev => 
+        searchSuggestions.length > 0 ? (prev + 1) % searchSuggestions.length : -1
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedSuggestionIndex(prev => 
+        searchSuggestions.length > 0 
+          ? (prev <= 0 ? searchSuggestions.length - 1 : prev - 1) 
+          : -1
+      );
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (focusedSuggestionIndex >= 0 && focusedSuggestionIndex < searchSuggestions.length) {
+        const selected = searchSuggestions[focusedSuggestionIndex];
+        setSearchQuery(selected.text);
+        handleSearchSubmit(selected.text);
+      } else {
+        handleSearchSubmit(searchQuery);
+      }
+    } else if (e.key === 'Escape') {
+      setSearchSuggestions([]);
+      setFocusedSuggestionIndex(-1);
+    }
+  };
+
+  const handleSearchSubmit = async (queryText) => {
+    if (!queryText || !queryText.trim()) return;
+    setSearchSuggestions([]);
+
+    const parseResult = parseSearchIntent(queryText);
+    if (!parseResult) return;
+
+    const { intent, artist, playlistName } = parseResult;
+
+    // Helper to get tracks matching an artist search term
+    const getTracksForArtistSearch = (artistQuery) => {
+      if (!artistQuery) return { name: '', tracks: [] };
+
+      // 1. Try exact/case-insensitive match on non-unknown artists
+      let matchedName = artistQuery;
+      let tracks = library.filter(t => 
+        t.artist && 
+        t.artist.toLowerCase() === artistQuery.toLowerCase() && 
+        t.artist.toLowerCase() !== 'unknown artist'
+      );
+
+      // 2. If no tracks found, check fuzzy matches in the search index
+      if (tracks.length === 0 && fuseSearchRef.current) {
+        const fuzzyResults = fuseSearchRef.current.search(artistQuery);
+        if (fuzzyResults.length > 0) {
+          // If the best match has a real artist, filter by that artist
+          const bestMatch = fuzzyResults[0].item;
+          if (bestMatch.artist && bestMatch.artist.toLowerCase() !== 'unknown artist') {
+            matchedName = bestMatch.artist;
+            tracks = library.filter(t => (t.artist || '').toLowerCase() === matchedName.toLowerCase());
+          } else {
+            // If the matched track is "Unknown Artist", we ONLY include the tracks from the search index
+            // that actually contain the query word in their title or path/filename.
+            matchedName = artistQuery;
+            const matchedIds = new Set();
+            fuzzyResults.forEach(res => {
+              const item = res.item;
+              const text = `${item.title || ''} ${item.artist || ''} ${item.path || ''}`.toLowerCase();
+              if (text.includes(artistQuery.toLowerCase()) && !matchedIds.has(item.id)) {
+                matchedIds.add(item.id);
+                tracks.push(item);
+              }
+            });
+          }
+        }
+      }
+
+      // If we still have absolutely nothing, but it's a specific query, do a simple substring fallback
+      if (tracks.length === 0) {
+        const queryLower = artistQuery.toLowerCase();
+        tracks = library.filter(t => 
+          (t.title || '').toLowerCase().includes(queryLower) ||
+          (t.artist || '').toLowerCase().includes(queryLower) ||
+          (t.path || '').toLowerCase().includes(queryLower)
+        );
+      }
+
+      return { name: matchedName, tracks };
+    };
+
+    if (intent === 'create_playlist' && artist) {
+      const { name: matchedArtist, tracks: artistTracks } = getTracksForArtistSearch(artist);
+
+      if (artistTracks.length === 0) {
+        showToastAlert(`No songs found for "${artist}"`, "Could not create playlist.");
+        return;
+      }
+
+      let baseName = matchedArtist;
+      // Capitalize the first letter for nicer presentation if it matched the query directly
+      if (baseName.toLowerCase() === artist.toLowerCase()) {
+        baseName = artist.charAt(0).toUpperCase() + artist.slice(1);
+      }
+      let finalName = baseName;
+      let count = 1;
+      while (playlists[finalName]) {
+        count++;
+        finalName = `${baseName} (${count})`;
+      }
+
+      const songIds = artistTracks.map(t => t.id);
+      const updatedPlaylists = {
+        ...playlists,
+        [finalName]: songIds
+      };
+
+      setPlaylists(updatedPlaylists);
+      const db = await getDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(updatedPlaylists, PLAYLISTS_KEY);
+
+      showToastAlert(`Playlist created successfully`, `${songIds.length} Songs Added`);
+      handleNavigateTo('playlist', finalName);
+    }
+
+    else if (intent === 'find_songs' && artist) {
+      const { name: matchedArtist, tracks: artistTracks } = getTracksForArtistSearch(artist);
+
+      if (artistTracks.length > 0) {
+        setAiFilteredTracks(artistTracks);
+        const uniqueAlbums = Array.from(new Set(artistTracks.map(t => t.album).filter(Boolean)));
+        setMatchedArtistInfo({
+          name: matchedArtist.toLowerCase() === artist.toLowerCase() ? (artist.charAt(0).toUpperCase() + artist.slice(1)) : matchedArtist,
+          count: artistTracks.length,
+          albums: uniqueAlbums.slice(0, 3)
+        });
+      } else {
+        setAiFilteredTracks([]);
+        setMatchedArtistInfo(null);
+      }
+    }
+
+    else if (intent === 'play_artist' && artist) {
+      const { name: matchedArtist, tracks: artistTracks } = getTracksForArtistSearch(artist);
+
+      if (artistTracks.length > 0) {
+        setAiFilteredTracks(artistTracks);
+        const displayName = matchedArtist.toLowerCase() === artist.toLowerCase() ? (artist.charAt(0).toUpperCase() + artist.slice(1)) : matchedArtist;
+        showToastAlert(`Playing songs by ${displayName}`, `${artistTracks.length} tracks started.`);
+        playlistRef.current = artistTracks;
+        playTrack(0, artistTracks);
+      } else {
+        showToastAlert(`No tracks by "${artist}"`, "Could not play artist.");
+      }
+    }
+
+    else if (intent === 'show_favorites') {
+      handleNavigateTo('playlist', 'favorites');
+    }
+
+    else if (intent === 'show_playlist' && playlistName) {
+      const matchKey = Object.keys(playlists).find(k => k.toLowerCase() === playlistName.toLowerCase());
+      if (matchKey) {
+        handleNavigateTo('playlist', matchKey);
+      } else if (playlistName.toLowerCase() === 'favorites') {
+        handleNavigateTo('playlist', 'favorites');
+      } else {
+        showToastAlert(`Playlist not found`, `No playlist matching "${playlistName}".`);
+      }
+    }
+  };
+
+  // Filtered search tracks using FlexSearch + Fuse.js
   const getFilteredSearchTracks = () => {
+    if (aiFilteredTracks !== null) {
+      return aiFilteredTracks;
+    }
+
     const query = searchQuery.toLowerCase().trim();
     if (!query) return [];
-    return library.filter(t => {
-      return (t.title || '').toLowerCase().includes(query) ||
-             (t.artist || '').toLowerCase().includes(query) ||
-             (t.album || '').toLowerCase().includes(query);
-    });
+
+    const matchedIds = new Set();
+    const results = [];
+
+    // 1. FlexSearch matches
+    if (flexSearchRef.current) {
+      const hits = flexSearchRef.current.search(query, 50);
+      hits.forEach(hit => {
+        const idx = typeof hit === 'string' ? parseInt(hit, 10) : hit;
+        if (!isNaN(idx) && idx >= 0 && idx < library.length) {
+          const track = library[idx];
+          if (!matchedIds.has(track.id)) {
+            matchedIds.add(track.id);
+            results.push(track);
+          }
+        }
+      });
+    }
+
+    // 2. Fuse.js matches (typo tolerance)
+    if (fuseSearchRef.current) {
+      const fuzzyResults = fuseSearchRef.current.search(query);
+      fuzzyResults.forEach(res => {
+        if (res.item && !matchedIds.has(res.item.id)) {
+          matchedIds.add(res.item.id);
+          results.push(res.item);
+        }
+      });
+    }
+
+    return results;
   };
 
   // Dynamic Island toggles
@@ -1318,7 +1745,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                 {/* 2. Search View */}
                 {activeView === 'search' && (
                   <div className="music-view active" id="view-search">
-                    <div className="search-input-wrapper">
+                    <div className="search-input-wrapper" style={{ position: 'relative' }}>
                       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1328,10 +1755,75 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                         id="music-search-field"
                         placeholder="Search for songs, artists, or albums..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={handleSearchChange}
+                        onKeyDown={handleSearchKeyDown}
+                        autoComplete="off"
                       />
+
+                      {/* Apple Music Style Search Suggestions Dropdown */}
+                      {searchSuggestions.length > 0 && (
+                        <div className="search-suggestions-card">
+                          {searchSuggestions.map((sug, idx) => {
+                            const matchStr = searchQuery.trim().toLowerCase();
+                            const fullText = sug.text;
+                            const matchIdx = fullText.toLowerCase().indexOf(matchStr);
+                            let content;
+
+                            if (matchIdx >= 0) {
+                              const before = fullText.slice(0, matchIdx);
+                              const match = fullText.slice(matchIdx, matchIdx + matchStr.length);
+                              const after = fullText.slice(matchIdx + matchStr.length);
+                              content = (
+                                <>
+                                  {before}
+                                  <strong className="highlighted-match">{match}</strong>
+                                  {after}
+                                </>
+                              );
+                            } else {
+                              content = fullText;
+                            }
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`search-suggestion-row ${focusedSuggestionIndex === idx ? 'focused' : ''}`}
+                                onClick={() => {
+                                  setSearchQuery(sug.text);
+                                  handleSearchSubmit(sug.text);
+                                }}
+                              >
+                                <span className="suggestion-type-badge">{sug.type}</span>
+                                <span className="suggestion-text">{content}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     <div className="search-results-section">
+                      {/* Matched Artist Highlight Card */}
+                      {matchedArtistInfo && (
+                        <div className="artist-highlight-card">
+                          <div className="artist-highlight-left">
+                            <h3 className="artist-highlight-name">{matchedArtistInfo.name}</h3>
+                            <p className="artist-highlight-songs">{matchedArtistInfo.count} Songs Found</p>
+                            <div className="artist-highlight-albums">
+                              {matchedArtistInfo.albums.map((album, aIdx) => (
+                                <span key={aIdx} className="artist-album-badge">{album}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="artist-highlight-right">
+                            <button 
+                              className="settings-btn settings-btn-primary artist-create-playlist-btn"
+                              onClick={() => handleSearchSubmit(`Create a playlist in the artist name of ${matchedArtistInfo.name}`)}
+                            >
+                              Create Playlist
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       <h2 className="view-section-title" id="search-results-header">
                         {searchQuery ? `Search results (${getFilteredSearchTracks().length})` : 'Start searching'}
                       </h2>
@@ -1835,6 +2327,15 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                     No custom playlists. Click + in sidebar to create.
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {toast && (
+            <div className="music-toast">
+              <div className="music-toast-icon">✨</div>
+              <div className="music-toast-text">
+                <strong>{toast.message}</strong>
+                <span>{toast.submessage}</span>
               </div>
             </div>
           )}
