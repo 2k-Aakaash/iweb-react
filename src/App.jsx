@@ -34,6 +34,44 @@ export default function App() {
     const storedBookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
     storedBookmarks.sort((a, b) => (a.order || 0) - (b.order || 0));
     setBookmarks(storedBookmarks);
+
+    // Load custom fonts from IndexedDB
+    const request = indexedDB.open("iWebDB", 2);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('background_images')) {
+        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('custom_fonts')) {
+        db.createObjectStore('custom_fonts', { keyPath: 'family' });
+      }
+    };
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('custom_fonts')) return;
+      const tx = db.transaction('custom_fonts', 'readonly');
+      const store = tx.objectStore('custom_fonts');
+      const req = store.getAll();
+      req.onsuccess = async (ev) => {
+        const fonts = ev.target.result || [];
+        for (const font of fonts) {
+          try {
+            const fontUrl = URL.createObjectURL(font.blob);
+            const fontFace = new FontFace(font.family, `url(${fontUrl})`);
+            await fontFace.load();
+            document.fonts.add(fontFace);
+            console.log(`Loaded custom font: ${font.name} (${font.family})`);
+          } catch (err) {
+            console.error(`Failed to load custom font ${font.name}:`, err);
+          }
+        }
+        // Force refresh state in case the custom font was active
+        if (storedFont) {
+          setClockFont('');
+          setTimeout(() => setClockFont(storedFont), 50);
+        }
+      };
+    };
   }, []);
 
   // Global hotkey Ctrl+K / Cmd+K listener
@@ -95,6 +133,7 @@ export default function App() {
         bookmarks={bookmarks}
         setBookmarks={setBookmarks}
         onChangeBg={() => changeBgRef.current?.()}
+        onOpenNotes={() => window.dispatchEvent(new CustomEvent('notes:open'))}
         onOpenSettings={() => setShowSettings(true)}
       />
 

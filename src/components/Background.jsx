@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Vibrant from '../libs/vibrant';
 
 const dbName = "iWebDB";
-const dbVersion = 1;
+const dbVersion = 2;
 const storeName = "background_images";
 
 export default function Background({ 
@@ -108,6 +108,9 @@ export default function Background({
       const dbInstance = e.target.result;
       if (!dbInstance.objectStoreNames.contains(storeName)) {
         dbInstance.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
+      }
+      if (!dbInstance.objectStoreNames.contains('custom_fonts')) {
+        dbInstance.createObjectStore('custom_fonts', { keyPath: 'family' });
       }
     };
   }, []);
@@ -361,135 +364,5 @@ export default function Background({
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
-  return (
-    <>
-      <div className="bottom-left-corner">
-        <button 
-          id="customization-button" 
-          className="custom-button"
-          onClick={() => setShowCustomization(!showCustomization)}
-        >
-          Customization ✨
-        </button>
-
-        <div 
-          id="font-box-container" 
-          className={`font-container ${showCustomization ? '' : 'hidden'}`}
-        >
-          <button id="bgButton" className="bg-button" onClick={handleCustomBgClick}>
-            Custom BG
-          </button>
-          <input 
-            type="file" 
-            id="fileInput" 
-            accept=".jpg, .jpeg, .png, .gif" 
-            style={{ display: 'none' }}
-            ref={fileInputRef}
-            onChange={handleFileChange}
-          />
-
-          <button 
-            id="custom-name-btn" 
-            className="custom-name-button"
-            onClick={() => {
-              setShowNameInput(!showNameInput);
-              setNameInputValue(customName || '');
-            }}
-          >
-            Custom Name
-          </button>
-
-          <button id="remove-bg-button" className="remove-bg-button" onClick={openRemoveBgOverlay}>
-            Remove BG
-          </button>
-
-          <button 
-            id="fontButton" 
-            className="custom-font-button"
-            onClick={() => setShowFontBox(!showFontBox)}
-          >
-            Custom Font
-          </button>
-
-          <button 
-            id="musicLibraryButton" 
-            className="music-library-button"
-            onClick={onOpenMusicLibrary}
-          >
-            Music Library
-          </button>
-
-          <div 
-            id="fontBox" 
-            className="box-container" 
-            style={{ display: showFontBox ? 'block' : 'none' }}
-          >
-            {fontOptions.map((font, idx) => (
-              <img 
-                key={idx}
-                src={font.svg} 
-                className={`font-option ${clockFont === font.family ? 'selected-font' : ''}`}
-                data-font-family={font.family}
-                alt={font.name}
-                onClick={() => handleFontSelect(font.family)}
-              />
-            ))}
-          </div>
-
-          <div 
-            className={`input-container ${showNameInput ? 'show-input' : ''}`} 
-            id="input-container"
-          >
-            <input 
-              type="text" 
-              id="name-input" 
-              placeholder="Enter your name"
-              value={nameInputValue}
-              onChange={(e) => setNameInputValue(e.target.value)}
-              onKeyUp={handleNameSave}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Remove BG Overlay Modal */}
-      <div 
-        id="remove-bg-window" 
-        className="remove-bg-window"
-        style={{ display: showRemoveBgOverlay ? 'block' : 'none' }}
-      >
-        <div className="remove-bg-content" style={{ position: 'relative' }}>
-          <div className="window-controls">
-            <span className="window-dot dot-close" onClick={closeRemoveBgOverlay}></span>
-            <span className="window-dot dot-minimize"></span>
-            <span className="window-dot dot-maximize"></span>
-          </div>
-          <div className="navbar" style={{ paddingTop: '20px' }}>
-            <p className="navbar-text">Remove Background Images</p>
-            <button 
-              id="delete-bg-button" 
-              className="delete-button"
-              onClick={handleDeleteSelectedBgs}
-            >
-              Delete Selected
-            </button>
-          </div>
-
-          <div className="image-grid">
-            {backgrounds.map((bg, idx) => (
-              <div key={idx} className="image-item">
-                <input 
-                  type="checkbox" 
-                  id={`image-checkbox-${idx}`}
-                  checked={selectedToDelete.includes(idx)}
-                  onChange={() => handleToggleSelectDelete(idx)}
-                />
-                <img src={bg} alt={`Saved Background ${idx + 1}`} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </>
-  );
+  return null;
 }

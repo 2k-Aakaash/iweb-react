@@ -1069,7 +1069,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
 
   // Format MM:SS
   const formatSecs = (secs) => {
-    if (isNaN(secs) || secs === null) return '0:00';
+    if (isNaN(secs) || secs === null || secs < 0) return '0:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
@@ -1209,16 +1209,19 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   };
 
   const handleSearchSubmit = async (queryText) => {
+    console.log("=== handleSearchSubmit triggered ===", queryText);
     if (!queryText || !queryText.trim()) return;
     setSearchSuggestions([]);
 
     const parseResult = parseSearchIntent(queryText);
+    console.log("Intent Parser Output:", parseResult);
     if (!parseResult) return;
 
     const { intent, artist, playlistName } = parseResult;
 
     // Helper to get tracks matching an artist search term
     const getTracksForArtistSearch = (artistQuery) => {
+      console.log("getTracksForArtistSearch invoked with query:", artistQuery);
       if (!artistQuery) return { name: '', tracks: [] };
 
       // 1. Try exact/case-insensitive match on non-unknown artists
@@ -1228,19 +1231,24 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
         t.artist.toLowerCase() === artistQuery.toLowerCase() && 
         t.artist.toLowerCase() !== 'unknown artist'
       );
+      console.log("Step 1 (Exact Artist) matched count:", tracks.length);
 
       // 2. If no tracks found, check fuzzy matches in the search index
       if (tracks.length === 0 && fuseSearchRef.current) {
         const fuzzyResults = fuseSearchRef.current.search(artistQuery);
+        console.log("Step 2 (Fuse.js Search) results:", fuzzyResults);
         if (fuzzyResults.length > 0) {
           // If the best match has a real artist, filter by that artist
           const bestMatch = fuzzyResults[0].item;
+          console.log("Best match candidate:", bestMatch);
           if (bestMatch.artist && bestMatch.artist.toLowerCase() !== 'unknown artist') {
             matchedName = bestMatch.artist;
             tracks = library.filter(t => (t.artist || '').toLowerCase() === matchedName.toLowerCase());
+            console.log("Matched real artist, tracks count:", tracks.length);
           } else {
             // If the matched track is "Unknown Artist", we ONLY include the tracks from the search index
             // that actually contain the query word in their title or path/filename.
+            console.log("Best match has Unknown Artist, filtering fuzzy results by query substring");
             matchedName = artistQuery;
             const matchedIds = new Set();
             fuzzyResults.forEach(res => {
@@ -1251,18 +1259,21 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                 tracks.push(item);
               }
             });
+            console.log("Filtered fuzzy matches count:", tracks.length);
           }
         }
       }
 
       // If we still have absolutely nothing, but it's a specific query, do a simple substring fallback
       if (tracks.length === 0) {
+        console.log("Step 3 (Substring Fallback) triggered");
         const queryLower = artistQuery.toLowerCase();
         tracks = library.filter(t => 
           (t.title || '').toLowerCase().includes(queryLower) ||
           (t.artist || '').toLowerCase().includes(queryLower) ||
           (t.path || '').toLowerCase().includes(queryLower)
         );
+        console.log("Substring fallback tracks count:", tracks.length);
       }
 
       return { name: matchedName, tracks };
@@ -1450,7 +1461,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
             onClick={handleIslandClick}
           >
             {/* 1. Collapsed State Content */}
-            {islandState === 'collapsed' && activeTrack && (
+            {activeTrack && (
               <div className="island-collapsed-content">
                 <img 
                   className="island-art" 
@@ -1472,7 +1483,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
             )}
 
             {/* 2. Hovered State Content */}
-            {islandState === 'hovered' && activeTrack && (
+            {activeTrack && (
               <div className="island-hovered-content">
                 <img 
                   className="island-art" 
@@ -1547,7 +1558,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                     />
                   </div>
                   <span className="expanded-time-remaining" id="island-expanded-remaining">
-                    -{formatSecs(duration - elapsed)}
+                    -{formatSecs(Math.max(0, duration - elapsed))}
                   </span>
                 </div>
                 <div className="expanded-controls-row">

@@ -39,6 +39,10 @@ export default function SettingsModal({
   const [activeBgId, setActiveBgId] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Custom fonts state & ref
+  const [customFonts, setCustomFonts] = useState([]);
+  const fontFileInputRef = useRef(null);
+
   // Music state
   const [musicSettings, setMusicSettings] = useState({
     volume: 80,
@@ -54,16 +58,26 @@ export default function SettingsModal({
     setNameInput(customName || '');
   }, [customName]);
 
-  // Load Wallpapers and Music settings
+  // Load Wallpapers, Custom Fonts and Music settings
   useEffect(() => {
     if (isOpen) {
       loadBackgrounds();
       loadMusicSettings();
+      loadCustomFonts();
     }
   }, [isOpen]);
 
   const loadBackgrounds = () => {
-    const request = indexedDB.open("iWebDB", 1);
+    const request = indexedDB.open("iWebDB", 2);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('background_images')) {
+        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('custom_fonts')) {
+        db.createObjectStore('custom_fonts', { keyPath: 'family' });
+      }
+    };
     request.onsuccess = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('background_images')) return;
@@ -82,6 +96,83 @@ export default function SettingsModal({
     const lastUsed = localStorage.getItem('lastUsedBackgroundId');
     if (lastUsed) {
       setActiveBgId(parseInt(lastUsed, 10));
+    }
+  };
+
+  const loadCustomFonts = () => {
+    const request = indexedDB.open("iWebDB", 2);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('background_images')) {
+        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('custom_fonts')) {
+        db.createObjectStore('custom_fonts', { keyPath: 'family' });
+      }
+    };
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('custom_fonts')) return;
+      const tx = db.transaction('custom_fonts', 'readonly');
+      const store = tx.objectStore('custom_fonts');
+      const req = store.getAll();
+      req.onsuccess = (ev) => {
+        setCustomFonts(ev.target.result || []);
+      };
+    };
+  };
+
+  const handleUploadCustomFont = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const arrayBuffer = ev.target.result;
+        const fontName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+        // Make clean font-family name
+        const cleanFontFamily = "custom_" + fontName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+        
+        // Save to IndexedDB
+        const request = indexedDB.open("iWebDB", 2);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('background_images')) {
+            db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+          }
+          if (!db.objectStoreNames.contains('custom_fonts')) {
+            db.createObjectStore('custom_fonts', { keyPath: 'family' });
+          }
+        };
+        request.onsuccess = (event) => {
+          const db = event.target.result;
+          const tx = db.transaction('custom_fonts', 'readwrite');
+          const store = tx.objectStore('custom_fonts');
+          
+          const newFontBlob = new Blob([arrayBuffer], { type: file.type || 'font/woff2' });
+          const record = {
+            family: cleanFontFamily,
+            name: fontName,
+            blob: newFontBlob
+          };
+          
+          const putReq = store.put(record);
+          putReq.onsuccess = async () => {
+            // Load dynamically into the document
+            try {
+              const fontUrl = URL.createObjectURL(newFontBlob);
+              const fontFace = new FontFace(cleanFontFamily, `url(${fontUrl})`);
+              await fontFace.load();
+              document.fonts.add(fontFace);
+              console.log(`Registered custom font: ${fontName}`);
+            } catch (err) {
+              console.error("Error registering FontFace:", err);
+            }
+            // Reload custom fonts list
+            loadCustomFonts();
+          };
+        };
+      };
+      reader.readAsArrayBuffer(file);
     }
   };
 
@@ -151,7 +242,16 @@ export default function SettingsModal({
   const handleUploadWallpaper = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const request = indexedDB.open("iWebDB", 1);
+      const request = indexedDB.open("iWebDB", 2);
+      request.onupgradeneeded = (ev) => {
+        const db = ev.target.result;
+        if (!db.objectStoreNames.contains('background_images')) {
+          db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('custom_fonts')) {
+          db.createObjectStore('custom_fonts', { keyPath: 'family' });
+        }
+      };
       request.onsuccess = (ev) => {
         const db = ev.target.result;
         const tx = db.transaction('background_images', 'readwrite');
@@ -176,7 +276,16 @@ export default function SettingsModal({
   const handleDeleteWallpaper = (id, e) => {
     e.stopPropagation();
     if (window.confirm('Delete this background image?')) {
-      const request = indexedDB.open("iWebDB", 1);
+      const request = indexedDB.open("iWebDB", 2);
+      request.onupgradeneeded = (ev) => {
+        const db = ev.target.result;
+        if (!db.objectStoreNames.contains('background_images')) {
+          db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('custom_fonts')) {
+          db.createObjectStore('custom_fonts', { keyPath: 'family' });
+        }
+      };
       request.onsuccess = (ev) => {
         const db = ev.target.result;
         const tx = db.transaction('background_images', 'readwrite');
@@ -356,20 +465,45 @@ export default function SettingsModal({
                   </div>
                 </div>
 
-                <div className="settings-group-card-title">Clock Font</div>
-                <div className="settings-group-card">
-                  {fontOptions.map((font, idx) => (
-                    <div
-                      key={idx}
-                      className="settings-row settings-row-clickable"
-                      onClick={() => handleSelectFont(font.family)}
-                    >
-                      <span className="settings-label">{font.name}</span>
-                      {clockFont === font.family && (
-                        <span className="settings-check-icon">✓</span>
-                      )}
-                    </div>
-                  ))}
+                <div className="settings-group-card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Clock Font</span>
+                  <button 
+                    className="settings-btn settings-btn-primary"
+                    style={{ fontSize: '11px', padding: '4px 12px' }}
+                    onClick={() => fontFileInputRef.current.click()}
+                  >
+                    Add New Font
+                  </button>
+                  <input 
+                    type="file"
+                    ref={fontFileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".ttf,.otf,.woff,.woff2"
+                    onChange={handleUploadCustomFont}
+                  />
+                </div>
+                <div className="settings-font-grid">
+                  {[
+                    ...fontOptions,
+                    ...customFonts.map(f => ({ name: f.name, family: f.family }))
+                  ].map((font, idx) => {
+                    const isActive = clockFont === font.family;
+                    return (
+                      <div
+                        key={idx}
+                        className={`settings-font-card ${isActive ? 'active' : ''}`}
+                        onClick={() => handleSelectFont(font.family)}
+                      >
+                        <div className="settings-font-preview" style={{ fontFamily: font.family }}>
+                          12
+                        </div>
+                        <span className="settings-font-name" title={font.name}>{font.name}</span>
+                        {isActive && (
+                          <span className="settings-font-check">✓</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

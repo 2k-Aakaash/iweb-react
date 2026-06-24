@@ -65,7 +65,16 @@ function restoreNotes(notesArray) {
 // Background images (Wallpapers) helpers
 function getBackgroundDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('iWebDB', 1);
+    const req = indexedDB.open('iWebDB', 2);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('background_images')) {
+        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('custom_fonts')) {
+        db.createObjectStore('custom_fonts', { keyPath: 'family' });
+      }
+    };
     req.onerror = () => reject(req.error);
     req.onsuccess = (e) => resolve(e.target.result);
   });
@@ -88,17 +97,8 @@ function getAllBackgrounds() {
 }
 
 function restoreBackgrounds(backgroundsArray) {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('iWebDB', 1);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('background_images')) {
-        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-      }
-    };
-    req.onerror = () => reject(req.error);
-    req.onsuccess = (e) => {
-      const db = e.target.result;
+  return getBackgroundDB().then((db) => {
+    return new Promise((resolve, reject) => {
       const tx = db.transaction('background_images', 'readwrite');
       const store = tx.objectStore('background_images');
       const clearReq = store.clear();
@@ -118,7 +118,53 @@ function restoreBackgrounds(backgroundsArray) {
           putReq.onerror = () => reject(putReq.error);
         });
       };
-    };
+    });
+  });
+}
+
+function getAllCustomFonts() {
+  return getBackgroundDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      if (!db.objectStoreNames.contains('custom_fonts')) {
+        resolve([]);
+        return;
+      }
+      const tx = db.transaction('custom_fonts', 'readonly');
+      const store = tx.objectStore('custom_fonts');
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  });
+}
+
+function restoreCustomFonts(fontsArray) {
+  return getBackgroundDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      if (!db.objectStoreNames.contains('custom_fonts')) {
+        resolve();
+        return;
+      }
+      const tx = db.transaction('custom_fonts', 'readwrite');
+      const store = tx.objectStore('custom_fonts');
+      const clearReq = store.clear();
+      clearReq.onerror = () => reject(clearReq.error);
+      clearReq.onsuccess = () => {
+        if (fontsArray.length === 0) {
+          resolve();
+          return;
+        }
+        let completed = 0;
+        fontsArray.forEach((font) => {
+          const putReq = store.put(font);
+          putReq.onsuccess = () => {
+            completed++;
+            if (completed === fontsArray.length) resolve();
+          };
+          putReq.onerror = () => reject(putReq.error);
+        });
+      };
+    });
   });
 }
 
@@ -307,6 +353,22 @@ export async function exportToIwebBackup(selectedModules) {
     console.error('Error exporting search database:', err);
   }
 
+  // 7. Back up Custom Fonts
+  try {
+    const customFonts = await getAllCustomFonts();
+    customFonts.forEach((font) => {
+      if (font.blob) {
+        zip.file(`fonts/${font.family}`, font.blob);
+      }
+    });
+    settingsData.custom_fonts_meta = customFonts.map((font) => ({
+      family: font.family,
+      name: font.name
+    }));
+  } catch (err) {
+    console.error('Error exporting custom fonts:', err);
+  }
+
   // Save settings.json
   zip.file('settings.json', JSON.stringify(settingsData, null, 2));
 
@@ -479,5 +541,33 @@ export async function restoreFromIwebBackup(zip, metadata, selectedModules) {
         console.error('Failed to restore notes:', err);
       }
     }
+  }
+
+  // 6. Restore Custom Fonts (always restore them if present in the settings.json and zip)
+  try {
+    const settingsFile = zip.file('settings.json');
+    if (settingsFile) {
+      const settingsData = JSON.parse(await settingsFile.async('string'));
+      const customFontsMeta = settingsData.custom_fonts_meta || [];
+      const customFonts = [];
+
+      for (const meta of customFontsMeta) {
+        const fileInZip = zip.file(`fonts/${meta.family}`);
+        if (fileInZip) {
+          const blobData = await fileInZip.async('blob');
+          customFonts.push({
+            family: meta.family,
+            name: meta.name,
+            blob: blobData
+          });
+        }
+      }
+
+      if (customFonts.length > 0) {
+        await restoreCustomFonts(customFonts);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to restore custom fonts:', err);
   }
 }

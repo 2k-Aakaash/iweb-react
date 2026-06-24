@@ -69,6 +69,17 @@ export default function Notes() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeNoteId, setActiveNoteId] = useState(null);
 
+  // Open modal via custom event
+  useEffect(() => {
+    const handleOpen = () => {
+      setShowModal(true);
+    };
+    window.addEventListener('notes:open', handleOpen);
+    return () => {
+      window.removeEventListener('notes:open', handleOpen);
+    };
+  }, []);
+
   // Local state for the currently active note in the editor (to avoid laggy typing)
   const [editorTitle, setEditorTitle] = useState('');
   const [editorContent, setEditorContent] = useState('');
@@ -309,11 +320,7 @@ export default function Notes() {
   );
 
   return (
-    <div className="notes-box">
-      <button id="add-note-btn" onClick={() => setShowModal(true)}>
-        Notes
-      </button>
-
+    <>
       {showModal && (
         <div className="remove-bg-window" style={{ display: 'block' }}>
           <div className="remove-bg-content notes-overhaul-modal">
@@ -464,6 +471,6 @@ export default function Notes() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -10,7 +10,7 @@ const scaleValue = (value, from, to) => {
   return Math.floor(capped * scale + to[0]);
 };
 
-export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenSettings }) {
+export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenNotes, onOpenSettings }) {
   const [isJiggling, setIsJiggling] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState({ show: false, bookmark: null });
@@ -301,7 +301,32 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenS
               <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Change BG</span>
             </button>
           </li>
-
+          {/* ── Notes Button ── */}
+          <li className={`${styles.app} ${styles.action}`} data-action="notes" onMouseMove={handleAppHover}>
+            <button
+              type="button"
+              className={styles.actionBtn}
+              title="Notes"
+              onClick={onOpenNotes}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={styles.actionIcon}
+              >
+                {/* Note / Notepad icon */}
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="9" y1="9" x2="15" y2="9" />
+                <line x1="9" y1="13" x2="15" y2="13" />
+                <line x1="9" y1="17" x2="13" y2="17" />
+              </svg>
+              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Notes</span>
+            </button>
+          </li>
           {/* ── Settings Button ── */}
           <li className={`${styles.app} ${styles.action}`} data-action="settings" onMouseMove={handleAppHover}>
             <button
