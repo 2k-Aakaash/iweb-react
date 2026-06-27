@@ -135,6 +135,7 @@ export default function App() {
         onChangeBg={() => changeBgRef.current?.()}
         onOpenNotes={() => window.dispatchEvent(new CustomEvent('notes:open'))}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenMusicLibrary={() => setShowMusicLibrary(true)}
       />
 
       {/* 5. Notes Section */}

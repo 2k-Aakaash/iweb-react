@@ -10,7 +10,7 @@ const scaleValue = (value, from, to) => {
   return Math.floor(capped * scale + to[0]);
 };
 
-export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenNotes, onOpenSettings }) {
+export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenNotes, onOpenSettings, onOpenMusicLibrary }) {
   const [isJiggling, setIsJiggling] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState({ show: false, bookmark: null });
@@ -325,6 +325,30 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                 <line x1="9" y1="17" x2="13" y2="17" />
               </svg>
               <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Notes</span>
+            </button>
+          </li>
+          {/* ── Music Library Button ── */}
+          <li className={`${styles.app} ${styles.action}`} data-action="music" onMouseMove={handleAppHover}>
+            <button
+              type="button"
+              className={styles.actionBtn}
+              title="Music Library"
+              onClick={onOpenMusicLibrary}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={styles.actionIcon}
+              >
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Music Library</span>
             </button>
           </li>
           {/* ── Settings Button ── */}

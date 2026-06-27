@@ -1929,9 +1929,12 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                             Clear Library
                           </button>
                         </div>
-                        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>
-                          Status: {statusText}
-                        </p>
+                         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>
+                           Selected Folder: <strong style={{ color: '#fff' }}>{dirHandle ? dirHandle.name : 'None'}</strong>
+                         </p>
+                         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                           Status: {statusText}
+                         </p>
                       </div>
 
                       {/* Section 2: Audio & Playback Options */}

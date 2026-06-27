@@ -192,6 +192,12 @@
   color: #ffffff;
 }
 
+/* Music Library scales on hover */
+.action[data-action="music"] .actionBtn:hover .actionIcon {
+  transform: scale(1.15);
+  color: #ffffff;
+}
+
 /* ── Tooltip ── */
 .tooltip {
   position: absolute;
