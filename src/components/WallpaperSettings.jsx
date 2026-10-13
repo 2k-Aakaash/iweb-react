@@ -417,11 +417,11 @@ export default function WallpaperSettings({ isOpen }) {
                 <span className="wp-setup-icon" aria-hidden="true">🔑</span>
                 <h4>Unsplash isn’t set up</h4>
                 <p>
-                  Add your Unsplash access key to the <code>.env</code> file in the project root:
+                  This build has no Unsplash proxy. Point it at your deployed proxy in the <code>.env</code> file:
                 </p>
-                <pre className="wp-code">VITE_UNSPLASH_ACCESS_KEY=your_access_key</pre>
+                <pre className="wp-code">VITE_UNSPLASH_PROXY_URL=https://your-app.vercel.app/api/unsplash</pre>
                 <p>
-                  Then restart the dev server, or rebuild the extension. Your saved Unsplash photos stay in the library below.
+                  Then rebuild the extension. Your saved Unsplash photos stay in the library below.
                 </p>
               </div>
             </div>

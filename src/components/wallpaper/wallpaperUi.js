@@ -25,8 +25,8 @@ export function isAbortError(err) {
 }
 
 const UNSPLASH_MESSAGES = {
-  NOT_CONFIGURED: 'Unsplash is not set up. Add VITE_UNSPLASH_ACCESS_KEY to your .env file, then restart the dev server or rebuild.',
-  UNAUTHORIZED: 'Unsplash rejected the access key. Check VITE_UNSPLASH_ACCESS_KEY in your .env file, then restart the dev server or rebuild.',
+  NOT_CONFIGURED: 'Unsplash is not set up. Set UNSPLASH_ACCESS_KEY on the server (.env for npm run dev, Vercel env vars when deployed); the extension build also needs VITE_UNSPLASH_PROXY_URL.',
+  UNAUTHORIZED: 'Unsplash rejected the access key. Check UNSPLASH_ACCESS_KEY (.env for npm run dev, Vercel env vars when deployed).',
   RATE_LIMITED: 'Unsplash is receiving too many requests from this key right now. Please try again a little later.',
   NETWORK: 'Couldn’t reach Unsplash. Check your connection and try again.',
   OFFLINE: 'You’re offline. Only photos already saved on this device are available.',

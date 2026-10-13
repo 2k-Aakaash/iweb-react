@@ -66,16 +66,28 @@ function readEnv(name) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function getAccessKey() {
-  return readEnv('VITE_UNSPLASH_ACCESS_KEY');
+// Requests go through a server-side proxy that adds the Access Key (api/unsplash.js on
+// Vercel, a Vite middleware in `npm run dev`), so the key is never shipped to the browser.
+// VITE_UNSPLASH_PROXY_URL overrides the default same-origin path; the extension build
+// needs an absolute URL (e.g. https://your-app.vercel.app/api/unsplash).
+const DEFAULT_PROXY_PATH = '/api/unsplash';
+
+function getProxyUrl() {
+  const configured = readEnv('VITE_UNSPLASH_PROXY_URL') || DEFAULT_PROXY_PATH;
+  if (/^https?:\/\//i.test(configured)) return new URL(configured);
+  const origin = typeof location !== 'undefined' && /^https?:$/.test(location.protocol)
+    ? location.origin
+    : null;
+  // A relative proxy path needs an http(s) page origin (not chrome-extension://).
+  return origin ? new URL(configured, origin) : null;
 }
 
 export function isUnsplashConfigured() {
-  return getAccessKey() !== '';
+  return getProxyUrl() !== null;
 }
 
 function getAppName() {
-  const name = readEnv('VITE_UNSPLASH_APP_NAME')
+  const name = (readEnv('UNSPLASH_APP_NAME') || readEnv('VITE_UNSPLASH_APP_NAME'))
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, '_')
     .replace(/^_+|_+$/g, '')
@@ -245,6 +257,9 @@ async function errorFromResponse(res) {
   const rateLimited = status === 429
     || (status === 403 && (/rate limit exceeded/i.test(body) || remaining === 0));
 
+  if (status === 500 && /not configured/i.test(body)) {
+    return new UnsplashError('NOT_CONFIGURED', 'The Unsplash proxy has no access key configured.', { status });
+  }
   if (rateLimited) {
     return new UnsplashError('RATE_LIMITED', 'Unsplash API rate limit reached. Try again later.', { status, retryAfter });
   }
@@ -273,7 +288,12 @@ function buildUrl(pathOrUrl, params) {
     if (value === undefined || value === null || value === '') continue;
     url.searchParams.set(key, String(value));
   }
-  return url.href;
+  // Re-target the Unsplash URL at the proxy: ?path=<endpoint>&<original params>.
+  const proxy = getProxyUrl();
+  if (!proxy) throw new UnsplashError('NOT_CONFIGURED', 'Unsplash proxy URL is not configured.');
+  proxy.searchParams.set('path', url.pathname);
+  for (const [key, value] of url.searchParams) proxy.searchParams.append(key, value);
+  return proxy.href;
 }
 
 /**
@@ -282,18 +302,12 @@ function buildUrl(pathOrUrl, params) {
  * NETWORK and SERVER errors; auth, rate-limit and client errors fail immediately.
  */
 async function request(pathOrUrl, { params, signal } = {}) {
-  const key = getAccessKey();
-  if (!key) throw new UnsplashError('NOT_CONFIGURED', 'Unsplash is not configured (missing access key).');
   if (signal?.aborted) throw abortedError();
   if (isOffline()) throw new UnsplashError('OFFLINE', 'You are offline.');
 
   const url = buildUrl(pathOrUrl, params);
   const init = {
     method: 'GET',
-    headers: {
-      Authorization: `Client-ID ${key}`,
-      'Accept-Version': 'v1',
-    },
     credentials: 'omit',
     signal,
   };

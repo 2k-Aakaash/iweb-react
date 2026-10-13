@@ -55,10 +55,12 @@ function textResponse(text, { status, headers = {} }) {
   return new Response(text, { status, headers });
 }
 
+const PROXY = 'https://proxy.test/api/unsplash';
+
 let fetchMock;
 
 beforeEach(() => {
-  vi.stubEnv('VITE_UNSPLASH_ACCESS_KEY', KEY);
+  vi.stubEnv('VITE_UNSPLASH_PROXY_URL', PROXY);
   vi.stubEnv('VITE_UNSPLASH_APP_NAME', 'iweb');
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
@@ -73,27 +75,29 @@ afterEach(() => {
 });
 
 describe('configuration and auth', () => {
-  it('reports configuration from the access key', () => {
+  it('is configured when a proxy URL is resolvable', () => {
     expect(isUnsplashConfigured()).toBe(true);
-    vi.stubEnv('VITE_UNSPLASH_ACCESS_KEY', '   ');
+    // A relative proxy path has no http(s) origin in node (like chrome-extension://).
+    vi.stubEnv('VITE_UNSPLASH_PROXY_URL', '');
     expect(isUnsplashConfigured()).toBe(false);
   });
 
-  it('sends the Client-ID and Accept-Version headers to the random endpoint', async () => {
+  it('routes the random endpoint through the proxy without sending any key', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([rawPhoto()]));
     const photos = await getRandomPhotos({ query: '  misty   mountains ', count: 10 });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     const parsed = new URL(url);
-    expect(parsed.origin + parsed.pathname).toBe('https://api.unsplash.com/photos/random');
+    expect(parsed.origin + parsed.pathname).toBe(PROXY);
+    expect(parsed.searchParams.get('path')).toBe('/photos/random');
     expect(parsed.searchParams.get('query')).toBe('misty mountains');
     expect(parsed.searchParams.get('count')).toBe('10');
     expect(parsed.searchParams.get('orientation')).toBe('landscape');
     expect(parsed.searchParams.get('content_filter')).toBe('high');
     expect(parsed.searchParams.has('client_id')).toBe(false);
-    expect(init.headers.Authorization).toBe(`Client-ID ${KEY}`);
-    expect(init.headers['Accept-Version']).toBe('v1');
+    expect(init.headers?.Authorization).toBeUndefined();
+    expect(url).not.toContain(KEY);
     expect(photos).toHaveLength(1);
     expect(photos[0].photoId).toBe('abc123');
   });
@@ -106,10 +110,16 @@ describe('configuration and auth', () => {
     expect(parsed.searchParams.has('query')).toBe(false);
   });
 
-  it('throws NOT_CONFIGURED without calling fetch when the key is missing', async () => {
-    vi.stubEnv('VITE_UNSPLASH_ACCESS_KEY', '');
+  it('throws NOT_CONFIGURED without calling fetch when no proxy is resolvable', async () => {
+    vi.stubEnv('VITE_UNSPLASH_PROXY_URL', '');
     await expect(getRandomPhotos()).rejects.toMatchObject({ code: 'NOT_CONFIGURED' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('maps the proxy "not configured" 500 to NOT_CONFIGURED without retrying', async () => {
+    fetchMock.mockResolvedValue(textResponse('{"errors":["Unsplash proxy is not configured (UNSPLASH_ACCESS_KEY missing)."]}', { status: 500 }));
+    await expect(getRandomPhotos()).rejects.toMatchObject({ code: 'NOT_CONFIGURED' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('maps 401 to UNAUTHORIZED without retrying and never leaks the key', async () => {
@@ -321,7 +331,7 @@ describe('response validation', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ total: 133, total_pages: 7, results: [rawPhoto('s1')] }));
     const res = await searchPhotos({ query: 'office', page: 2, perPage: 50 });
     const parsed = new URL(fetchMock.mock.calls[0][0]);
-    expect(parsed.pathname).toBe('/search/photos');
+    expect(parsed.searchParams.get('path')).toBe('/search/photos');
     expect(parsed.searchParams.get('page')).toBe('2');
     expect(parsed.searchParams.get('per_page')).toBe('30');
     expect(res).toMatchObject({ total: 133, totalPages: 7 });
@@ -342,12 +352,13 @@ describe('queries, tracking and utm', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('tracks downloads with an authenticated request to the download location', async () => {
+  it('tracks downloads through the proxy, keeping the download location params', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ url: 'https://image.unsplash.com/example' }));
     await trackDownload('https://api.unsplash.com/photos/abc/download?ixid=xyz');
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('https://api.unsplash.com/photos/abc/download?ixid=xyz');
-    expect(init.headers.Authorization).toBe(`Client-ID ${KEY}`);
+    const parsed = new URL(fetchMock.mock.calls[0][0]);
+    expect(parsed.origin + parsed.pathname).toBe(PROXY);
+    expect(parsed.searchParams.get('path')).toBe('/photos/abc/download');
+    expect(parsed.searchParams.get('ixid')).toBe('xyz');
   });
 
   it('refuses to send credentials to a non-API host', async () => {
