@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { exportToIwebBackup, parseIwebBackup, restoreFromIwebBackup } from '../libs/backupService';
+import { openIwebDB } from '../libs/wallpaper/db';
+import WallpaperSettings from './WallpaperSettings';
 
 export default function SettingsModal({
   isOpen,
@@ -34,11 +36,6 @@ export default function SettingsModal({
   });
   const [showImportConfirm, setShowImportConfirm] = useState(false);
 
-  // Background images state (for Wallpaper tab)
-  const [wallpapers, setWallpapers] = useState([]);
-  const [activeBgId, setActiveBgId] = useState(null);
-  const fileInputRef = useRef(null);
-
   // Custom fonts state & ref
   const [customFonts, setCustomFonts] = useState([]);
   const fontFileInputRef = useRef(null);
@@ -58,68 +55,28 @@ export default function SettingsModal({
     setNameInput(customName || '');
   }, [customName]);
 
-  // Load Wallpapers, Custom Fonts and Music settings
+  // Load Custom Fonts and Music settings
   useEffect(() => {
     if (isOpen) {
-      loadBackgrounds();
       loadMusicSettings();
       loadCustomFonts();
     }
   }, [isOpen]);
 
-  const loadBackgrounds = () => {
-    const request = indexedDB.open("iWebDB", 2);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('background_images')) {
-        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains('custom_fonts')) {
-        db.createObjectStore('custom_fonts', { keyPath: 'family' });
-      }
-    };
-    request.onsuccess = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('background_images')) return;
-      const tx = db.transaction('background_images', 'readonly');
-      const store = tx.objectStore('background_images');
-      const req = store.getAll();
-      req.onsuccess = (ev) => {
-        const records = ev.target.result || [];
-        const mapped = records.map(r => ({
-          id: r.id,
-          url: URL.createObjectURL(r.blob)
-        }));
-        setWallpapers(mapped);
-      };
-    };
-    const lastUsed = localStorage.getItem('lastUsedBackgroundId');
-    if (lastUsed) {
-      setActiveBgId(parseInt(lastUsed, 10));
-    }
-  };
-
   const loadCustomFonts = () => {
-    const request = indexedDB.open("iWebDB", 2);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('background_images')) {
-        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains('custom_fonts')) {
-        db.createObjectStore('custom_fonts', { keyPath: 'family' });
-      }
-    };
-    request.onsuccess = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('custom_fonts')) return;
-      const tx = db.transaction('custom_fonts', 'readonly');
-      const store = tx.objectStore('custom_fonts');
-      const req = store.getAll();
-      req.onsuccess = (ev) => {
-        setCustomFonts(ev.target.result || []);
-      };
-    };
+    openIwebDB()
+      .then((db) => {
+        if (!db.objectStoreNames.contains('custom_fonts')) return;
+        const tx = db.transaction('custom_fonts', 'readonly');
+        const store = tx.objectStore('custom_fonts');
+        const req = store.getAll();
+        req.onsuccess = (ev) => {
+          setCustomFonts(ev.target.result || []);
+        };
+      })
+      .catch((err) => {
+        console.error('Error opening iWebDB for custom fonts:', err);
+      });
   };
 
   const handleUploadCustomFont = (e) => {
@@ -133,43 +90,37 @@ export default function SettingsModal({
         const cleanFontFamily = "custom_" + fontName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
         
         // Save to IndexedDB
-        const request = indexedDB.open("iWebDB", 2);
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-          if (!db.objectStoreNames.contains('background_images')) {
-            db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-          }
-          if (!db.objectStoreNames.contains('custom_fonts')) {
-            db.createObjectStore('custom_fonts', { keyPath: 'family' });
-          }
+        let db;
+        try {
+          db = await openIwebDB();
+        } catch (err) {
+          console.error('Error opening iWebDB for custom fonts:', err);
+          return;
+        }
+        const tx = db.transaction('custom_fonts', 'readwrite');
+        const store = tx.objectStore('custom_fonts');
+        
+        const newFontBlob = new Blob([arrayBuffer], { type: file.type || 'font/woff2' });
+        const record = {
+          family: cleanFontFamily,
+          name: fontName,
+          blob: newFontBlob
         };
-        request.onsuccess = (event) => {
-          const db = event.target.result;
-          const tx = db.transaction('custom_fonts', 'readwrite');
-          const store = tx.objectStore('custom_fonts');
-          
-          const newFontBlob = new Blob([arrayBuffer], { type: file.type || 'font/woff2' });
-          const record = {
-            family: cleanFontFamily,
-            name: fontName,
-            blob: newFontBlob
-          };
-          
-          const putReq = store.put(record);
-          putReq.onsuccess = async () => {
-            // Load dynamically into the document
-            try {
-              const fontUrl = URL.createObjectURL(newFontBlob);
-              const fontFace = new FontFace(cleanFontFamily, `url(${fontUrl})`);
-              await fontFace.load();
-              document.fonts.add(fontFace);
-              console.log(`Registered custom font: ${fontName}`);
-            } catch (err) {
-              console.error("Error registering FontFace:", err);
-            }
-            // Reload custom fonts list
-            loadCustomFonts();
-          };
+        
+        const putReq = store.put(record);
+        putReq.onsuccess = async () => {
+          // Load dynamically into the document
+          try {
+            const fontUrl = URL.createObjectURL(newFontBlob);
+            const fontFace = new FontFace(cleanFontFamily, `url(${fontUrl})`);
+            await fontFace.load();
+            document.fonts.add(fontFace);
+            console.log(`Registered custom font: ${fontName}`);
+          } catch (err) {
+            console.error("Error registering FontFace:", err);
+          }
+          // Reload custom fonts list
+          loadCustomFonts();
         };
       };
       reader.readAsArrayBuffer(file);
@@ -236,72 +187,6 @@ export default function SettingsModal({
       const store = tx.objectStore('settings');
       store.put(updated, 'music-settings');
     };
-  };
-
-  // Upload wallpaper logic
-  const handleUploadWallpaper = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const request = indexedDB.open("iWebDB", 2);
-      request.onupgradeneeded = (ev) => {
-        const db = ev.target.result;
-        if (!db.objectStoreNames.contains('background_images')) {
-          db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-        }
-        if (!db.objectStoreNames.contains('custom_fonts')) {
-          db.createObjectStore('custom_fonts', { keyPath: 'family' });
-        }
-      };
-      request.onsuccess = (ev) => {
-        const db = ev.target.result;
-        const tx = db.transaction('background_images', 'readwrite');
-        const store = tx.objectStore('background_images');
-        const addReq = store.add({ blob: file });
-        addReq.onsuccess = () => {
-          loadBackgrounds();
-        };
-      };
-    }
-  };
-
-  // Set active wallpaper
-  const handleSetWallpaper = (id, url) => {
-    setActiveBgId(id);
-    localStorage.setItem('lastUsedBackgroundId', id);
-    document.body.style.backgroundImage = `url('${url}')`;
-    document.documentElement.style.setProperty('--page-bg-url', `url('${url}')`);
-  };
-
-  // Delete wallpaper
-  const handleDeleteWallpaper = (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Delete this background image?')) {
-      const request = indexedDB.open("iWebDB", 2);
-      request.onupgradeneeded = (ev) => {
-        const db = ev.target.result;
-        if (!db.objectStoreNames.contains('background_images')) {
-          db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-        }
-        if (!db.objectStoreNames.contains('custom_fonts')) {
-          db.createObjectStore('custom_fonts', { keyPath: 'family' });
-        }
-      };
-      request.onsuccess = (ev) => {
-        const db = ev.target.result;
-        const tx = db.transaction('background_images', 'readwrite');
-        const store = tx.objectStore('background_images');
-        const delReq = store.delete(id);
-        delReq.onsuccess = () => {
-          loadBackgrounds();
-          if (activeBgId === id) {
-            localStorage.removeItem('lastUsedBackgroundId');
-            document.body.style.backgroundImage = '';
-            document.documentElement.style.removeProperty('--page-bg-url');
-            setActiveBgId(null);
-          }
-        };
-      };
-    }
   };
 
   // Select Folder reconnect handler
@@ -551,48 +436,7 @@ export default function SettingsModal({
 
             {/* 3. WALLPAPER TAB */}
             {activeTab === 'wallpaper' && (
-              <div className="settings-tab-pane">
-                <div className="settings-wallpaper-controls">
-                  <button 
-                    className="settings-btn settings-btn-primary"
-                    onClick={() => fileInputRef.current.click()}
-                  >
-                    Add Wallpaper Image / GIF
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    style={{ display: 'none' }} 
-                    accept="image/*"
-                    onChange={handleUploadWallpaper}
-                  />
-                </div>
-
-                <div className="settings-wallpaper-grid">
-                  {wallpapers.map((wp) => (
-                    <div 
-                      key={wp.id} 
-                      className={`settings-wallpaper-item ${activeBgId === wp.id ? 'active' : ''}`}
-                      onClick={() => handleSetWallpaper(wp.id, wp.url)}
-                    >
-                      <img src={wp.url} alt="Wallpaper" />
-                      <button 
-                        className="settings-wallpaper-delete"
-                        onClick={(e) => handleDeleteWallpaper(wp.id, e)}
-                        title="Delete wallpaper"
-                      >
-                        &times;
-                      </button>
-                      {activeBgId === wp.id && (
-                        <div className="active-wallpaper-badge">Active</div>
-                      )}
-                    </div>
-                  ))}
-                  {wallpapers.length === 0 && (
-                    <p className="no-wallpapers-placeholder">No custom wallpapers uploaded yet.</p>
-                  )}
-                </div>
-              </div>
+              <WallpaperSettings isOpen={isOpen} />
             )}
 
             {/* 4. MUSIC TAB */}

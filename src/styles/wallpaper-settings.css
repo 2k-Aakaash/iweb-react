@@ -1,0 +1,850 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Wallpaper Settings (Local Images + Unsplash)
+   Builds on the macOS settings tokens in style.css (.settings-*). All classes are
+   prefixed with wp-. No backdrop-filter here: the settings modal already provides
+   the single glass layer, so panels and cards use plain translucent fills.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.wp-root {
+  --wp-accent: #007aff;
+  --wp-accent-soft: rgba(0, 122, 255, 0.18);
+  --wp-focus: #0a84ff;
+  --wp-surface: rgba(255, 255, 255, 0.04);
+  --wp-surface-hover: rgba(255, 255, 255, 0.08);
+  --wp-border: rgba(255, 255, 255, 0.08);
+  --wp-text-muted: rgba(255, 255, 255, 0.55);
+  --wp-danger: #ff453a;
+  --wp-warning: #ffb340;
+  --wp-success: #30d158;
+  --wp-radius: 12px;
+  --wp-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Never let wide content stretch the settings content column. */
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Neutralise legacy globals in style.css (`body { text-align: center }`,
+   `button { margin-top: 20px }`) that misalign controls inside this panel. */
+.wp-root {
+  text-align: left;
+}
+
+.wp-root button {
+  margin: 0;
+}
+
+.wp-root .settings-row {
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.wp-segmented {
+  align-items: center;
+}
+
+.wp-root .settings-group-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Visible focus rings (the base .settings-btn removes outlines) */
+.wp-root :focus-visible,
+.wp-root .settings-btn:focus-visible,
+.wp-root .settings-input-text:focus-visible {
+  outline: 2px solid var(--wp-focus);
+  outline-offset: 2px;
+}
+
+.wp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.wp-hidden-input {
+  display: none;
+}
+
+.wp-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.wp-row-wrap {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.wp-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.wp-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--wp-text-muted);
+  margin: 0;
+}
+
+/* ── Segmented control ───────────────────────────────────────────────────── */
+.wp-segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--wp-border);
+  flex-shrink: 0;
+}
+
+.wp-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s var(--wp-ease), color 0.15s var(--wp-ease);
+}
+
+.wp-segmented-sm .wp-segment {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.wp-segment:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wp-segment.is-checked {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.wp-segment:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.wp-segment-count {
+  font-size: 10px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  line-height: 16px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.wp-root .settings-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+.wp-btn-danger {
+  background: var(--wp-danger);
+  border-color: transparent;
+}
+.wp-btn-danger:hover:not(:disabled) {
+  background: #e0352b;
+}
+
+.wp-btn-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 168px;
+  padding: 9px 18px;
+  font-size: 13px;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.35);
+}
+
+.wp-link-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  color: #4da3ff;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.wp-link-btn:hover {
+  text-decoration: underline;
+}
+
+/* ── Notices ─────────────────────────────────────────────────────────────── */
+.wp-notice {
+  margin: 0;
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+.wp-notice.is-error {
+  color: #ffd1ce;
+  background: rgba(255, 69, 58, 0.12);
+  border-color: rgba(255, 69, 58, 0.28);
+}
+
+.wp-notice.is-warning {
+  color: #ffe2b3;
+  background: rgba(255, 179, 64, 0.1);
+  border-color: rgba(255, 179, 64, 0.25);
+}
+
+.wp-notice.is-success {
+  color: #c8f5d4;
+  background: rgba(48, 209, 88, 0.1);
+  border-color: rgba(48, 209, 88, 0.24);
+}
+
+.wp-gallery > .wp-notice {
+  margin-bottom: 12px;
+}
+
+/* ── Import progress + summary ───────────────────────────────────────────── */
+.wp-progress-row {
+  gap: 14px;
+}
+
+.wp-progress-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wp-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.wp-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wp-accent);
+  transition: width 0.2s var(--wp-ease);
+}
+
+.wp-progress-meta {
+  font-size: 11px;
+  color: var(--wp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wp-summary {
+  width: 100%;
+  font-size: 12px;
+}
+
+.wp-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wp-summary.is-success .wp-summary-text {
+  color: #c8f5d4;
+}
+.wp-summary.is-warning .wp-summary-text {
+  color: #ffe2b3;
+}
+
+.wp-summary-details {
+  margin-top: 8px;
+}
+
+.wp-summary-details summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--wp-text-muted);
+  border-radius: 4px;
+  width: max-content;
+}
+
+.wp-summary-details h4 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.wp-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wp-detail-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wp-detail-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wp-detail-reason {
+  color: #ffb4ae;
+  flex-shrink: 0;
+  max-width: 60%;
+  text-align: right;
+}
+
+/* ── Unsplash: quota, chips, search ──────────────────────────────────────── */
+.wp-quota {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.wp-quota-dots {
+  display: inline-flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.wp-quota-bar {
+  flex: 0 1 120px;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.wp-quota-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wp-success);
+  transition: width 0.2s var(--wp-ease);
+}
+
+.wp-quota-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--wp-success);
+  box-shadow: 0 0 6px rgba(48, 209, 88, 0.45);
+  transition: background 0.2s var(--wp-ease), box-shadow 0.2s var(--wp-ease);
+}
+
+.wp-quota-dot.is-used {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+
+.wp-quota-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+}
+
+.wp-quota-reset {
+  color: var(--wp-text-muted);
+}
+
+.wp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wp-chip {
+  border: 1px solid var(--wp-border);
+  background: var(--wp-surface);
+  color: rgba(255, 255, 255, 0.8);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s var(--wp-ease), border-color 0.15s var(--wp-ease), color 0.15s var(--wp-ease);
+}
+
+.wp-chip:hover {
+  background: var(--wp-surface-hover);
+  color: #ffffff;
+}
+
+.wp-chip.is-on {
+  background: var(--wp-accent-soft);
+  border-color: rgba(0, 122, 255, 0.6);
+  color: #ffffff;
+}
+
+.wp-search-form {
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.wp-root .wp-search-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
+.wp-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 14px;
+}
+
+.wp-loading-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wp-load-more {
+  align-self: center;
+}
+
+/* ── Unsplash setup empty state ──────────────────────────────────────────── */
+.wp-setup {
+  align-items: center;
+  text-align: center;
+  padding: 22px 24px;
+  gap: 6px;
+}
+
+.wp-setup-icon {
+  font-size: 26px;
+}
+
+.wp-setup h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wp-setup p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 380px;
+}
+
+.wp-setup code,
+.wp-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.wp-code {
+  margin: 4px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--wp-border);
+  font-size: 12px;
+  color: #c8e1ff;
+  user-select: all;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Gallery ─────────────────────────────────────────────────────────────── */
+.wp-gallery {
+  display: flex;
+  flex-direction: column;
+}
+
+.wp-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.wp-section-title {
+  margin: 0 auto 0 0;
+}
+
+.wp-select-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+}
+
+.wp-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 10px 8px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--wp-accent-soft);
+  border: 1px solid rgba(0, 122, 255, 0.35);
+}
+
+.wp-selection-count {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wp-selection-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wp-selection-actions .settings-btn {
+  padding: 4px 11px;
+  font-size: 11px;
+}
+
+.wp-dropzone {
+  position: relative;
+  border-radius: var(--wp-radius);
+  min-height: 120px;
+}
+
+.wp-dropzone.is-enabled {
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  transition: outline-color 0.15s var(--wp-ease);
+}
+
+.wp-dropzone.is-dragging {
+  outline-color: rgba(0, 122, 255, 0.8);
+}
+
+.wp-drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--wp-radius);
+  background: rgba(0, 122, 255, 0.16);
+  border: 2px dashed rgba(0, 122, 255, 0.85);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.wp-drop-overlay span {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(10, 12, 22, 0.75);
+}
+
+.wp-empty {
+  margin: 0;
+  padding: 34px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  border-radius: var(--wp-radius);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wp-results .wp-empty {
+  padding: 18px 12px;
+}
+
+.wp-empty-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.wp-grid {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px 12px;
+}
+
+.wp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  /* Skip layout/paint for cards scrolled out of view (keeps scrolling smooth). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+.wp-card-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--wp-surface);
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s var(--wp-ease), border-color 0.15s var(--wp-ease), box-shadow 0.15s var(--wp-ease);
+}
+
+.wp-card-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
+}
+
+.wp-card-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.wp-card-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.wp-card.is-active .wp-card-button {
+  border-color: var(--wp-accent);
+}
+
+.wp-card.is-selected .wp-card-button {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.45);
+}
+
+.wp-card.is-blocked .wp-card-button {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wp-card-img,
+.wp-card-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wp-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.wp-badge {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.wp-badge-source {
+  top: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.wp-badge-unsplash {
+  background: rgba(20, 20, 20, 0.7);
+}
+
+.wp-badge-active {
+  bottom: 5px;
+  left: 5px;
+  background: var(--wp-accent);
+}
+
+.wp-badge-cached {
+  top: 5px;
+  left: 5px;
+  background: rgba(48, 209, 88, 0.85);
+  color: #04210d;
+}
+
+.wp-card-check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.wp-card-check.is-checked {
+  background: var(--wp-accent);
+  border-color: var(--wp-accent);
+}
+
+.wp-card-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.wp-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  animation: wp-spin 0.8s linear infinite;
+}
+
+.wp-spinner-inline {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
+@keyframes wp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.wp-attribution {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--wp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wp-attribution a {
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 2px;
+  border-radius: 3px;
+}
+
+.wp-attribution a:hover {
+  color: #ffffff;
+  text-decoration-color: currentColor;
+}
+
+/* ── Confirm dialog ──────────────────────────────────────────────────────── */
+/* The settings modal is a containing block for fixed elements (transform), so
+   inset: 0 makes the overlay cover exactly the modal. */
+.wp-dialog-overlay {
+  inset: 0;
+  width: auto;
+  height: auto;
+}
+
+.wp-dialog {
+  max-width: calc(100% - 48px);
+  box-sizing: border-box;
+}
+
+.wp-dialog-message {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.wp-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .wp-root *,
+  .wp-root *::before,
+  .wp-root *::after {
+    transition: none !important;
+  }
+
+  .wp-root,
+  .wp-dialog-overlay,
+  .wp-dialog {
+    animation: none !important;
+  }
+
+  .wp-card-button:hover:not(:disabled),
+  .wp-card-button:active:not(:disabled),
+  .wp-root .settings-btn:active {
+    transform: none;
+  }
+
+  /* The spinner becomes a static ring; busy state is also conveyed by labels and aria-busy. */
+  .wp-spinner {
+    animation: none;
+  }
+}

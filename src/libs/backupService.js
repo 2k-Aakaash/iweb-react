@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { db as searchDB } from '../search/db/searchDB';
+import { openIwebDB } from './wallpaper/db';
 
 // Generic Promise-based IndexedDB helpers for notes DB
 function getNotesDB() {
@@ -64,20 +65,7 @@ function restoreNotes(notesArray) {
 
 // Background images (Wallpapers) helpers
 function getBackgroundDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('iWebDB', 2);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('background_images')) {
-        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains('custom_fonts')) {
-        db.createObjectStore('custom_fonts', { keyPath: 'family' });
-      }
-    };
-    req.onerror = () => reject(req.error);
-    req.onsuccess = (e) => resolve(e.target.result);
-  });
+  return openIwebDB();
 }
 
 function getAllBackgrounds() {

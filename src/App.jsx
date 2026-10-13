@@ -8,6 +8,7 @@ import Notes from './components/Notes';
 import { SearchBar } from './search/components/SearchBar';
 import { SearchResult } from './search/components/SearchResult';
 import SettingsModal from './components/SettingsModal';
+import { openIwebDB } from './libs/wallpaper/db';
 
 export default function App() {
   const [customName, setCustomName] = useState('');
@@ -36,18 +37,7 @@ export default function App() {
     setBookmarks(storedBookmarks);
 
     // Load custom fonts from IndexedDB
-    const request = indexedDB.open("iWebDB", 2);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('background_images')) {
-        db.createObjectStore('background_images', { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains('custom_fonts')) {
-        db.createObjectStore('custom_fonts', { keyPath: 'family' });
-      }
-    };
-    request.onsuccess = (e) => {
-      const db = e.target.result;
+    openIwebDB().then((db) => {
       if (!db.objectStoreNames.contains('custom_fonts')) return;
       const tx = db.transaction('custom_fonts', 'readonly');
       const store = tx.objectStore('custom_fonts');
@@ -71,7 +61,9 @@ export default function App() {
           setTimeout(() => setClockFont(storedFont), 50);
         }
       };
-    };
+    }).catch((err) => {
+      console.error('Failed to open iWebDB for custom fonts:', err);
+    });
   }, []);
 
   // Global hotkey Ctrl+K / Cmd+K listener
