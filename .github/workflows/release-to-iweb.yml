@@ -1,0 +1,112 @@
+# Builds iweb-react on every push to main and publishes the build to the
+# 2k-Aakaash/iWeb repository:
+#   - build files are committed to iWeb's `build` branch (iWeb `main` is never touched)
+#   - a new GitHub Release (marked Latest) is created from that commit with
+#     iWeb.Extension.zip attached
+#
+# Required setup in iweb-react → Settings → Secrets and variables → Actions:
+#   Secret   IWEB_DEPLOY_TOKEN     fine-grained PAT, repo 2k-Aakaash/iWeb, permission Contents: Read and write
+#   Variable UNSPLASH_PROXY_URL    e.g. https://your-app.vercel.app/api/unsplash (the extension has no server of its own)
+#   Variable UNSPLASH_APP_NAME     optional, defaults to "iweb"
+
+name: Release build to iWeb
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-to-iweb
+  cancel-in-progress: false
+
+env:
+  TARGET_REPO: 2k-Aakaash/iWeb
+  TARGET_BRANCH: build
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout iweb-react
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        env:
+          VITE_UNSPLASH_PROXY_URL: ${{ vars.UNSPLASH_PROXY_URL }}
+          UNSPLASH_APP_NAME: ${{ vars.UNSPLASH_APP_NAME || 'iweb' }}
+        run: npm run build
+
+      - name: Compute release version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./public/manifest.json').version")
+          TAG="v${VERSION}-build.${GITHUB_RUN_NUMBER}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Package extension zip
+        run: |
+          cd dist
+          zip -r ../iWeb.Extension.zip . -x '*.map'
+
+      - name: Push build to iWeb `build` branch
+        env:
+          TOKEN: ${{ secrets.IWEB_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          REMOTE="https://x-access-token:${TOKEN}@github.com/${TARGET_REPO}.git"
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "41898299+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads "$REMOTE" "$TARGET_BRANCH" >/dev/null; then
+            git clone --depth 1 --branch "$TARGET_BRANCH" "$REMOTE" target
+          else
+            # First run: create an orphan branch containing only build output.
+            git init target
+            git -C target checkout --orphan "$TARGET_BRANCH"
+            git -C target remote add origin "$REMOTE"
+          fi
+
+          # Replace the branch contents with the fresh build.
+          find target -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R dist/. target/
+
+          cd target
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Build output unchanged; reusing current commit."
+          else
+            git commit -m "Build from iweb-react@${{ steps.version.outputs.short_sha }}" \
+                       -m "Source: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
+          echo "BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Create Latest release in iWeb
+        env:
+          GH_TOKEN: ${{ secrets.IWEB_DEPLOY_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" iWeb.Extension.zip \
+            --repo "$TARGET_REPO" \
+            --target "$BUILD_COMMIT" \
+            --title "iWeb ${{ steps.version.outputs.tag }}" \
+            --notes "Automated build of [iweb-react@${{ steps.version.outputs.short_sha }}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}).
+
+          Install: download **iWeb.Extension.zip**, unzip it, then open chrome://extensions → enable Developer mode → Load unpacked → select the unzipped folder." \
+            --latest
