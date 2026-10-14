@@ -76,13 +76,14 @@ describe('importLocalFiles', () => {
     expect(result.imported).toHaveLength(3);
 
     const records = await listLocal();
-    expect(records.map((r) => r.name)).toEqual(['a.jpg', 'b.png', 'c.gif']);
-    expect(records.map((r) => r.id)).toEqual(result.imported);
+    // Files are processed concurrently, so storage order is not guaranteed.
+    expect(records.map((r) => r.name).sort()).toEqual(['a.jpg', 'b.png', 'c.gif']);
+    expect(records.map((r) => r.id).sort()).toEqual([...result.imported].sort());
     records.forEach((r) => {
       expect(r.thumb).toBeInstanceOf(Blob);
       expect(r.blob).toBeInstanceOf(Blob);
     });
-    expect(records[1].type).toBe('image/png');
+    expect(records.find((r) => r.name === 'b.png').type).toBe('image/png');
 
     expect(progress[0]).toEqual({ done: 0, total: 3, current: null });
     expect(progress.at(-1)).toMatchObject({ done: 3, total: 3 });

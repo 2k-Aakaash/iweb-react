@@ -92,6 +92,13 @@ export async function importLocalFiles(files, {
   const outcomes = new Array(total).fill(null);
   // hash -> Promise<outcome> of the first file in this batch with those bytes
   const batchHashes = new Map();
+  // Files claim their hash in selection order (hashing itself stays concurrent), so the
+  // first copy in the selection is always the one imported and later copies are duplicates.
+  const claimTurns = list.map(() => {
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    return { promise, resolve };
+  });
   let nextIndex = 0;
   let done = 0;
 
@@ -155,19 +162,23 @@ export async function importLocalFiles(files, {
       type = validateFile(file);
       hash = await sha256Hex(file);
     } catch (err) {
+      claimTurns[index].resolve();
       return toFailure(name, err);
     }
 
+    // Wait until every earlier file has claimed its hash, then claim ours.
+    if (index > 0) await claimTurns[index - 1].promise;
     // Same bytes as an earlier file in this batch: share that file's fate.
-    // (The map is checked and filled synchronously, so concurrent workers cannot race.)
     const first = batchHashes.get(hash);
     if (first) {
+      claimTurns[index].resolve();
       const outcome = await first;
       if (outcome.kind === 'imported' || outcome.kind === 'duplicate') return { kind: 'duplicate', name };
       return { ...outcome, name };
     }
     const pending = storeFile(file, name, type, hash);
     batchHashes.set(hash, pending);
+    claimTurns[index].resolve();
     return pending;
   }
 
