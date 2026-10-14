@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Background from './components/Background';
 import Clock from './components/Clock';
 import Dock from './components/Dock';
-import Weather from './components/Weather';
+import SmartStack from './components/widgets/SmartStack';
 import Music from './components/Music';
 import Notes from './components/Notes';
 import { SearchBar } from './search/components/SearchBar';
@@ -109,9 +109,9 @@ export default function App() {
         setShowModal={setShowMusicLibrary} 
       />
 
-      {/* 2. Top Right Weather widget */}
+      {/* 2. Top Right Smart Stack (Weather, Currency) */}
       <div className="top-right-container">
-        <Weather />
+        <SmartStack />
       </div>
 
       {/* 3. Center Dashboard Container */}

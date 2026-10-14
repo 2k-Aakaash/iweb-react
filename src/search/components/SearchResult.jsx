@@ -3,7 +3,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { List } from 'react-window';
 import { useSearch } from '../hooks/useSearch';
+import { useCurrencyAnswer } from '../hooks/useCurrencyAnswer';
 import { Favicon } from './Favicon';
+import { CurrencyAnswer } from './CurrencyAnswer';
 import '../styles/search.css';
 
 export const SearchResult = ({ isOpen, onClose }) => {
@@ -21,6 +23,10 @@ export const SearchResult = ({ isOpen, onClose }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const answerRef = useRef(null);
+
+  // Instant answer (currency conversion); null for every other query
+  const currencyAnswer = useCurrencyAnswer(query);
 
   // Combine suggestions and results for keyboard navigation when in 'all' tab
   const activeItems = useMemo(() => {
@@ -29,6 +35,18 @@ export const SearchResult = ({ isOpen, onClose }) => {
     }
     return results;
   }, [query, suggestions, results]);
+
+  // When the answer card is shown it takes selection index 0 and list rows shift down by one
+  const answerOffset = currencyAnswer ? 1 : 0;
+  const navCount = activeItems.length + answerOffset;
+
+  const scrollToSelection = (index) => {
+    if (index < answerOffset) {
+      answerRef.current?.scrollIntoView({ block: 'nearest' });
+    } else {
+      listRef.current?.scrollToRow({ index: index - answerOffset, align: 'smart' });
+    }
+  };
 
   // Keep selected index bounded
   useEffect(() => {
@@ -45,21 +63,31 @@ export const SearchResult = ({ isOpen, onClose }) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex((prev) => {
-        const next = prev + 1 >= activeItems.length ? 0 : prev + 1;
-        listRef.current?.scrollToRow({ index: next, align: 'smart' });
+        const next = prev + 1 >= navCount ? 0 : prev + 1;
+        scrollToSelection(next);
         return next;
       });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex((prev) => {
-        const next = prev - 1 < 0 ? activeItems.length - 1 : prev - 1;
-        listRef.current?.scrollToRow({ index: next, align: 'smart' });
+        const next = prev - 1 < 0 ? navCount - 1 : prev - 1;
+        scrollToSelection(next);
         return next;
       });
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeItems[selectedIndex]) {
-        handleItemClick(activeItems[selectedIndex], selectedIndex);
+      if (answerOffset && selectedIndex === 0) {
+        // Instant answer: Enter copies the result, Cmd/Ctrl+Enter shows this pair in the currency widget
+        if (e.metaKey || e.ctrlKey) {
+          currencyAnswer.saveToWidget();
+        } else {
+          currencyAnswer.copy();
+        }
+        return;
+      }
+      const item = activeItems[selectedIndex - answerOffset];
+      if (item) {
+        handleItemClick(item, selectedIndex - answerOffset);
       } else if (query.trim()) {
         // Direct search
         window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
@@ -141,7 +169,7 @@ export const SearchResult = ({ isOpen, onClose }) => {
     const item = activeItems[index];
     if (!item) return null;
 
-    const isSelected = index === selectedIndex;
+    const isSelected = index + answerOffset === selectedIndex;
     const formatTime = (ts) => {
       if (!ts) return '';
       const diff = Date.now() - ts;
@@ -156,7 +184,7 @@ export const SearchResult = ({ isOpen, onClose }) => {
         <div 
           className={`search-result-row ${isSelected ? 'selected' : ''}`}
           onClick={() => handleItemClick(item, index)}
-          onMouseEnter={() => setSelectedIndex(index)}
+          onMouseEnter={() => setSelectedIndex(index + answerOffset)}
         >
           <div className="search-result-favicon-container">
             <Favicon url={item.url} title={item.title} type={item.type} />
@@ -333,18 +361,26 @@ export const SearchResult = ({ isOpen, onClose }) => {
 
                     {/* Results Container Panel */}
                     <div className="search-results-panel">
+                      {activeTab === 'all' && currencyAnswer && (
+                        <CurrencyAnswer
+                          ref={answerRef}
+                          answer={currencyAnswer}
+                          isSelected={selectedIndex === 0}
+                          onHover={() => setSelectedIndex(0)}
+                        />
+                      )}
                       {activeTab === 'all' && (
                         activeItems.length > 0 ? (
                           <List
                             listRef={listRef}
-                            height={Math.min(activeItems.length * 60, 480)}
+                            height={Math.min(activeItems.length * 60, currencyAnswer ? 360 : 480)}
                             rowCount={activeItems.length}
                             rowHeight={60}
                             width="100%"
                             rowComponent={VirtualRow}
                             rowProps={{}}
                           />
-                        ) : (
+                        ) : !currencyAnswer && (
                           <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)' }}>
                             <p style={{ fontSize: '15px' }}>No matches found inside history or bookmarks.</p>
                             <p style={{ fontSize: '12px', marginTop: '6px' }}>Press Enter to search Web for "{query}"</p>
@@ -522,8 +558,11 @@ export const SearchResult = ({ isOpen, onClose }) => {
                               <div>Navigate through virtualized list suggestions.</div>
                               
                               <div className="search-help-key">Enter</div>
-                              <div>Select highlighted option, execute command or trigger Google search.</div>
-                              
+                              <div>Select highlighted option, execute command or trigger Google search. On a currency answer, copy the result.</div>
+
+                              <div className="search-help-key">Ctrl / ⌘ + Enter</div>
+                              <div>On a currency answer, show that conversion in the currency widget.</div>
+
                               <div className="search-help-key">ESC</div>
                               <div>Close the search engine modal overlay.</div>
                             </div>

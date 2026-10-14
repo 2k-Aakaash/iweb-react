@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 
-export default function Weather() {
+export default function Weather({ onExpandedChange }) {
   const [weatherData, setWeatherData] = useState(null);
   const [locationName, setLocationName] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -243,6 +243,11 @@ export default function Weather() {
         .to(hlText, { fontSize: 10, duration: 0.22 }, 0);
     }
   }, [isExpanded]);
+
+  // Lets a container (the Smart Stack) know when the card is expanded.
+  useEffect(() => {
+    onExpandedChange?.(isExpanded);
+  }, [isExpanded, onExpandedChange]);
 
   // Translate vertical wheel movements into horizontal scrolling in forecast items
   useEffect(() => {

@@ -1,0 +1,837 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Smart Stack (ws-) and Currency widget (cw-)
+   The stack sits inside .top-right-container and is exactly the size of the
+   visible card, so the home screen layout is unchanged. The currency card mirrors
+   .weather-container in style.css (size, radius, glass, shadow, type scale,
+   hover/active scale and the GSAP expand values).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Smart Stack ─────────────────────────────────────────────────────────── */
+
+.ws-stack {
+  --ws-duration: 280ms;
+  --ws-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ws-shift: 28px;
+  position: relative;
+  border-radius: 18px;
+  outline: none;
+}
+
+.ws-stack:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 3px;
+}
+
+/* The active page is in flow and sizes the stack; the others are stacked on top of it. */
+.ws-page-active {
+  position: relative;
+  z-index: 1;
+}
+
+.ws-page-leaving,
+.ws-page-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.ws-page-leaving {
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Kept mounted (state survives) but skipped for paint and layout. */
+.ws-page-hidden {
+  visibility: hidden;
+  content-visibility: hidden;
+  pointer-events: none;
+}
+
+/* Flip transition: the page wrapper slides, the card itself fades. Fading the card
+   rather than the wrapper keeps its backdrop-filter sampling the wallpaper. */
+.ws-enter-next {
+  animation: ws-in-next var(--ws-duration) var(--ws-ease) both;
+}
+
+.ws-enter-prev {
+  animation: ws-in-prev var(--ws-duration) var(--ws-ease) both;
+}
+
+.ws-leave-next {
+  animation: ws-out-next var(--ws-duration) var(--ws-ease) both;
+}
+
+.ws-leave-prev {
+  animation: ws-out-prev var(--ws-duration) var(--ws-ease) both;
+}
+
+.ws-enter-next > *,
+.ws-enter-prev > * {
+  animation: ws-fade-in var(--ws-duration) var(--ws-ease) both;
+}
+
+.ws-leave-next > *,
+.ws-leave-prev > * {
+  animation: ws-fade-out calc(var(--ws-duration) * 0.75) ease-out both;
+}
+
+@keyframes ws-in-next {
+  from { transform: translateY(var(--ws-shift)) scale(0.96); }
+  to { transform: none; }
+}
+
+@keyframes ws-in-prev {
+  from { transform: translateY(calc(var(--ws-shift) * -1)) scale(0.96); }
+  to { transform: none; }
+}
+
+@keyframes ws-out-next {
+  from { transform: none; }
+  to { transform: translateY(calc(var(--ws-shift) * -1)) scale(0.96); }
+}
+
+@keyframes ws-out-prev {
+  from { transform: none; }
+  to { transform: translateY(var(--ws-shift)) scale(0.96); }
+}
+
+@keyframes ws-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ws-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Page dots on the card's left edge (macOS style). The hit area reaches the card
+   so moving the pointer from the card to the dots never loses hover. */
+.ws-indicator {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  z-index: 2;
+  padding-right: 6px;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ws-stack:hover .ws-indicator,
+.ws-stack:focus-visible .ws-indicator,
+.ws-indicator:focus-within,
+.ws-stack.ws-hint .ws-indicator {
+  opacity: 1;
+}
+
+.ws-stack.ws-locked .ws-indicator {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.ws-dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+}
+
+.ws-dot {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.ws-dot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.ws-dot:hover::before {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.ws-dot[aria-current='true']::before {
+  background: #fff;
+  transform: scale(1.2);
+}
+
+.ws-dot:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: -1px;
+}
+
+.ws-sr-only,
+.cw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Currency card (mirrors .weather-container) ──────────────────────────── */
+
+.cw-card {
+  --cw-expand-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* GSAP power1.out */
+  --cw-collapse-ease: cubic-bezier(0.645, 0.045, 0.355, 1); /* GSAP power2.inOut */
+  --cw-muted: rgba(255, 255, 255, 0.7);
+  --cw-faint: rgba(255, 255, 255, 0.55);
+  --cw-surface: rgba(255, 255, 255, 0.08);
+  --cw-surface-active: rgba(255, 255, 255, 0.12);
+  --cw-border: rgba(255, 255, 255, 0.12);
+  --cw-border-active: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(to top, rgba(10, 84, 74, 0.8), rgba(32, 138, 110, 0.85));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 18px;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  width: 150px;
+  height: 150px;
+  /* Expanded, the height follows the content and never drops below the tile. */
+  min-height: 150px;
+  color: white;
+  /* Neutralise the legacy `body { text-align: center }` */
+  text-align: left;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  will-change: width, height, transform, filter, backdrop-filter;
+  backface-visibility: hidden;
+}
+
+/* Whole-card colour follows the 7-day trend, like the macOS Stocks widget:
+   green when the rate rises, red when it falls, teal when flat or unknown. */
+.cw-card.cw-mood-up {
+  background: linear-gradient(to top, rgba(14, 92, 48, 0.82), rgba(40, 160, 86, 0.86));
+}
+
+.cw-card.cw-mood-down {
+  background: linear-gradient(to top, rgba(112, 24, 32, 0.82), rgba(196, 58, 62, 0.86));
+}
+
+/* Neutralise the legacy `button { margin-top: 20px }` */
+.cw-card button {
+  margin: 0;
+  font-family: 'sf_pro_displaysemibold', sans-serif;
+}
+
+.cw-card:not(.cw-expanded) {
+  cursor: pointer;
+}
+
+.cw-card:not(.cw-expanded):hover {
+  transform: scale(1.02);
+  box-shadow: 0 12px 40px 0 rgba(61, 62, 76, 0.4);
+}
+
+.cw-card:not(.cw-expanded):active {
+  transform: scale(0.97);
+}
+
+/* Collapsed: label + value on top, trend + rate at the bottom (like the weather tile). */
+.cw-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cw-top,
+.cw-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.cw-expanded .cw-bottom {
+  margin-top: 6px;
+}
+
+/* Text sizes step like the weather card: 13→20, 32→56, 11→14. Collapsing uses
+   the weather card's 0.22s power2.inOut, expanding its 0.3s power1.out. */
+.cw-header,
+.cw-value,
+.cw-rate,
+.cw-change,
+.cw-status {
+  transition: font-size 0.22s var(--cw-collapse-ease);
+}
+
+.cw-expanded .cw-header,
+.cw-expanded .cw-value,
+.cw-expanded .cw-rate {
+  transition: font-size 0.3s var(--cw-expand-ease);
+}
+
+.cw-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: normal;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.cw-card .cw-header {
+  margin-bottom: 2px;
+}
+
+.cw-expanded .cw-header {
+  font-size: 20px;
+}
+
+.cw-header:focus-visible,
+.cw-card .cw-retry:focus-visible,
+.cw-card .cw-swap:focus-visible,
+.cw-attribution:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+/* Currency symbol badge (flag emoji don't render on Windows). */
+.cw-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.cw-arrow {
+  opacity: 0.75;
+}
+
+.cw-value {
+  display: block;
+  max-width: 100%;
+  font-size: 32px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.cw-trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.cw-spark-mini {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  overflow: visible;
+}
+
+/* Trend colours: green when the rate rises, red when it falls (like macOS Stocks).
+   The sparkline strokes with currentColor, so the colour is set on its container. */
+/* The card colour carries the direction, so the line stays white on any card. */
+.cw-dir-up,
+.cw-dir-down,
+.cw-dir-flat {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.cw-change {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cw-change-up {
+  color: #a8ffcb;
+}
+
+.cw-change-down {
+  color: #ffc2bd;
+}
+
+/* Collapsed card: plain "USD → INR" so the label fits; badges show when expanded. */
+.cw-card:not(.cw-expanded) .cw-header .cw-flag {
+  display: none;
+}
+
+.cw-rate {
+  max-width: 100%;
+  margin-bottom: 2px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cw-expanded .cw-rate {
+  font-size: 14px;
+}
+
+.cw-status {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--cw-muted);
+}
+
+/* The mini trend and the offline note move into the details panel when expanded. */
+.cw-expanded .cw-trend,
+.cw-expanded .cw-status {
+  display: none;
+}
+
+.cw-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cw-expanded .cw-error {
+  font-size: 13px;
+}
+
+.cw-retry {
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.cw-retry:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.cw-retry:active {
+  transform: scale(0.95);
+}
+
+/* Loading shimmer (first load only; cached rates render immediately). */
+.cw-shimmer {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: cw-shimmer 1.3s ease-in-out infinite;
+}
+
+.cw-shimmer-value {
+  width: 80%;
+  height: 28px;
+  margin-top: 4px;
+}
+
+.cw-shimmer-line {
+  width: 90%;
+  height: 10px;
+}
+
+.cw-shimmer-chart {
+  width: 100%;
+  height: 64px;
+}
+
+@keyframes cw-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+/* ── Expanded converter (revealed like .weather-search / .weather-forecast-container) ── */
+
+.cw-controls {
+  display: none;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 3px;
+  will-change: opacity, height;
+}
+
+.cw-field,
+.cw-picker {
+  background: var(--cw-surface);
+  border: 1px solid var(--cw-border);
+  border-radius: 10px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.cw-field:focus-within,
+.cw-picker:focus-within {
+  border-color: var(--cw-border-active);
+  background: var(--cw-surface-active);
+}
+
+.cw-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: text;
+}
+
+.cw-field-invalid,
+.cw-field-invalid:focus-within {
+  border-color: rgba(255, 190, 180, 0.75);
+}
+
+.cw-amount {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 3px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: white;
+  font-family: 'sf_pro_displaysemibold', sans-serif;
+  font-size: 16px;
+  text-align: left;
+}
+
+.cw-field-suffix {
+  font-size: 12px;
+  color: var(--cw-muted);
+}
+
+.cw-field-message {
+  margin: -2px 0 0 2px;
+  font-size: 11px;
+  color: #ffd0c9;
+}
+
+.cw-pickers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.cw-picker {
+  grid-column: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.cw-picker:hover {
+  background: var(--cw-surface-active);
+}
+
+.cw-picker:has(select:focus-visible) {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.cw-picker .cw-flag {
+  font-size: 12px;
+}
+
+.cw-picker-code {
+  font-size: 13px;
+}
+
+.cw-picker-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--cw-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cw-picker-chevron {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  color: var(--cw-muted);
+}
+
+/* Native select stretched invisibly over the styled face: native list and keyboard. */
+.cw-picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  color-scheme: dark;
+  font-size: 14px;
+}
+
+.cw-picker option {
+  background: #0f3b33;
+  color: #fff;
+}
+
+.cw-swap {
+  --cw-swap-turn: 0deg;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: var(--cw-surface-active);
+  color: #fff;
+  cursor: pointer;
+  transform: rotate(var(--cw-swap-turn));
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.2s ease;
+}
+
+.cw-swap:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(var(--cw-swap-turn)) scale(1.08);
+}
+
+.cw-swap:active {
+  transform: rotate(var(--cw-swap-turn)) scale(0.92);
+}
+
+.cw-swap svg {
+  width: 16px;
+  height: 16px;
+}
+
+.cw-divider {
+  display: none;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 12px 0 8px 0;
+}
+
+.cw-details {
+  display: none;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  flex-direction: column;
+  gap: 6px;
+  will-change: opacity, height;
+}
+
+.cw-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--cw-muted);
+  text-transform: uppercase;
+}
+
+.cw-chart-head .cw-change {
+  font-size: 11px;
+  text-transform: none;
+}
+
+.cw-chart {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 64px auto;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+
+.cw-spark-large {
+  grid-column: 1;
+  grid-row: 1;
+  display: block;
+  width: 100%;
+  height: 64px;
+  overflow: visible;
+}
+
+.cw-chart-scale {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--cw-muted);
+  text-align: right;
+}
+
+.cw-chart-dates {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--cw-faint);
+}
+
+.cw-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--cw-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* One line each, so the panel's height doesn't depend on the card's width mid-animation. */
+.cw-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--cw-faint);
+}
+
+.cw-updated {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cw-updated-offline {
+  color: var(--cw-muted);
+}
+
+.cw-attribution {
+  color: var(--cw-faint);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: 3px;
+}
+
+.cw-attribution:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* ── Phones (mirrors the weather card's ≤480px rules) ────────────────────── */
+
+@media screen and (max-width: 480px) {
+  .ws-stack {
+    border-radius: 14px;
+  }
+
+  /* No room left of a full-width card: dots sit inside its right edge. */
+  .ws-indicator {
+    right: 4px;
+    padding-right: 0;
+  }
+
+  .cw-card {
+    width: auto;
+    padding: 12px;
+    border-radius: 14px;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-enter-next,
+  .ws-enter-prev,
+  .ws-leave-next,
+  .ws-leave-prev,
+  .ws-enter-next > *,
+  .ws-enter-prev > *,
+  .ws-leave-next > *,
+  .ws-leave-prev > * {
+    animation: none !important;
+  }
+
+  .ws-indicator,
+  .ws-dot::before,
+  .cw-card,
+  .cw-card * {
+    transition: none !important;
+  }
+
+  .cw-shimmer {
+    animation: none;
+  }
+}

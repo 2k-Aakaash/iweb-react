@@ -666,3 +666,251 @@
   color: rgba(156, 163, 175, 0.7);
   margin-top: 2px;
 }
+
+/* Instant answer: currency conversion card (Spotlight-style) */
+.sp-cc-card {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 10px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(255, 255, 255, 0.03) 60%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sp-cc-card:hover, .sp-cc-card.selected {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(255, 255, 255, 0.07) 60%);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.sp-cc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 11.5px;
+  color: rgba(156, 163, 175, 0.85);
+}
+
+.sp-cc-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.sp-cc-names {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-cc-aside {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sp-cc-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sp-cc-card:hover .sp-cc-hint, .sp-cc-card.selected .sp-cc-hint {
+  opacity: 1;
+}
+
+.sp-cc-kbd {
+  font-family: inherit;
+  font-size: 10.5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #9ca3af;
+}
+
+.sp-cc-feedback {
+  font-weight: 700;
+  color: #34d399;
+}
+
+.sp-cc-feedback.failed {
+  color: #f87171;
+}
+
+.sp-cc-feedback:empty {
+  display: none;
+}
+
+.sp-cc-value {
+  margin-top: 6px;
+  height: 36px;
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-cc-error {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #fca5a5;
+}
+
+.sp-cc-pair {
+  margin-top: 2px;
+  height: 20px;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: #e5e7eb;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-cc-flag {
+  margin-right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.sp-cc-eq {
+  margin: 0 8px;
+  color: rgba(156, 163, 175, 0.7);
+}
+
+.sp-cc-meta {
+  margin-top: 2px;
+  height: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  color: rgba(156, 163, 175, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-cc-dot {
+  margin: 0 6px;
+}
+
+.sp-cc-offline {
+  color: #fbbf24;
+}
+
+.sp-cc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 25px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sp-cc-attribution {
+  font-size: 10.5px;
+  color: rgba(156, 163, 175, 0.5);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-cc-attribution:hover {
+  color: #818cf8;
+  text-decoration: underline;
+}
+
+.sp-cc-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 4px 2px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sp-cc-action:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #ffffff;
+}
+
+/* Loading skeleton: same line boxes as the loaded card, so nothing shifts */
+.sp-cc-skel {
+  display: inline-block;
+  vertical-align: middle;
+  width: 220px;
+  max-width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: sp-cc-shimmer 1.2s ease-in-out infinite;
+}
+
+.sp-cc-skel.value {
+  width: 180px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.sp-cc-skel.short {
+  width: 160px;
+}
+
+@keyframes sp-cc-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-cc-card, .sp-cc-hint { transition: none; }
+  .sp-cc-card:hover, .sp-cc-card.selected { transform: none; }
+  .sp-cc-skel { animation: none; }
+}

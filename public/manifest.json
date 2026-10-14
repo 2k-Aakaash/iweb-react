@@ -19,7 +19,9 @@
     "https://api.github.com/*",
     "https://github.com/*",
     "https://objects.githubusercontent.com/*",
-    "https://release-assets.githubusercontent.com/*"
+    "https://release-assets.githubusercontent.com/*",
+    "https://open.er-api.com/*",
+    "https://api.frankfurter.dev/*"
   ],
   "background": {
     "service_worker": "service-worker.js"
