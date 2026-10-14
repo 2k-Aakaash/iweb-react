@@ -65,6 +65,14 @@ describe('updater', () => {
     expect(getUpdateMode()).toBe('web'); // no chrome.runtime in node
   });
 
+  it('reads the build number from the release name when the tag has none', async () => {
+    const { checkForUpdate } = await loadUpdater('v1.0.0-build.2');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ...release('v2.2'), name: 'iWeb v2.2-build.3' }));
+    const status = await checkForUpdate();
+    expect(status.latest).toMatchObject({ tag: 'v2.2', build: 3, name: 'iWeb v2.2-build.3' });
+    expect(status.available).toBe(true);
+  });
+
   it('ignores releases that are not workflow builds', async () => {
     const { checkForUpdate } = await loadUpdater('v1.0.0-build.1');
     fetchMock.mockResolvedValueOnce(jsonResponse(release('v2.0.2alpha')));

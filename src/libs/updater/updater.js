@@ -39,7 +39,7 @@ export class UpdateError extends Error {
 }
 
 export function parseBuildNumber(tag) {
-  const match = /-build\.(\d+)$/.exec(tag || '');
+  const match = /-build\.(\d+)\b/.exec(tag || '');
   return match ? Number(match[1]) : null;
 }
 
@@ -83,7 +83,10 @@ function writeJson(key, value) {
 
 function normalizeRelease(json) {
   const tag = typeof json?.tag_name === 'string' ? json.tag_name : '';
-  const build = parseBuildNumber(tag);
+  const name = typeof json?.name === 'string' ? json.name.trim() : '';
+  // Build number from the tag ("v2.2-build.4"), or from the release name when the tag
+  // was renamed by hand ("v2.2" named "iWeb v2.2-build.3").
+  const build = parseBuildNumber(tag) ?? parseBuildNumber(name);
   const assets = Array.isArray(json?.assets) ? json.assets : [];
   const zip = assets.find((a) => a?.name === ZIP_ASSET);
   const sha = assets.find((a) => a?.name === SHA_ASSET);
@@ -91,7 +94,7 @@ function normalizeRelease(json) {
   return {
     tag,
     build,
-    name: typeof json.name === 'string' ? json.name : tag,
+    name: name || tag,
     notes: typeof json.body === 'string' ? json.body.slice(0, 4000) : '',
     url: typeof json.html_url === 'string' ? json.html_url : `https://github.com/${REPO}/releases`,
     publishedAt: json.published_at || null,
