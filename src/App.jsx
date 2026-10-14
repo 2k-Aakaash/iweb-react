@@ -8,6 +8,7 @@ import Notes from './components/Notes';
 import { SearchBar } from './search/components/SearchBar';
 import { SearchResult } from './search/components/SearchResult';
 import SettingsModal from './components/SettingsModal';
+import UpdateNotice from './components/update/UpdateNotice';
 import { openIwebDB } from './libs/wallpaper/db';
 
 export default function App() {
@@ -83,11 +84,16 @@ export default function App() {
     const handleOpenMusic = () => {
       setShowMusicLibrary(true);
     };
+    const handleOpenSettings = () => {
+      setShowSettings(true);
+    };
     window.addEventListener('music:open', handleOpenMusic);
+    window.addEventListener('settings:open', handleOpenSettings);
     window.addEventListener('music:openSettings', handleOpenMusic);
     return () => {
       window.removeEventListener('music:open', handleOpenMusic);
       window.removeEventListener('music:openSettings', handleOpenMusic);
+      window.removeEventListener('settings:open', handleOpenSettings);
     };
   }, []);
 
@@ -146,6 +152,8 @@ export default function App() {
       />
 
       <SearchResult isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      <UpdateNotice />
 
       <SettingsModal 
         isOpen={showSettings} 

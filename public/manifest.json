@@ -15,7 +15,11 @@
     "https://nominatim.openstreetmap.org/*",
     "https://ipapi.co/*",
     "https://api.unsplash.com/*",
-    "https://images.unsplash.com/*"
+    "https://images.unsplash.com/*",
+    "https://api.github.com/*",
+    "https://github.com/*",
+    "https://objects.githubusercontent.com/*",
+    "https://release-assets.githubusercontent.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js"

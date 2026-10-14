@@ -45,12 +45,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
-        env:
-          VITE_UNSPLASH_PROXY_URL: ${{ vars.UNSPLASH_PROXY_URL }}
-          UNSPLASH_APP_NAME: ${{ vars.UNSPLASH_APP_NAME || 'iweb' }}
-        run: npm run build
-
       - name: Compute release version
         id: version
         run: |
@@ -60,10 +54,35 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Package extension zip
+      - name: Build
+        env:
+          # Baked into the bundle so the extension's updater knows its own release.
+          VITE_IWEB_RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          VITE_UNSPLASH_PROXY_URL: ${{ vars.UNSPLASH_PROXY_URL }}
+          UNSPLASH_APP_NAME: ${{ vars.UNSPLASH_APP_NAME || 'iweb' }}
+        run: npm run build
+
+      - name: Stamp manifest version and file list
+        run: |
+          # Chrome shows this in chrome://extensions (4-part version: x.y.z.<run>).
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('dist/manifest.json', 'utf8'));
+            m.version = '${{ steps.version.outputs.version }}.' + process.env.GITHUB_RUN_NUMBER;
+            m.version_name = '${{ steps.version.outputs.tag }}';
+            fs.writeFileSync('dist/manifest.json', JSON.stringify(m, null, 2) + '\n');
+          "
+          # File list lets the in-extension updater delete files a newer release drops.
+          (cd dist && find . -type f ! -name '*.map' | sed 's|^\./||' | sort) > files.txt
+          echo "release-files.json" >> files.txt
+          node -e "const l=require('fs').readFileSync('files.txt','utf8').trim().split('\n');require('fs').writeFileSync('dist/release-files.json', JSON.stringify(l, null, 2))"
+
+      - name: Package extension zip and checksum
         run: |
           cd dist
           zip -r ../iWeb.Extension.zip . -x '*.map'
+          cd ..
+          sha256sum iWeb.Extension.zip > iWeb.Extension.zip.sha256
 
       - name: Push build to iWeb `build` branch
         env:
@@ -102,7 +121,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.IWEB_DEPLOY_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" iWeb.Extension.zip \
+          gh release create "${{ steps.version.outputs.tag }}" iWeb.Extension.zip iWeb.Extension.zip.sha256 \
             --repo "$TARGET_REPO" \
             --target "$BUILD_COMMIT" \
             --title "iWeb ${{ steps.version.outputs.tag }}" \

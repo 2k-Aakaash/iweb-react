@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { exportToIwebBackup, parseIwebBackup, restoreFromIwebBackup } from '../libs/backupService';
 import { openIwebDB } from '../libs/wallpaper/db';
 import WallpaperSettings from './WallpaperSettings';
+import SoftwareUpdate from './update/SoftwareUpdate';
+import { CURRENT_TAG } from '../libs/updater/updater';
 
 export default function SettingsModal({
   isOpen,
@@ -14,6 +16,15 @@ export default function SettingsModal({
   setBookmarks
 }) {
   const [activeTab, setActiveTab] = useState('general');
+
+  // Other parts of the app (e.g. the update notice) can open a specific tab.
+  useEffect(() => {
+    const handleOpenTab = (e) => {
+      if (e.detail?.tab) setActiveTab(e.detail.tab);
+    };
+    window.addEventListener('settings:open', handleOpenTab);
+    return () => window.removeEventListener('settings:open', handleOpenTab);
+  }, []);
   const [nameInput, setNameInput] = useState(customName || '');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -646,7 +657,7 @@ export default function SettingsModal({
               <div className="settings-tab-pane" style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: '48px', marginBottom: '20px' }}>🌐</div>
                 <h3 style={{ fontSize: '24px', margin: '0 0 10px 0', fontFamily: 'SFRounded-Semibold' }}>iWeb</h3>
-                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', margin: '0 0 25px 0' }}>Version: iWeb v2.0</p>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', margin: '0 0 25px 0' }}>Version: {CURRENT_TAG || 'iWeb v2.0 (local build)'}</p>
                 <div className="settings-group-card" style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'left' }}>
                   <div className="settings-row">
                     <span className="settings-label">Developer</span>
@@ -657,6 +668,7 @@ export default function SettingsModal({
                     <span className="settings-value">Vite React JS</span>
                   </div>
                 </div>
+                <SoftwareUpdate />
               </div>
             )}
 
