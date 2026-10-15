@@ -106,6 +106,15 @@ export const Favicon = ({ url, title, className = '', type }) => {
     );
   }
 
+  // src is set by the effect above; until then show a neutral letter instead of src="".
+  if (!src) {
+    return (
+      <div className={`search-result-letter-avatar ${className}`} style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+        {domain.letter}
+      </div>
+    );
+  }
+
   return (
     <img 
       src={src} 

@@ -139,3 +139,16 @@ describe('history', () => {
     expect(await getRateHistory('AED', 'INR', { now: NOW })).toBeNull();
   });
 });
+
+describe('stale reasons', () => {
+  it('marks cached rates as an error (not offline) when the service fails', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(latest('USD', { INR: 83.5 })));
+    await getLatestRates('USD', { now: NOW });
+    fetchMock.mockResolvedValueOnce(jsonResponse({ result: 'error' }, 503));
+    const failed = await getLatestRates('USD', { now: NOW + 2 * 24 * 3600 * 1000 });
+    expect(failed).toMatchObject({ stale: true, staleReason: 'error' });
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const offline = await getLatestRates('USD', { now: NOW + 3 * 24 * 3600 * 1000 });
+    expect(offline).toMatchObject({ stale: true, staleReason: 'offline' });
+  });
+});

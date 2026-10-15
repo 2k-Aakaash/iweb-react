@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Background from './components/Background';
 import Clock from './components/Clock';
 import Dock from './components/Dock';
@@ -10,6 +10,22 @@ import { SearchResult } from './search/components/SearchResult';
 import SettingsModal from './components/SettingsModal';
 import UpdateNotice from './components/update/UpdateNotice';
 import { openIwebDB } from './libs/wallpaper/db';
+import { OPEN_EVENT as MARKETS_OPEN_EVENT } from './libs/markets/marketService';
+
+// The Markets app is loaded on first open, so it adds nothing to the new-tab bundle. If its
+// chunk can't be fetched (offline, or a page left open across a deploy) it logs and closes
+// instead of taking the whole page down.
+const MarketsModal = React.lazy(() => import('./components/markets/MarketsModal').catch((err) => {
+  console.error('Failed to load the Markets app:', err);
+  return { default: MarketsUnavailable };
+}));
+
+function MarketsUnavailable({ onClose }) {
+  useEffect(() => {
+    onClose();
+  }, [onClose]);
+  return null;
+}
 
 export default function App() {
   const [customName, setCustomName] = useState('');
@@ -18,6 +34,8 @@ export default function App() {
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [marketsOpen, setMarketsOpen] = useState(false);
+  const [marketsSymbol, setMarketsSymbol] = useState(null);
 
   const changeBgRef = useRef(null);
   // Ref that Background.jsx will expose to trigger its file input (upload new BG)
@@ -97,6 +115,18 @@ export default function App() {
     };
   }, []);
 
+  // The Markets card and Spotlight open the Markets app, optionally on a symbol.
+  useEffect(() => {
+    const handleOpenMarkets = (e) => {
+      setMarketsSymbol(e.detail?.symbol || null);
+      setMarketsOpen(true);
+    };
+    window.addEventListener(MARKETS_OPEN_EVENT, handleOpenMarkets);
+    return () => window.removeEventListener(MARKETS_OPEN_EVENT, handleOpenMarkets);
+  }, []);
+
+  const closeMarkets = useCallback(() => setMarketsOpen(false), []);
+
   const handleClockColorChange = (color) => {
     setClockColor(color);
   };
@@ -165,6 +195,12 @@ export default function App() {
         bookmarks={bookmarks}
         setBookmarks={setBookmarks}
       />
+
+      {marketsOpen && (
+        <Suspense fallback={null}>
+          <MarketsModal initialSymbol={marketsSymbol} onClose={closeMarkets} />
+        </Suspense>
+      )}
 
       <style>{`
         #clock {

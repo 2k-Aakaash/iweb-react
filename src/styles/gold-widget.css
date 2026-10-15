@@ -1,0 +1,363 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Gold & Silver card (gw-) for the Smart Stack.
+   Built on the cw- card system in widgets.css (size, glass, hover, expand); this
+   file adds the gold colour, the two-metal tile and the expanded controls.
+   Overrides use compound selectors (.cw-card.gw-card, .gw-card .x) so they win
+   whichever order the two stylesheets load in.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Fixed warm gold, not trend-coloured (the two metals can move in opposite directions).
+   Deep enough that white text stays ≥ 5:1 even over a white wallpaper (bottom ≥ 8:1);
+   muted / faint text and control surfaces are adjusted for the same reason. */
+.cw-card.gw-card {
+  --cw-muted: rgba(255, 255, 255, 0.88);
+  --cw-faint: rgba(255, 255, 255, 0.76);
+  --gw-track: rgba(0, 0, 0, 0.18);
+  --gw-track-hover: rgba(0, 0, 0, 0.28);
+  --gw-thumb: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(to top, rgba(82, 55, 8, 0.9), rgba(130, 92, 17, 0.92));
+}
+
+/* ── Collapsed tile ──────────────────────────────────────────────────────────
+   Content box 124×124 (150 − 2×12 padding − 2×1 border). Every line has a fixed
+   height except the header (13px, line-height normal = 1.335em in SF Pro → 17.4px):
+     head 19.4 (header + 2px margin) · gold label 12 · value 26 · trend 3+14
+     · silver label 12 · silver row 1+16                          = 103.4px
+     + offline line 2+12 when stale                               = 117.4px
+   The free space sits between the gold and silver blocks (cw-main space-between). */
+
+.gw-top,
+.gw-bottom {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gw-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gw-head .cw-header {
+  flex: none;
+}
+
+/* "Retail est." / "Intl." beside the title; it gives way first if space runs short. */
+.gw-mode {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--cw-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gw-label {
+  display: block;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--cw-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gw-unit {
+  margin-left: 1px;
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--cw-muted);
+}
+
+/* Sparkline + pill; without a sparkline the pill stays on the right like silver's. */
+.gw-card .gw-trend {
+  justify-content: flex-end;
+  margin: 3px 0 0;
+}
+
+.gw-card .gw-spark-mini {
+  height: 14px;
+}
+
+.gw-card .cw-change {
+  flex: none;
+  line-height: 12px;
+}
+
+.gw-silver-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 1px;
+}
+
+.gw-silver-value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gw-silver-value .gw-unit {
+  font-size: 10px;
+}
+
+.gw-card .gw-status {
+  display: block;
+  max-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Expanded, the tile summary gives way to the controls and details. */
+.cw-expanded .gw-mode,
+.cw-expanded .gw-gold,
+.cw-expanded .gw-bottom,
+.cw-expanded .gw-top > .cw-shimmer {
+  display: none;
+}
+
+/* The shared light retry pill is too pale on gold; use the darker surface. */
+.gw-card .cw-retry {
+  background: var(--gw-track);
+}
+
+.gw-card .cw-retry:hover {
+  background: var(--gw-track-hover);
+}
+
+/* ── Expanded controls ───────────────────────────────────────────────────── */
+
+.gw-card .gw-controls {
+  gap: 8px;
+}
+
+.gw-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gw-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--gw-track);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.gw-card .gw-segment {
+  min-width: 46px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--cw-muted);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.gw-card .gw-segment:hover {
+  color: #fff;
+}
+
+.gw-card .gw-segment[aria-checked='true'] {
+  background: var(--gw-thumb);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
+}
+
+.gw-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.gw-card .gw-chip {
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: var(--gw-track);
+  color: var(--cw-muted);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.gw-card .gw-chip:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.gw-card .gw-chip[aria-pressed='true'] {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: linear-gradient(var(--gw-thumb), var(--gw-thumb)) var(--gw-track);
+  color: #fff;
+}
+
+/* Inside the panel's 3px padding, so the ring isn't clipped by its overflow. */
+.gw-card .gw-segment:focus-visible,
+.gw-card .gw-chip:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 1px;
+}
+
+.gw-duty-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.gw-duty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background: var(--gw-track);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--cw-muted);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gw-duty:focus-within {
+  border-color: var(--cw-border-active);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.gw-duty-invalid,
+.gw-duty-invalid:focus-within {
+  border-color: rgba(255, 190, 180, 0.75);
+}
+
+.gw-duty label {
+  cursor: text;
+}
+
+.gw-card .gw-duty-input {
+  width: 5ch;
+  margin: 0;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 5px;
+  outline: none;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  font-family: 'sf_pro_displaysemibold', sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: right;
+}
+
+/* ── Expanded details ────────────────────────────────────────────────────── */
+
+.gw-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.gw-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.gw-row dt {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--cw-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gw-row dd {
+  flex: none;
+  margin: 0;
+  font-size: 18px;
+  line-height: 22px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.gw-shimmer-rows {
+  width: 100%;
+  height: 48px;
+}
+
+.gw-card .gw-footer {
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.gw-source,
+.gw-disclaimer {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gw-source {
+  color: var(--cw-muted);
+}
+
+.gw-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* The 3px right / bottom margin keeps the focus ring inside the panel's clipped box. */
+.gw-card .gw-open {
+  flex: none;
+  margin: 0 3px 3px 0;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: var(--gw-track);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.gw-card .gw-open:hover {
+  background: var(--gw-track-hover);
+}
+
+.gw-card .gw-open:active {
+  transform: scale(0.95);
+}
+
+.gw-card .gw-open:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 1px;
+}

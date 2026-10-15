@@ -186,7 +186,11 @@ export async function getLatestRates(base, { signal, now = Date.now() } = {}) {
     return { ...entry, stale: false };
   } catch (err) {
     if (err?.name === 'AbortError') throw err;
-    if (cached) return { ...cached, stale: true };
+    // Stale because the device is offline, or because the rate service failed (e.g. 503).
+    const staleReason = err instanceof CurrencyError && (err.code === 'HTTP' || err.code === 'BAD_RESPONSE')
+      ? 'error'
+      : 'offline';
+    if (cached) return { ...cached, stale: true, staleReason };
     if (err instanceof CurrencyError) throw err;
     throw new CurrencyError('NETWORK', 'Couldn’t load exchange rates. Check your connection.');
   }
@@ -202,7 +206,7 @@ export async function convert(amount, from, to, options = {}) {
   const data = await getLatestRates(from, options);
   const rate = data.rates[to];
   if (!rate) throw new CurrencyError('UNSUPPORTED', `No rate available for ${from} → ${to}.`);
-  return { amount: value, from, to, rate, result: value * rate, updatedAt: data.updatedAt, stale: data.stale };
+  return { amount: value, from, to, rate, result: value * rate, updatedAt: data.updatedAt, stale: data.stale, staleReason: data.staleReason || null };
 }
 
 function isoDate(date) {

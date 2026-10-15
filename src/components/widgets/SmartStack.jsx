@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import Weather from '../Weather';
 import CurrencyWidget from './CurrencyWidget';
+import GoldWidget from './GoldWidget';
+import MarketsWidget from './MarketsWidget';
 import '../../styles/widgets.css';
 
 // macOS-style Smart Stack for the top-right widgets: one card-sized slot that flips between
@@ -8,9 +10,14 @@ import '../../styles/widgets.css';
 // Every page stays mounted (Weather keeps its data, nothing refetches on a flip); inactive
 // pages are hidden with visibility/content-visibility + inert, so they cost no paint or layout.
 
+// Page registry: every widget receives { active, onExpandedChange }. `active` is true while
+// the page is the visible one (use it to pause polling); a widget that expands in place
+// reports it through onExpandedChange so flipping is disabled meanwhile.
 const PAGES = [
-  { id: 'weather', label: 'Weather' },
-  { id: 'currency', label: 'Currency Converter' },
+  { id: 'weather', label: 'Weather', Component: Weather },
+  { id: 'currency', label: 'Currency Converter', Component: CurrencyWidget },
+  { id: 'metals', label: 'Gold & Silver', Component: GoldWidget },
+  { id: 'markets', label: 'Markets', Component: MarketsWidget },
 ];
 
 const WHEEL_THRESHOLD = 60; // px of accumulated wheel delta that flips one page
@@ -44,7 +51,7 @@ function wheelDelta(e) {
 
 export default function SmartStack() {
   const [view, setView] = useState({ active: 0, leaving: null, direction: 1 });
-  const [expanded, setExpanded] = useState({ weather: false, currency: false });
+  const [expanded, setExpanded] = useState({});
   const [hint, setHint] = useState(false);
   const [announcement, setAnnouncement] = useState('');
 
@@ -56,7 +63,7 @@ export default function SmartStack() {
 
   const activePage = PAGES[view.active];
   // Flipping is disabled while the visible widget is expanded.
-  const locked = expanded[activePage.id];
+  const locked = Boolean(expanded[activePage.id]);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -75,8 +82,11 @@ export default function SmartStack() {
     setView((prev) => (prev.active === index ? prev : { active: index, leaving: null, direction: 1 }));
   }, []);
 
-  const handleWeatherExpanded = useCallback((value) => reportExpanded('weather', value), [reportExpanded]);
-  const handleCurrencyExpanded = useCallback((value) => reportExpanded('currency', value), [reportExpanded]);
+  // One stable callback per page.
+  const expandHandlers = useMemo(
+    () => Object.fromEntries(PAGES.map((page) => [page.id, (value) => reportExpanded(page.id, value)])),
+    [reportExpanded],
+  );
 
   const showPage = (index, direction) => {
     if (locked || index === view.active) return false;
@@ -221,11 +231,7 @@ export default function SmartStack() {
             aria-hidden={isActive ? undefined : true}
             inert={!isActive}
           >
-            {page.id === 'weather' ? (
-              <Weather onExpandedChange={handleWeatherExpanded} />
-            ) : (
-              <CurrencyWidget active={isActive} onExpandedChange={handleCurrencyExpanded} />
-            )}
+            <page.Component active={isActive} onExpandedChange={expandHandlers[page.id]} />
           </div>
         );
       })}

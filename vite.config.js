@@ -1,16 +1,22 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { proxyUnsplash } from './api/_unsplashProxy.js'
+import { proxyMarket } from './api/_marketProxy.js'
 
-// Serves /api/unsplash during `npm run dev` with the same logic as the Vercel
-// function, reading the server-only UNSPLASH_ACCESS_KEY from .env.
-function unsplashDevProxy(accessKey) {
+// Serves /api/unsplash and /api/market during `npm run dev` with the same logic as the
+// Vercel functions, reading the server-only UNSPLASH_ACCESS_KEY from .env.
+function apiDevProxy(accessKey) {
   return {
-    name: 'unsplash-dev-proxy',
+    name: 'api-dev-proxy',
     configureServer(server) {
       server.middlewares.use('/api/unsplash', async (req, res) => {
         const query = new URL(req.url, 'http://localhost').searchParams
         const result = await proxyUnsplash(query, accessKey)
+        res.writeHead(result.status, result.headers).end(result.body)
+      })
+      server.middlewares.use('/api/market', async (req, res) => {
+        const query = new URL(req.url, 'http://localhost').searchParams
+        const result = await proxyMarket(query)
         res.writeHead(result.status, result.headers).end(result.body)
       })
     },
@@ -23,7 +29,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), unsplashDevProxy(env.UNSPLASH_ACCESS_KEY)],
+    plugins: [react(), apiDevProxy(env.UNSPLASH_ACCESS_KEY)],
     // UNSPLASH_APP_NAME is non-secret (attribution utm_source), so expose it to the client too.
     envPrefix: ['VITE_', 'UNSPLASH_APP_NAME'],
     server: {

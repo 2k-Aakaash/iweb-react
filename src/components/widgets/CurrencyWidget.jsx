@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import gsap from 'gsap';
+import Sparkline from './shared/Sparkline';
+import { useCardExpand } from './shared/useCardExpand';
 import {
   ATTRIBUTION,
   CURRENCIES,
@@ -16,18 +17,11 @@ import {
 } from '../../libs/currency/currencyService';
 
 // Currency converter card for the Smart Stack. Sized, styled and animated like the
-// Weather card: a glanceable 150×150 tile that expands (same GSAP timeline values)
-// into the full converter.
+// Weather card: a glanceable 150×150 tile that expands (shared useCardExpand, same GSAP
+// timeline values as Weather) into the full converter.
 
-const COLLAPSED_SIZE = 150;
-const EXPANDED_WIDTH = 320;
-const MOBILE_QUERY = '(max-width: 480px)';
 const HISTORY_DAYS = 7;
 const TICK_MS = 30 * 1000;
-// The weather card's timeline passes a CSS cubic-bezier() string, which GSAP core can't
-// parse and resolves to its default 'power1.out'; use that so both cards move the same.
-const EXPAND_EASE = 'power1.out';
-const COLLAPSE_EASE = 'power2.inOut';
 
 const numberParts = new Intl.NumberFormat().formatToParts(12345.6);
 const GROUP_SEPARATOR = numberParts.find((part) => part.type === 'group')?.value ?? ',';
@@ -94,48 +88,6 @@ function describeTrend(points) {
   };
 }
 
-function Sparkline({ points, width, height, className }) {
-  const gradientId = `cw-spark-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const rates = points.map((point) => point.rate);
-  const min = Math.min(...rates);
-  const span = Math.max(...rates) - min;
-  const inset = 2;
-  const step = width / (points.length - 1);
-  const coords = points.map((point, index) => {
-    const y = span === 0 ? height / 2 : inset + (1 - (point.rate - min) / span) * (height - inset * 2);
-    return `${(index * step).toFixed(2)},${y.toFixed(2)}`;
-  });
-  const line = `M${coords.join(' L')}`;
-  const area = `${line} L${width},${height} L0,${height} Z`;
-
-  return (
-    <svg
-      className={className}
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#fff" stopOpacity="0.32" />
-          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradientId})`} />
-      <path
-        d={line}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-
 function CurrencyPicker({ label, value, onChange }) {
   const currency = getCurrency(value);
   return (
@@ -177,7 +129,9 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
   useEffect(() => {
     const apply = (prefs) => {
       setAmount(prefs.amount);
-      setAmountText(amountFormat.format(prefs.amount));
+      // Our own save echoes back synchronously: keep in-progress text such as "1." (which
+      // parses to the same amount) instead of reformatting it to "1" mid-typing.
+      setAmountText((text) => (parseAmount(text) === prefs.amount ? text : amountFormat.format(prefs.amount)));
       setAmountInvalid(false);
       setFrom(prefs.from);
       setTo(prefs.to);
@@ -200,7 +154,6 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
   const controlsRef = useRef(null);
   const dividerRef = useRef(null);
   const detailsRef = useRef(null);
-  const lastExpandedRef = useRef(false);
 
   const controlsId = useId();
   const amountId = useId();
@@ -258,80 +211,13 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
     return () => window.removeEventListener('online', handleOnline);
   }, []);
 
-  // Collapse when clicking anywhere outside the expanded card.
-  useEffect(() => {
-    if (!isExpanded) return undefined;
-    const handlePointerDown = (e) => {
-      if (cardRef.current && !cardRef.current.contains(e.target)) setIsExpanded(false);
-    };
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [isExpanded]);
-
-  // Expand / collapse: the same GSAP timeline values as the Weather card.
-  useEffect(() => {
-    const card = cardRef.current;
-    const controls = controlsRef.current;
-    const divider = dividerRef.current;
-    const details = detailsRef.current;
-    if (!card || !controls || !divider || !details) return undefined;
-    if (lastExpandedRef.current === isExpanded) return undefined;
-    lastExpandedRef.current = isExpanded;
-
-    const mobile = window.matchMedia(MOBILE_QUERY).matches;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const sections = [controls, divider, details];
-    // Callbacks live on the tweens (not the timeline) so a quick re-toggle that kills
-    // them can never fire a stale one.
-    const hideSections = () => gsap.set(sections, { display: 'none', height: 0, opacity: 0 });
-    const restoreCollapsedSize = () => gsap.set(card, { clearProps: 'width,height,padding' });
-    gsap.killTweensOf([card, ...sections]);
-
-    if (isExpanded) {
-      gsap.set([controls, details], { display: 'flex' });
-      gsap.set(divider, { display: 'block' });
-      // The card's height follows its content (min-height 150px) while the sections open,
-      // so it grows smoothly and ends at the real height without a jump.
-      gsap.set(card, { height: 'auto' });
-      const cardTo = { width: mobile ? '100%' : EXPANDED_WIDTH, padding: 16 };
-      if (reducedMotion) {
-        gsap.set(card, cardTo);
-        gsap.set([controls, details], { height: 'auto', opacity: 1 });
-        gsap.set(divider, { height: 1, opacity: 0.5 });
-        return undefined;
-      }
-      gsap.timeline({ defaults: { ease: EXPAND_EASE } })
-        .to(card, { ...cardTo, duration: 0.38 }, 0)
-        .to(controls, { height: 'auto', opacity: 1, duration: 0.32 }, 0.03)
-        .to(divider, { height: 1, opacity: 0.5, duration: 0.25 }, 0.03)
-        .to(details, { height: 'auto', opacity: 1, duration: 0.35 }, 0.03);
-      return undefined;
-    }
-
-    // Collapsed size comes from CSS (150×150, full width on phones) once the tween ends.
-    if (reducedMotion) {
-      hideSections();
-      restoreCollapsedSize();
-      return undefined;
-    }
-    gsap.timeline({ defaults: { ease: COLLAPSE_EASE } })
-      .to(sections, { height: 0, opacity: 0, duration: 0.22, onComplete: hideSections }, 0)
-      .to(card, {
-        width: mobile ? '100%' : COLLAPSED_SIZE,
-        height: COLLAPSED_SIZE,
-        padding: 12,
-        duration: 0.28,
-        onComplete: restoreCollapsedSize,
-      }, 0);
-    return undefined;
-  }, [isExpanded]);
-
-  // Kill any running tween if the card unmounts mid-animation.
-  useEffect(() => {
-    const card = cardRef.current;
-    const sections = [controlsRef.current, dividerRef.current, detailsRef.current];
-    return () => gsap.killTweensOf([card, ...sections]);
-  }, []);
+  useCardExpand({
+    isExpanded,
+    onCollapse: () => setIsExpanded(false),
+    cardRef,
+    panelRefs: [controlsRef, detailsRef],
+    dividerRef,
+  });
 
   const toggleExpand = () => setIsExpanded((value) => !value);
 
@@ -396,13 +282,14 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
   const rateText = ready ? `1 ${from} = ${formatRate(conversion.rate)} ${to}` : '';
   const updatedText = ready
     ? stale
-      ? `Offline · last updated ${formatClock(conversion.updatedAt, now)}`
+      ? `${conversion.staleReason === 'error' ? 'Couldn’t refresh' : 'Offline'} · last updated ${formatClock(conversion.updatedAt, now)}`
       : `Updated ${formatRelative(conversion.updatedAt, now)}`
     : '';
 
   const historyReady = history?.pair === pairKey;
   const points = historyReady ? history.points : null;
   const trend = describeTrend(points);
+  const rates = points ? points.map((point) => point.rate) : null;
   const amountMessage = amountInvalid && amountText.trim() ? 'Enter a valid amount.' : '';
 
   return (
@@ -460,7 +347,7 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
           {loading && <span className="cw-shimmer cw-shimmer-line" aria-hidden="true" />}
           {ready && trend && (
             <div className={`cw-trend cw-dir-${trend.direction}`}>
-              <Sparkline points={points} width={100} height={22} className="cw-spark-mini" />
+              <Sparkline values={rates} width={100} height={22} className="cw-spark-mini" />
               <span className={`cw-change cw-change-${trend.direction}`} aria-label={trend.label}>
                 {trend.text}
               </span>
@@ -533,7 +420,7 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
         {!historyReady && <span className="cw-shimmer cw-shimmer-chart" aria-hidden="true" />}
         {historyReady && points && (
           <div className={`cw-chart${trend ? ` cw-dir-${trend.direction}` : ''}`}>
-            <Sparkline points={points} width={240} height={64} className="cw-spark-large" />
+            <Sparkline values={rates} width={240} height={64} className="cw-spark-large" />
             <div className="cw-chart-scale">
               <span aria-label={`High ${formatRate(trend.max)}`}>{formatRate(trend.max)}</span>
               <span aria-label={`Low ${formatRate(trend.min)}`}>{formatRate(trend.min)}</span>

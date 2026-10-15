@@ -4,8 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { List } from 'react-window';
 import { useSearch } from '../hooks/useSearch';
 import { useCurrencyAnswer } from '../hooks/useCurrencyAnswer';
+import { useMarketAnswer } from '../hooks/useMarketAnswer';
 import { Favicon } from './Favicon';
 import { CurrencyAnswer } from './CurrencyAnswer';
+import { MarketAnswer } from './MarketAnswer';
 import '../styles/search.css';
 
 export const SearchResult = ({ isOpen, onClose }) => {
@@ -25,8 +27,12 @@ export const SearchResult = ({ isOpen, onClose }) => {
   const listRef = useRef(null);
   const answerRef = useRef(null);
 
-  // Instant answer (currency conversion); null for every other query
+  // Instant answers (currency conversion, market quote); null for every other query.
+  // The market parser yields to conversions, so at most one card shows.
   const currencyAnswer = useCurrencyAnswer(query);
+  const marketAnswer = useMarketAnswer(query);
+  const marketCard = !currencyAnswer && marketAnswer?.visible ? marketAnswer : null;
+  const hasAnswer = Boolean(currencyAnswer || marketCard);
 
   // Combine suggestions and results for keyboard navigation when in 'all' tab
   const activeItems = useMemo(() => {
@@ -36,8 +42,8 @@ export const SearchResult = ({ isOpen, onClose }) => {
     return results;
   }, [query, suggestions, results]);
 
-  // When the answer card is shown it takes selection index 0 and list rows shift down by one
-  const answerOffset = currencyAnswer ? 1 : 0;
+  // When an answer card is shown it takes selection index 0 and list rows shift down by one
+  const answerOffset = hasAnswer ? 1 : 0;
   const navCount = activeItems.length + answerOffset;
 
   const scrollToSelection = (index) => {
@@ -48,13 +54,13 @@ export const SearchResult = ({ isOpen, onClose }) => {
     }
   };
 
-  // Keep selected index bounded
+  // Keep selected index bounded (a market card can appear or go away after its lookup settles)
   useEffect(() => {
     setSelectedIndex(0);
     if (listRef.current) {
       listRef.current.scrollToRow({ index: 0 });
     }
-  }, [activeItems, query]);
+  }, [activeItems, query, hasAnswer]);
 
   // Keyboard navigation handler
   const handleKeyDown = (e) => {
@@ -77,11 +83,18 @@ export const SearchResult = ({ isOpen, onClose }) => {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (answerOffset && selectedIndex === 0) {
-        // Instant answer: Enter copies the result, Cmd/Ctrl+Enter shows this pair in the currency widget
-        if (e.metaKey || e.ctrlKey) {
-          currencyAnswer.saveToWidget();
+        if (currencyAnswer) {
+          // Currency: Enter copies the result, Cmd/Ctrl+Enter shows this pair in the currency widget
+          if (e.metaKey || e.ctrlKey) {
+            currencyAnswer.saveToWidget();
+          } else {
+            currencyAnswer.copy();
+          }
+        } else if (e.metaKey || e.ctrlKey) {
+          // Market: Cmd/Ctrl+Enter adds it to the watchlist, Enter opens it in the Markets app
+          marketCard.addToWatchlist();
         } else {
-          currencyAnswer.copy();
+          openMarketAnswer();
         }
         return;
       }
@@ -136,6 +149,12 @@ export const SearchResult = ({ isOpen, onClose }) => {
       window.open(item.url.startsWith('http') ? item.url : `https://${item.url}`, '_blank');
       onClose();
     }
+  };
+
+  // Market answer: open it in the Markets app and close the palette like opening a result
+  // (no click analytics; nothing happens until a stock name has resolved to a symbol)
+  const openMarketAnswer = () => {
+    if (marketCard?.openInMarkets()) onClose();
   };
 
   // Focus input on mount
@@ -369,18 +388,27 @@ export const SearchResult = ({ isOpen, onClose }) => {
                           onHover={() => setSelectedIndex(0)}
                         />
                       )}
+                      {activeTab === 'all' && marketCard && (
+                        <MarketAnswer
+                          ref={answerRef}
+                          answer={marketCard}
+                          isSelected={selectedIndex === 0}
+                          onHover={() => setSelectedIndex(0)}
+                          onOpen={openMarketAnswer}
+                        />
+                      )}
                       {activeTab === 'all' && (
                         activeItems.length > 0 ? (
                           <List
                             listRef={listRef}
-                            height={Math.min(activeItems.length * 60, currencyAnswer ? 360 : 480)}
+                            height={Math.min(activeItems.length * 60, hasAnswer ? 360 : 480)}
                             rowCount={activeItems.length}
                             rowHeight={60}
                             width="100%"
                             rowComponent={VirtualRow}
                             rowProps={{}}
                           />
-                        ) : !currencyAnswer && (
+                        ) : !hasAnswer && (
                           <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)' }}>
                             <p style={{ fontSize: '15px' }}>No matches found inside history or bookmarks.</p>
                             <p style={{ fontSize: '12px', marginTop: '6px' }}>Press Enter to search Web for "{query}"</p>
@@ -558,10 +586,10 @@ export const SearchResult = ({ isOpen, onClose }) => {
                               <div>Navigate through virtualized list suggestions.</div>
                               
                               <div className="search-help-key">Enter</div>
-                              <div>Select highlighted option, execute command or trigger Google search. On a currency answer, copy the result.</div>
+                              <div>Select highlighted option, execute command or trigger Google search. On a currency answer, copy the result; on a market answer, open it in Markets.</div>
 
                               <div className="search-help-key">Ctrl / ⌘ + Enter</div>
-                              <div>On a currency answer, show that conversion in the currency widget.</div>
+                              <div>On a currency answer, show that conversion in the currency widget; on a market answer, add it to your watchlist.</div>
 
                               <div className="search-help-key">ESC</div>
                               <div>Close the search engine modal overlay.</div>
