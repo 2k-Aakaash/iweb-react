@@ -1,7 +1,7 @@
 // Release version bumping for the release workflow (scripts/next-version.mjs).
 //
 //   commit message starts with "feat"  → minor  (v2.2 → v2.3)
-//   "[major]" anywhere in a message     → major  (v2.3 → v3.0)
+//   "[major]" in a commit subject       → major  (v2.3 → v3.0)
 //   anything else ("fix", …)            → patch  (v2.3 → v2.3.1)
 //
 // The base is the latest iWeb release (its tag or name, whichever is newer: older
@@ -24,9 +24,14 @@ function newer(a, b) {
   return a;
 }
 
-/** 'major' | 'minor' | 'patch' from all commit messages in the push. */
+/**
+ * 'major' | 'minor' | 'patch' from the commit messages in the push. Only each commit's
+ * subject (first line) counts, so a body that merely mentions "[major]" can't bump it.
+ */
 export function bumpKind(messages) {
-  const list = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
+  const list = (Array.isArray(messages) ? messages : [messages])
+    .filter(Boolean)
+    .map((m) => m.trim().split(/\r?\n/)[0]);
   if (list.some((m) => /\[major\]/i.test(m))) return 'major';
   if (list.some((m) => /^\s*feat(\(.+?\))?!?:/i.test(m) || /^\s*feat\b/i.test(m))) return 'minor';
   return 'patch';

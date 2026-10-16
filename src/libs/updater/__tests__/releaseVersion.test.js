@@ -17,6 +17,9 @@ describe('release versions', () => {
     expect(bumpKind(['fix: chart labels'])).toBe('patch');
     expect(bumpKind(['Update README'])).toBe('patch');
     expect(bumpKind(['feat: redesign [major]'])).toBe('major');
+    // Only the subject line counts (this exact body caused an accidental v3.0).
+    expect(bumpKind(['feat: release versions\n\nBody explains that "[major]" bumps the major.'])).toBe('minor');
+    expect(bumpKind(['fix: typo\n\nfeat: mentioned in body'])).toBe('patch');
   });
 
   it('bumps from the latest release', () => {
