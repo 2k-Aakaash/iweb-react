@@ -26,9 +26,10 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const FOLDER_HANDLE_KEY = 'extension_folder_handle';
 const MAX_ZIP_BYTES = 50 * 1024 * 1024;
 
-// Release tag baked in by the release workflow (e.g. "v1.0.0-build.12"); empty for local builds.
+// Release tag baked in by the release workflow ("v2.3", "v2.3.1"; older builds used
+// "v2.2-build.5"); empty for local builds.
 export const CURRENT_TAG = (import.meta.env.VITE_IWEB_RELEASE_TAG || '').trim();
-export const CURRENT_BUILD = parseBuildNumber(CURRENT_TAG);
+export const CURRENT_VERSION = parseVersion(CURRENT_TAG);
 
 export class UpdateError extends Error {
   constructor(code, message) {
@@ -43,6 +44,25 @@ export function parseBuildNumber(tag) {
   return match ? Number(match[1]) : null;
 }
 
+// A workflow release: "v2.3", "v2.3.1", "v2.2-build.5", optionally prefixed "iWeb " (release
+// names). Anything else (e.g. the old hand-made "v2.0.2alpha") is not a release.
+
+/** [major, minor, patch, build] for a release tag/name, or null. */
+export function parseVersion(text) {
+  const match = /^(?:iweb\s+)?v(\d+)\.(\d+)(?:\.(\d+))?(?:-build\.(\d+))?$/i.exec((text || '').trim());
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3] || 0), Number(match[4] || 0)];
+}
+
+/** > 0 when a is newer than b. */
+export function compareVersions(a, b) {
+  for (let i = 0; i < 4; i += 1) {
+    const diff = (a?.[i] ?? 0) - (b?.[i] ?? 0);
+    if (diff) return diff;
+  }
+  return 0;
+}
+
 function isExtensionPage() {
   return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
 }
@@ -55,7 +75,7 @@ function isExtensionPage() {
  */
 export function getUpdateMode() {
   if (!isExtensionPage()) return 'web';
-  return CURRENT_BUILD === null ? 'dev' : 'release';
+  return CURRENT_VERSION === null ? 'dev' : 'release';
 }
 
 export function canWriteFolder() {
@@ -84,16 +104,19 @@ function writeJson(key, value) {
 function normalizeRelease(json) {
   const tag = typeof json?.tag_name === 'string' ? json.tag_name : '';
   const name = typeof json?.name === 'string' ? json.name.trim() : '';
-  // Build number from the tag ("v2.2-build.4"), or from the release name when the tag
-  // was renamed by hand ("v2.2" named "iWeb v2.2-build.3").
-  const build = parseBuildNumber(tag) ?? parseBuildNumber(name);
+  // Version from the tag ("v2.3.1"), or from the release name when the tag was renamed
+  // by hand ("v2.2" named "iWeb v2.2-build.3" → the name carries the build number).
+  const fromTag = parseVersion(tag);
+  const fromName = parseVersion(name);
+  const version = fromTag && fromName && compareVersions(fromName, fromTag) > 0 ? fromName : (fromTag || fromName);
   const assets = Array.isArray(json?.assets) ? json.assets : [];
   const zip = assets.find((a) => a?.name === ZIP_ASSET);
   const sha = assets.find((a) => a?.name === SHA_ASSET);
-  if (!tag || build === null || !zip?.browser_download_url) return null;
+  if (!tag || !version || !zip?.browser_download_url) return null;
   return {
     tag,
-    build,
+    version,
+    build: version[3],
     name: name || tag,
     notes: typeof json.body === 'string' ? json.body.slice(0, 4000) : '',
     url: typeof json.html_url === 'string' ? json.html_url : `https://github.com/${REPO}/releases`,
@@ -106,10 +129,10 @@ function normalizeRelease(json) {
 
 function withStatus(latest, checkedAt) {
   return {
-    current: { tag: CURRENT_TAG || null, build: CURRENT_BUILD },
+    current: { tag: CURRENT_TAG || null, version: CURRENT_VERSION },
     latest,
     checkedAt,
-    available: Boolean(latest && CURRENT_BUILD !== null && latest.build > CURRENT_BUILD),
+    available: Boolean(latest && CURRENT_VERSION && compareVersions(latest.version, CURRENT_VERSION) > 0),
   };
 }
 

@@ -104,3 +104,28 @@ describe('updater', () => {
     expect(isDismissed('v1.0.0-build.3')).toBe(false);
   });
 });
+
+describe('feature versions', () => {
+  it('parses v2.3, v2.3.1, old -build.N tags and release names', async () => {
+    const { parseVersion } = await loadUpdater('');
+    expect(parseVersion('v2.3')).toEqual([2, 3, 0, 0]);
+    expect(parseVersion('v2.3.1')).toEqual([2, 3, 1, 0]);
+    expect(parseVersion('v2.2-build.5')).toEqual([2, 2, 0, 5]);
+    expect(parseVersion('iWeb v2.4')).toEqual([2, 4, 0, 0]);
+    expect(parseVersion('v2.0.2alpha')).toBeNull();
+  });
+
+  it('offers v2.3 to v2.2-build.5 installs, and v2.3.1 to v2.3', async () => {
+    let updater = await loadUpdater('v2.2-build.5');
+    fetchMock.mockResolvedValueOnce(jsonResponse(release('v2.3')));
+    expect((await updater.checkForUpdate()).available).toBe(true);
+
+    updater = await loadUpdater('v2.3');
+    fetchMock.mockResolvedValueOnce(jsonResponse(release('v2.3.1')));
+    expect((await updater.checkForUpdate({ force: true })).available).toBe(true);
+
+    updater = await loadUpdater('v2.3.1');
+    fetchMock.mockResolvedValueOnce(jsonResponse(release('v2.3')));
+    expect((await updater.checkForUpdate({ force: true })).available).toBe(false);
+  });
+});

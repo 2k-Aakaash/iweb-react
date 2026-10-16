@@ -95,6 +95,7 @@ function buildItems(localRecords, unsplashRecords, blobCache) {
       source: 'unsplash',
       thumbBlob,
       thumbUrl: thumbBlob ? null : hotlink,
+      hotlinkUrl: hotlink,
       color: r.color || null,
       title: r.description || (name ? `Photo by ${name}` : 'Unsplash photo'),
       photographer: r.photographer || null,
@@ -213,11 +214,13 @@ export default function WallpaperSettings({ isOpen }) {
     [library.local, library.unsplash]
   );
 
+  // Unsplash API guideline: display photos from their hotlinked URLs. Saved thumbnails are
+  // only used offline.
   const visibleItems = useMemo(() => {
-    if (filter === 'local') return library.local;
-    if (filter === 'unsplash') return library.unsplash;
-    return allItems;
-  }, [filter, library.local, library.unsplash, allItems]);
+    const items = filter === 'local' ? library.local : filter === 'unsplash' ? library.unsplash : allItems;
+    if (!online) return items;
+    return items.map((item) => (item.hotlinkUrl ? { ...item, thumbBlob: null, thumbUrl: item.hotlinkUrl } : item));
+  }, [filter, library.local, library.unsplash, allItems, online]);
 
   const itemsByKey = useMemo(() => new Map(allItems.map((item) => [item.key, item])), [allItems]);
 

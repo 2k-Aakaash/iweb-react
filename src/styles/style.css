@@ -5025,6 +5025,24 @@ body{
   font-weight: bold;
 }
 
+/* App feel: the dashboard (clock, quote, labels, cards) can't be text-selected or dragged,
+   and shows the normal arrow cursor. Fields people type in stay selectable; links and
+   buttons keep their own pointer cursors. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
 
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
 
-
+img,
+svg {
+  -webkit-user-drag: none;
+}

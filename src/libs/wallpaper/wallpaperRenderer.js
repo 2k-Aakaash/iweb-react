@@ -10,7 +10,9 @@ import Vibrant from '../vibrant';
 import { getWallpaperRecord, touchWallpaper } from './repository';
 import { pickUnsplashUrl, decodeImage } from './imageLoader';
 
-export const DEFAULT_WALLPAPER_URL = 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=2560';
+// With no wallpaper chosen (first launch) the page shows the body's solid dark colour
+// (style.css) and white text; no remote image is loaded.
+export const DEFAULT_TEXT_COLOR = '#ffffff';
 
 const FADE_MS = 450;
 const FADE_FALLBACK_MS = FADE_MS + 200;
@@ -290,18 +292,13 @@ export async function showWallpaper(ref, { onColor } = {}) {
 /** Shows the built-in default wallpaper (used when the library is empty). */
 export async function showDefaultWallpaper({ onColor } = {}) {
   const token = ++renderToken;
-  let decoded = true;
-  try {
-    await decodeImage(DEFAULT_WALLPAPER_URL);
-  } catch {
-    decoded = false;
-  }
-  if (token !== renderToken) return false;
-
-  // Offline / unreachable: paint it without a fade; the body's background
-  // colour shows until the image becomes available.
-  swapTo(DEFAULT_WALLPAPER_URL, { allowFade: decoded });
-  extractColor(DEFAULT_WALLPAPER_URL, token, onColor, null);
+  fadeId++;
+  const existing = document.getElementById(OVERLAY_ID);
+  if (existing) resetOverlay(existing);
+  retire(activeUrl);
+  paintBody(null);
+  flushRetiredUrls();
+  if (token === renderToken) onColor?.(DEFAULT_TEXT_COLOR);
   return true;
 }
 

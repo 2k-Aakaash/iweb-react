@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import UnsplashCredit from './UnsplashCredit';
 import { getWallpaperSettings, getActiveWallpaper, setActiveWallpaper } from '../libs/wallpaper/settings';
 import { subscribe, broadcast } from '../libs/wallpaper/sync';
 import { listLocal, listUnsplash, getWallpaperRecord, addLocalRecord, findLocalByHash } from '../libs/wallpaper/repository';
@@ -343,7 +344,9 @@ export default function Background({
   };
 
   return (
-    <input
+    <>
+      <UnsplashCredit />
+      <input
       ref={fileInputRef}
       type="file"
       multiple
@@ -353,5 +356,6 @@ export default function Background({
       tabIndex={-1}
       aria-hidden="true"
     />
+    </>
   );
 }
