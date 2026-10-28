@@ -308,6 +308,9 @@ async function fetchCandidates(selection, signal) {
 // RATE_RESERVE requests for download pings of photos already chosen: below that, pause new
 // acquisitions for a while. A hard rate-limit response pauses until Unsplash resets.
 const RATE_RESERVE = 50;
+// Saved photos rotate among those matching the topics/keyword only when at least this many
+// match; fewer would repeat the same few photos over and over.
+const MIN_MATCHING_ROTATION = 6;
 const LOW_RATE_PAUSE_MS = 10 * 60 * 1000;
 const RATE_LIMITED_PAUSE_MS = 60 * 60 * 1000;
 
@@ -325,9 +328,38 @@ function pauseIfRateLow() {
   }
 }
 
+// When Unsplash can't be reached, Change Background must not wait on the network each time:
+// the API gets API_TIMEOUT_MS, then saved photos are shown, and the network is skipped for
+// UNREACHABLE_COOLDOWN_MS (so shuffling is instant and a second click never cancels a hung one).
+const API_TIMEOUT_MS = 8000;
+const UNREACHABLE_COOLDOWN_MS = 60 * 1000;
+let unreachableUntil = 0;
+
+const isUnreachable = () => Date.now() < unreachableUntil;
+
+function noteUnreachable(err) {
+  if (err?.code === 'NETWORK') unreachableUntil = Date.now() + UNREACHABLE_COOLDOWN_MS;
+}
+
+/** Test helper: forget a remembered network failure. */
+export function _resetDiscoveryForTests() {
+  unreachableUntil = 0;
+}
+
 async function fetchAndAcquire(selection, signal, { deferTracking = false } = {}) {
   pauseIfRateLow();
-  const candidates = await fetchCandidates(selection, signal);
+  const timeout = AbortSignal.timeout(API_TIMEOUT_MS);
+  let candidates;
+  try {
+    candidates = await fetchCandidates(selection, signal ? AbortSignal.any([signal, timeout]) : timeout);
+  } catch (err) {
+    // Out of time (not cancelled by the caller): the same as not reaching Unsplash.
+    if (timeout.aborted && !signal?.aborted) {
+      throw new UnsplashError('NETWORK', 'Unsplash took too long to respond.', { cause: err });
+    }
+    throw err;
+  }
+  unreachableUntil = 0;
   throwIfAborted(signal);
   const cachedFlags = await Promise.all(candidates.map((p) => getUnsplash(p.photoId)));
   const fresh = candidates.filter((_, i) => !cachedFlags[i]);
@@ -381,24 +413,27 @@ export async function changeUnsplashBackground({ settings, signal } = {}) {
     const quota = await getQuotaStatus();
     const online = isOnline();
     const configured = isUnsplashConfigured();
-    if (quota.remaining > 0 && online && configured) {
+    if (quota.remaining > 0 && online && configured && !(isUnreachable() && records.length)) {
       try {
         const record = await fetchAndAcquire(selection, sig);
         if (record) return await activate(record, 'new');
       } catch (err) {
         if (isAbort(err, sig)) throw err;
         pauseIfRateLimited(err);
+        noteUnreachable(err);
         lastError = err;
       }
     }
 
-    // 3. Least-recently-used cached image (matching ones first, never the current one if avoidable).
+    // 3. Least-recently-used cached image, never the current one if avoidable. Matching
+    // photos first, but only when there are enough of them: with just a couple matching,
+    // shuffling would alternate between the same two photos, so every saved photo rotates.
     throwIfAborted(sig);
     const byLru = (a, b) => lruTime(a) - lruTime(b);
     const others = records.filter((r) => !isActiveRecord(r));
     const pool = others.length ? others : records;
     const matching = pool.filter((r) => recordMatches(r, selection)).sort(byLru);
-    const rotation = matching.length ? matching : [...pool].sort(byLru);
+    const rotation = matching.length >= MIN_MATCHING_ROTATION ? matching : [...pool].sort(byLru);
     if (rotation.length) return await activate(rotation[0], 'cache');
 
     // 4. Nothing to show.
@@ -429,7 +464,7 @@ export function prefetchNextUnsplash({ settings } = {}) {
   if (prefetching) return prefetching;
   prefetching = (async () => {
     try {
-      if (!isOnline() || !isUnsplashConfigured()) return null;
+      if (!isOnline() || !isUnsplashConfigured() || isUnreachable()) return null;
       const selection = resolveSelection(settings ?? getWallpaperSettings());
       const records = await listUnsplash();
       if (records.some((r) => r.lastUsedAt == null && recordMatches(r, selection) && !isActiveRecord(r))) return null;
@@ -437,6 +472,7 @@ export function prefetchNextUnsplash({ settings } = {}) {
       return await fetchAndAcquire(selection, undefined, { deferTracking: true });
     } catch (err) {
       pauseIfRateLimited(err);
+      noteUnreachable(err);
       console.warn('[wallpaper] prefetch skipped:', err?.code || err?.message);
       return null;
     } finally {

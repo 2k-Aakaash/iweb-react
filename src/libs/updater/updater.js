@@ -24,6 +24,8 @@ const DISMISSED_KEY = 'iwebUpdateDismissed';
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // Folder handle lives in the shared iWebDB key/value meta store (no schema change needed).
 const FOLDER_HANDLE_KEY = 'extension_folder_handle';
+// chrome.storage.local key read by public/service-worker.js after the reload (keep in sync).
+const REOPEN_KEY = 'iweb:reopenAfterUpdate';
 const MAX_ZIP_BYTES = 50 * 1024 * 1024;
 
 // Release tag baked in by the release workflow ("v2.3", "v2.3.1"; older builds used
@@ -361,5 +363,13 @@ export async function applyUpdate(latest, { onProgress = () => {}, signal } = {}
 
   writeJson(CHECK_CACHE_KEY, null);
   onProgress({ phase: 'reload' });
+  // Reloading unloads the extension, so Chrome swaps this tab to its default new tab page.
+  // Remember the tab; the service worker opens iWeb in it again once the update is running.
+  try {
+    const tab = await chrome.tabs.getCurrent();
+    await chrome.storage.local.set({ [REOPEN_KEY]: { tabId: tab?.id ?? null, at: Date.now() } });
+  } catch {
+    // Reopening is a nicety; the update itself is done.
+  }
   chrome.runtime.reload();
 }

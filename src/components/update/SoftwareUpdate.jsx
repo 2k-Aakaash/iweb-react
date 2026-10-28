@@ -70,11 +70,22 @@ export default function SoftwareUpdate() {
     }
   };
 
+  // Update Now is always clickable: without a remembered folder it asks for one first (the
+  // picker grants write access, so the install continues in the same click). It used to be
+  // silently disabled until "Choose Folder", which looked like a button that did nothing.
   const handleUpdate = async () => {
     if (busyRef.current || !status?.latest) return;
     busyRef.current = true;
     setError('');
     try {
+      if (!folderName) {
+        try {
+          setFolderName(await chooseExtensionFolder());
+        } catch (err) {
+          if (err?.code === 'CANCELLED') return;
+          throw err;
+        }
+      }
       await applyUpdate(status.latest, { onProgress: setProgress });
     } catch (err) {
       setProgress(null);
@@ -151,7 +162,7 @@ export default function SoftwareUpdate() {
           <span className="settings-value">
             {folderName
               ? <>Extension folder: <strong>{folderName}</strong></>
-              : 'First time: choose the folder you loaded in chrome://extensions → Load unpacked.'}
+              : 'Update Now will ask for the folder you loaded in chrome://extensions → Load unpacked (the one with manifest.json).'}
           </span>
           <button type="button" className="settings-btn" onClick={handleChooseFolder} disabled={installing}>
             {folderName ? 'Change Folder' : 'Choose Folder'}
@@ -176,7 +187,7 @@ export default function SoftwareUpdate() {
             type="button"
             className="settings-btn settings-btn-primary"
             onClick={handleUpdate}
-            disabled={!folderName || installing}
+            disabled={installing}
           >
             {installing ? 'Updating…' : 'Update Now'}
           </button>

@@ -4524,6 +4524,19 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Disabled buttons must look disabled (a disabled "Update Now" once looked clickable). */
+.settings-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+.settings-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.settings-btn-primary:disabled:hover {
+  background: #0a84ff;
+}
+
 /* Switch: the macOS 26 capsule, blue when on. */
 .settings-switch {
   appearance: none;

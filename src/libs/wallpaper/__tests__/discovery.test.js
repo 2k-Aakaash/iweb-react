@@ -105,7 +105,7 @@ const repo = await import('../repository.js');
 const settingsModule = await import('../settings.js');
 const loader = await import('../imageLoader.js');
 const client = await import('../unsplashClient.js');
-const { acquirePhoto, changeUnsplashBackground, prefetchNextUnsplash, searchWallpapers, CURATED_TOPICS } = await import('../discovery.js');
+const { acquirePhoto, changeUnsplashBackground, prefetchNextUnsplash, searchWallpapers, CURATED_TOPICS, _resetDiscoveryForTests } = await import('../discovery.js');
 
 function photo(id, overrides = {}) {
   return {
@@ -155,6 +155,7 @@ beforeEach(() => {
   state.reservations.clear();
   state.active = null;
   vi.clearAllMocks();
+  _resetDiscoveryForTests();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -456,6 +457,45 @@ describe('changeUnsplashBackground', () => {
     const res = await changeUnsplashBackground({ settings: topicSettings });
     expect(res.record.photoId).toBe('old');
     expect(client.getRandomPhotos).not.toHaveBeenCalled();
+  });
+
+  it('rotates through every saved photo when only a couple match the selection', async () => {
+    state.remaining = 0;
+    seed(
+      cachedRecord('m1', { lastUsedAt: 6000 }),
+      cachedRecord('m2', { lastUsedAt: 7000 }),
+      ...['c1', 'c2', 'c3', 'c4'].map((id, i) => cachedRecord(id, { topic: 'cities', keywords: ['city'], lastUsedAt: 1000 + i * 1000 })),
+    );
+    let now = 10000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+    const shown = [];
+    for (let i = 0; i < 6; i += 1) {
+      shown.push((await changeUnsplashBackground({ settings: topicSettings })).record.photoId);
+    }
+    // Before, the two matching photos alternated: m1, m2, m1, m2, …
+    expect(new Set(shown).size).toBe(6);
+  });
+
+  it('keeps to matching saved photos when enough of them match', async () => {
+    state.remaining = 0;
+    seed(
+      ...['m1', 'm2', 'm3', 'm4', 'm5', 'm6'].map((id, i) => cachedRecord(id, { lastUsedAt: 5000 + i })),
+      cachedRecord('other', { topic: 'cities', keywords: ['city'], lastUsedAt: 1 }),
+    );
+    const res = await changeUnsplashBackground({ settings: topicSettings });
+    expect(res.record.photoId).toBe('m1');
+  });
+
+  it('stops waiting on an unreachable Unsplash: saved photos shuffle without the network for a while', async () => {
+    seed(cachedRecord('a', { lastUsedAt: 1000 }), cachedRecord('b', { lastUsedAt: 2000 }));
+    client.getRandomPhotos.mockRejectedValueOnce(new client.UnsplashError('NETWORK', 'Could not reach Unsplash.'));
+    const first = await changeUnsplashBackground({ settings: topicSettings });
+    expect(first).toMatchObject({ origin: 'cache', record: { photoId: 'a' } });
+    const second = await changeUnsplashBackground({ settings: topicSettings });
+    expect(second).toMatchObject({ origin: 'cache', record: { photoId: 'b' } });
+    expect(client.getRandomPhotos).toHaveBeenCalledTimes(1);
+    expect(await prefetchNextUnsplash({ settings: topicSettings })).toBeNull();
+    expect(client.getRandomPhotos).toHaveBeenCalledTimes(1);
   });
 
   it('throws QuotaError when nothing is cached and the limit is reached', async () => {

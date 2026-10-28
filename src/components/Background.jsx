@@ -294,6 +294,8 @@ export default function Background({
           setActiveWallpaper({ source: 'unsplash', id: record.photoId });
           prefetchNextUnsplash({ settings }); // next change is then instant
         } catch (err) {
+          // A newer click replaced this change: not an error, the newer one shows the result.
+          if (err?.name === 'AbortError' || err?.code === 'ABORTED') return;
           console.warn('[wallpaper] Could not change the Unsplash wallpaper:', err);
           window.dispatchEvent(new CustomEvent('wallpaper:error', {
             detail: { message: unsplashErrorMessage(err), code: err?.code || null },

@@ -249,8 +249,11 @@ export default function UnsplashPanel({ settings, onSettingsChange, quota, onlin
           : `Showing a saved photo${by}.`);
       }
     } catch (err) {
-      console.error('Change Background failed:', err);
-      showError(err);
+      // Replaced by a newer change (e.g. the Dock's Change BG): that one shows the result.
+      if (!isAbortError(err)) {
+        console.error('Change Background failed:', err);
+        showError(err);
+      }
     } finally {
       changingRef.current = false;
       setChanging(false);

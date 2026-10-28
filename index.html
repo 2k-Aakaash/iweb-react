@@ -58,14 +58,5 @@
     </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator && !window.chrome?.runtime?.id) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/pwa-service-worker.js')
-            .then(reg => console.log('PWA Service Worker registered:', reg))
-            .catch(err => console.error('Service Worker registration failed:', err));
-        });
-      }
-    </script>
   </body>
 </html>
