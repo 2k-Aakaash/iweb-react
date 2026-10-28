@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import GlassSurface from './glass/GlassSurface';
 
 export default function Bookmarks({ mode, onChangeBg, bookmarks = [], setBookmarks }) {
   const [showBox, setShowBox] = useState(false);
@@ -216,9 +217,10 @@ export default function Bookmarks({ mode, onChangeBg, bookmarks = [], setBookmar
 
       <div 
         id="box" 
-        className="box" 
+        className="box glass-host" 
         style={{ display: showBox ? 'block' : 'none' }}
       >
+        {showBox && <GlassSurface preset="window" />}
         <div className="bookmark-input-container">
           <input 
             type="text" 

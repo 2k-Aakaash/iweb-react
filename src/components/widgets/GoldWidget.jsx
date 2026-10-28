@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import GlassSurface from '../glass/GlassSurface';
 import Sparkline from './shared/Sparkline';
 import { useCardExpand } from './shared/useCardExpand';
 import {
@@ -265,10 +266,11 @@ export default function GoldWidget({ active = true, onExpandedChange }) {
   return (
     <div
       ref={cardRef}
-      className={`cw-card gw-card${isExpanded ? ' cw-expanded' : ''}`}
+      className={`cw-card glass-host gw-card${isExpanded ? ' cw-expanded' : ''}`}
       onClick={toggleExpand}
       onKeyDown={handleCardKeyDown}
     >
+      <GlassSurface preset="card" />
       <div className="cw-main">
         <div className="gw-top">
           <div className="gw-head">

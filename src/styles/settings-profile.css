@@ -1,0 +1,131 @@
+/* Settings sidebar profile (src/components/settings/ProfileCard.jsx), after macOS 26. */
+
+/* A sidebar row like System Settings' account row: no card of its own. */
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 10px;
+  padding: 6px 6px;
+  text-align: left;
+}
+
+.profile-card button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font-family: inherit;
+}
+
+.profile-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.profile-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* No photo: a Contacts-style monogram. */
+.profile-monogram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #a9adb5, #6f747c);
+  color: #fff;
+  font-family: "SFRounded-Semibold", system-ui, sans-serif;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
+/* Hover: a dark veil with a camera, like editing a photo in macOS. */
+.profile-avatar-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.profile-avatar:hover .profile-avatar-edit,
+.profile-avatar:focus-visible .profile-avatar-edit,
+.profile-avatar.is-busy .profile-avatar-edit {
+  opacity: 1;
+}
+
+.profile-avatar:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 2px;
+}
+
+.profile-avatar-remove {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1.5px solid rgba(30, 30, 34, 0.9);
+  border-radius: 50%;
+  background: #8e8e93;
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.profile-avatar-wrap:hover .profile-avatar-remove,
+.profile-avatar-remove:focus-visible {
+  opacity: 1;
+}
+
+.profile-avatar-remove:hover {
+  background: #ff453a;
+}
+
+.profile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 14px;
+  color: #fff;
+}
+
+.profile-error {
+  font-size: 11px;
+  color: #ff6961;
+}

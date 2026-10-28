@@ -473,11 +473,14 @@ export async function searchPhotos({ query, page = 1, perPage = 24, signal } = {
 }
 
 /**
- * Tells Unsplash a photo was used (required by the API guidelines whenever a photo
- * is set as a wallpaper). Authenticated request to `photo.links.download_location`.
+ * Tells Unsplash a photo was used or downloaded (required by the API guidelines whenever a
+ * photo is set as a wallpaper or saved by the user). Authenticated request to
+ * `photo.links.download_location`. Resolves to the full-size image URL Unsplash returns for
+ * the download (null if it sent none).
  */
 export async function trackDownload(downloadLocation, { signal } = {}) {
   const url = safeUnsplashUrl(downloadLocation, { host: API_HOST });
   if (!url) throw new UnsplashError('BAD_RESPONSE', 'Invalid Unsplash download location.');
-  await request(url, { signal });
+  const data = await request(url, { signal });
+  return safeUnsplashUrl(data?.url, { host: 'images.unsplash.com' });
 }

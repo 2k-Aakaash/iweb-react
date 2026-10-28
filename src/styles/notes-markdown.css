@@ -1,0 +1,279 @@
+/* Notes: Markdown editing (Write / Preview switch, formatting toolbar, rendered preview). */
+
+.notes-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notes-editor-actions button {
+  margin: 0; /* legacy global `button { margin-top }` */
+}
+
+/* Write | Preview — a macOS segmented control. */
+.notes-mode-switch {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.notes-mode-switch button {
+  min-width: 72px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font: 600 12.5px "SFRounded-Semibold", system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.notes-mode-switch button:hover {
+  color: #fff;
+}
+
+.notes-mode-switch button.is-active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Formatting toolbar */
+.notes-md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin: -6px 0 14px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.notes-md-btn {
+  min-width: 30px;
+  height: 28px;
+  margin: 0;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font: 600 13px "SFRounded-Semibold", system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.notes-md-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.notes-md-btn:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 1px;
+}
+
+.notes-md-heading { font-weight: 800; }
+.notes-md-bold { font-weight: 800; }
+.notes-md-italic { font-style: italic; font-family: Georgia, serif; }
+.notes-md-strike { text-decoration: line-through; }
+.notes-md-code,
+.notes-md-codeblock { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+
+.notes-md-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 5px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.notes-md-hint {
+  margin-left: auto;
+  padding: 0 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.02em;
+}
+
+.notes-editor-textarea {
+  font-family: ui-monospace, "SF Mono", Consolas, "SFRounded-Semibold", monospace;
+  font-size: 14.5px;
+}
+
+/* Rendered preview */
+.notes-md-preview {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.9);
+  /* A regular-weight face, so **bold** stands out (the Notes font is already semibold). */
+  font: 400 15.5px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  word-wrap: break-word;
+  cursor: text;
+  /* The page is unselectable (`body { user-select: none }`); the note text can be copied. */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.notes-md-preview ::selection {
+  background: rgba(10, 132, 255, 0.45);
+}
+
+.notes-md-preview > :first-child { margin-top: 0; }
+
+.notes-md-preview h1,
+.notes-md-preview h2,
+.notes-md-preview h3,
+.notes-md-preview h4 {
+  margin: 1.2em 0 0.45em;
+  line-height: 1.25;
+  color: #fff;
+  font-family: "SFProDisplay-Heavy", system-ui, sans-serif;
+}
+
+.notes-md-preview h1 { font-size: 1.75em; padding-bottom: 0.25em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.notes-md-preview h2 { font-size: 1.4em; }
+.notes-md-preview h3 { font-size: 1.18em; }
+.notes-md-preview h4 { font-size: 1em; }
+
+.notes-md-preview p { margin: 0 0 0.85em; }
+
+/* The app sets `* { font-family: sf_pro_displaysemibold }`; in the Preview, body text uses
+   the medium face and **bold** the bold face, so emphasis is visible. Headings and code
+   have their own (more specific) rules. */
+.notes-md-preview,
+.notes-md-preview * {
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.notes-md-preview strong,
+.notes-md-preview b,
+.notes-md-preview th {
+  font-family: 'sf_pro_displaybold', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 700;
+  color: #fff;
+}
+
+.notes-md-preview a {
+  color: #64b5ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(100, 181, 255, 0.4);
+  text-underline-offset: 2px;
+}
+
+.notes-md-preview ul,
+.notes-md-preview ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.5em;
+}
+
+.notes-md-preview li { margin: 0.2em 0; }
+
+/* Checklists: no bullet, a real (clickable) checkbox. */
+.notes-md-preview li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.4em;
+}
+
+.notes-md-preview input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0 8px 0 0;
+  vertical-align: -2px;
+  accent-color: #0a84ff;
+  cursor: pointer;
+}
+
+.notes-md-preview li:has(> input[type="checkbox"]:checked) {
+  color: rgba(255, 255, 255, 0.45);
+  text-decoration: line-through;
+}
+
+.notes-md-preview blockquote {
+  margin: 0 0 0.85em;
+  padding: 0.3em 1em;
+  border-left: 3px solid rgba(10, 132, 255, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0 8px 8px 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.notes-md-preview code {
+  padding: 0.12em 0.4em;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  font: 0.88em ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+.notes-md-preview pre {
+  margin: 0 0 0.85em;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.notes-md-preview pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.86em;
+  line-height: 1.55;
+}
+
+.notes-md-preview hr {
+  border: 0;
+  height: 1px;
+  margin: 1.4em 0;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.notes-md-preview table {
+  border-collapse: collapse;
+  margin: 0 0 0.85em;
+  font-size: 0.93em;
+}
+
+.notes-md-preview th,
+.notes-md-preview td {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.notes-md-preview th { background: rgba(255, 255, 255, 0.07); }
+
+.notes-md-preview img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.notes-md-empty {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+/* Undo / Redo */
+.notes-md-history {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-md-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.notes-md-btn:disabled:hover {
+  background: transparent;
+}
+
+.notes-md-preview:focus {
+  outline: none;
+}

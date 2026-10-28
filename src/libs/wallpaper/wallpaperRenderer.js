@@ -1,8 +1,8 @@
 // Paints the active wallpaper onto the page.
 //
 // The wallpaper lives on `document.body` (background-image) and on the
-// `--page-bg-url` CSS variable, which the extension-safe "fake blur" glass
-// layers in style.css reference. Swaps are crossfaded with a single fixed
+// `--page-bg-url` CSS variable, which the Liquid Glass surfaces (src/components/glass)
+// refract and the genie animation's glass stills use. Swaps are crossfaded with a single fixed
 // overlay that holds the OLD image on top of the body and fades out once the
 // NEW image (already decoded off-screen) has been painted underneath.
 

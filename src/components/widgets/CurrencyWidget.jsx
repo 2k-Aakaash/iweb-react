@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import GlassSurface from '../glass/GlassSurface';
 import Sparkline from './shared/Sparkline';
 import { useCardExpand } from './shared/useCardExpand';
 import {
@@ -295,10 +296,11 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
   return (
     <div
       ref={cardRef}
-      className={`cw-card cw-mood-${trend?.direction ?? 'flat'}${isExpanded ? ' cw-expanded' : ''}`}
+      className={`cw-card glass-host cw-mood-${trend?.direction ?? 'flat'}${isExpanded ? ' cw-expanded' : ''}`}
       onClick={toggleExpand}
       onKeyDown={handleCardKeyDown}
     >
+      <GlassSurface preset="card" />
       <div className="cw-main">
         <div className="cw-top">
           <button

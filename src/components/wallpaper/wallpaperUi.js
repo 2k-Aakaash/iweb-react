@@ -46,7 +46,11 @@ export function describeWallpaperError(err, { resetsAt } = {}) {
       const time = formatResetTime(resetsAt ?? err.resetsAt);
       return `Today’s limit for new Unsplash photos is reached.${time ? ` New photos are available again at ${time}.` : ''} Photos you’ve already saved can still be used.`;
     }
-    return 'The daily Unsplash allowance couldn’t be checked. Please try again.';
+    if (err.code === 'RATE_PAUSED') {
+      const time = formatResetTime(resetsAt ?? err.resetsAt);
+      return `Unsplash is busy right now.${time ? ` New photos are available again at ${time}.` : ' New photos will be available again shortly.'} Photos you’ve already saved can still be used.`;
+    }
+    return 'The Unsplash allowance couldn’t be checked. Please try again.';
   }
 
   if (err instanceof UnsplashError || err.name === 'UnsplashError') {

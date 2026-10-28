@@ -7,7 +7,30 @@ const SOURCE_LABELS = { local: 'Local', unsplash: 'Unsplash' };
 
 const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
 
-function WallpaperCard({ item, isActive, selectionMode, selected, disabled, onClick }) {
+// macOS 26-style round glass button (arrow into a tray), shown over the photo on hover.
+function DownloadButton({ item, busy, onDownload }) {
+  return (
+    <button
+      type="button"
+      className={`wp-card-download${busy ? ' is-busy' : ''}`}
+      aria-label={`Download ${item.title}`}
+      title="Download"
+      disabled={busy}
+      onClick={() => onDownload(item)}
+    >
+      {busy ? (
+        <span className="wp-spinner wp-spinner-inline" aria-hidden="true" />
+      ) : (
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 4v10.5M7.5 10.5 12 15l4.5-4.5" />
+          <path d="M5 15.5v2A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-2" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+function WallpaperCard({ item, isActive, selectionMode, selected, disabled, downloading, onClick, onDownload }) {
   const sourceLabel = SOURCE_LABELS[item.source];
   const description = `${sourceLabel} wallpaper: ${item.title}`;
   const label = selectionMode
@@ -34,6 +57,7 @@ function WallpaperCard({ item, isActive, selectionMode, selected, disabled, onCl
           </span>
         )}
       </button>
+      {!selectionMode && onDownload && <DownloadButton item={item} busy={downloading} onDownload={onDownload} />}
       {item.photographer && (
         <Attribution photographer={item.photographer} photoPageUrl={item.photoPageUrl} />
       )}
@@ -55,6 +79,8 @@ export default function WallpaperGallery({
   onClearSelection,
   onRequestDelete,
   onCardClick,
+  onDownload,
+  downloadingKeys,
   deleting,
   loaded,
   loadError,
@@ -180,7 +206,9 @@ export default function WallpaperGallery({
                 selectionMode={selectionMode}
                 selected={selectedKeys.has(item.key)}
                 disabled={deleting}
+                downloading={Boolean(downloadingKeys?.has(item.key))}
                 onClick={onCardClick}
+                onDownload={onDownload}
               />
             ))}
           </ul>

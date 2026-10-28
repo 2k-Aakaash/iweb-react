@@ -205,9 +205,9 @@
   --cw-surface-active: rgba(255, 255, 255, 0.12);
   --cw-border: rgba(255, 255, 255, 0.12);
   --cw-border-active: rgba(255, 255, 255, 0.3);
-  background: linear-gradient(to top, rgba(10, 84, 74, 0.8), rgba(32, 138, 110, 0.85));
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  /* Liquid Glass card (<GlassSurface preset="card">) coloured by the market mood. */
+  --glass-tint: linear-gradient(to top, rgba(10, 84, 74, 0.8), rgba(32, 138, 110, 0.85));
+  --glass-tint-opacity: 0.68;
   border: 1px solid rgba(255, 255, 255, 0.26);
   border-radius: 18px;
   box-shadow:
@@ -235,11 +235,11 @@
 /* Whole-card colour follows the 7-day trend, like the macOS Stocks widget:
    green when the rate rises, red when it falls, teal when flat or unknown. */
 .cw-card.cw-mood-up {
-  background: linear-gradient(to top, rgba(14, 92, 48, 0.82), rgba(40, 160, 86, 0.86));
+  --glass-tint: linear-gradient(to top, rgba(14, 92, 48, 0.82), rgba(40, 160, 86, 0.86));
 }
 
 .cw-card.cw-mood-down {
-  background: linear-gradient(to top, rgba(112, 24, 32, 0.82), rgba(196, 58, 62, 0.86));
+  --glass-tint: linear-gradient(to top, rgba(112, 24, 32, 0.82), rgba(196, 58, 62, 0.86));
 }
 
 /* Neutralise the legacy `button { margin-top: 20px }` */

@@ -16,6 +16,7 @@ import { errorMessage } from './format';
 import { moveItem } from './listOrder';
 import { startPolling, usePageVisible } from './polling';
 import { useSymbolSearch } from './useSymbolSearch';
+import GlassSurface from '../glass/GlassSurface';
 import '../../styles/markets.css';
 
 // The Markets app: a macOS Stocks-style window with the watchlist (and symbol search) in
@@ -433,7 +434,7 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
     <div className={`mk-overlay${closing ? ' is-closing' : ''}`} onPointerDown={handleOverlayPointerDown}>
       <div
         ref={windowRef}
-        className="mk-window"
+        className="mk-window glass-host"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -441,6 +442,7 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
         data-view={effectiveView}
         onKeyDown={handleKeyDown}
       >
+        <GlassSurface preset="window" />
         <div className="mk-window-controls">
           <button type="button" className="mk-light mk-light-close" aria-label="Close Markets" title="Close" onClick={requestClose}>
             <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">

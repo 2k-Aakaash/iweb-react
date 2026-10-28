@@ -1,0 +1,261 @@
+/* Notes sidebar, after the macOS 26 Notes app: large title with a count, a compose button,
+   a rounded search field, and borderless rows grouped by date (Today, Yesterday, …) with the
+   selected note in Notes yellow. */
+
+.notes-sidebar.nsb {
+  width: 290px;
+  padding: 14px 10px 10px;
+  gap: 0;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.nsb button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font-family: inherit;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.nsb-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 2px 6px 12px;
+}
+
+.nsb-heading h2 {
+  margin: 0;
+  font-family: "SFProDisplay-Heavy", system-ui, sans-serif;
+  font-size: 22px;
+  line-height: 1.15;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.nsb-count {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.nsb-compose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 2px 8px rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.nsb-compose:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.nsb-compose:active {
+  transform: scale(0.94);
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+
+.nsb-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  margin: 0 4px 10px;
+  padding: 0 9px 0 10px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.24);
+  color: rgba(235, 235, 245, 0.6);
+  cursor: text;
+  transition: box-shadow 0.15s ease;
+}
+
+.nsb-search:focus-within {
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.55);
+}
+
+.nsb-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-size: 13.5px;
+}
+
+.nsb-search input::placeholder {
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.nsb-search-clear {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(235, 235, 245, 0.55);
+  cursor: pointer;
+}
+
+/* ── List ────────────────────────────────────────────────────────────────── */
+
+.nsb-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 2px 4px;
+}
+
+.nsb-group + .nsb-group {
+  margin-top: 10px;
+}
+
+.nsb-group-title {
+  margin: 0;
+  padding: 6px 12px 4px;
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.nsb-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nsb-row {
+  position: relative;
+  border-radius: 9px;
+  transition: background 0.12s ease;
+}
+
+/* Hairline between rows, inset like macOS; hidden next to the hovered / selected row. */
+.nsb-row + .nsb-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nsb-row:hover::before,
+.nsb-row:hover + .nsb-row::before,
+.nsb-row.is-active::before,
+.nsb-row.is-active + .nsb-row::before {
+  opacity: 0;
+}
+
+.nsb-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nsb-row.is-active {
+  background: rgba(255, 214, 10, 0.3); /* Notes yellow */
+}
+
+.nsb-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 36px 9px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: inherit;
+}
+
+.nsb-row-main:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: -2px;
+}
+
+.nsb-row-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.nsb-row-sub {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.nsb-row-date {
+  flex-shrink: 0;
+  font-family: "sf_pro_displaymedium", system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.nsb-row-snippet {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: "sf_pro_displaymedium", system-ui, sans-serif;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.nsb-row.is-active .nsb-row-snippet {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Delete: appears on hover (and keyboard focus) on the right of the row. */
+.nsb-row-delete {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.nsb-row:hover .nsb-row-delete,
+.nsb-row-delete:focus-visible {
+  opacity: 1;
+}
+
+.nsb-row-delete:hover {
+  background: rgba(255, 69, 58, 0.22);
+  color: #ff6961;
+}
+
+.nsb-empty {
+  padding: 40px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(235, 235, 245, 0.45);
+}

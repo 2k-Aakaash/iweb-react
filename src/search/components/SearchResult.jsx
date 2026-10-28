@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { List } from 'react-window';
@@ -8,7 +8,86 @@ import { useMarketAnswer } from '../hooks/useMarketAnswer';
 import { Favicon } from './Favicon';
 import { CurrencyAnswer } from './CurrencyAnswer';
 import { MarketAnswer } from './MarketAnswer';
+import GlassSurface from '../../components/glass/GlassSurface';
 import '../styles/search.css';
+
+// Layout after macOS 26 Spotlight: a large field with the top hit hinted after the typed text,
+// a row of category chips, and results with an icon, a title and a subtitle naming the source.
+
+const SEARCH_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'images', label: 'Images' },
+  { id: 'videos', label: 'Videos' },
+  { id: 'reddit', label: 'Reddit' },
+  { id: 'maps', label: 'Maps' },
+  { id: 'settings', label: 'Settings' },
+];
+
+const SOURCE_LABELS = { history: 'History', bookmark: 'Bookmark', typesense: 'Suggestion', web: 'Web' };
+
+function hostOf(url) {
+  try {
+    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+/** The grey line under a result: "reddit.com · History", a command's description, … */
+function resultSubtitle(item) {
+  if (item.type === 'command') {
+    return item.title.startsWith('/') ? item.url || 'Command' : 'Recent Search';
+  }
+  const source = item.folder ? `Bookmarks — ${item.folder}` : SOURCE_LABELS[item.type] || '';
+  return [item.url ? hostOf(item.url) : '', source].filter(Boolean).join(' · ');
+}
+
+// Highlights the part of `text` that matches the query.
+function HighlightText({ text, highlight }) {
+  if (!highlight.trim()) return <span>{text}</span>;
+  const regex = new RegExp(`(${highlight.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <span>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <span key={i} className="search-highlight">{part}</span>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+}
+
+// One result row for react-window. Defined here, not inside SearchResult: a component created
+// during render is a new type every render, so hovering (which re-renders) remounted every
+// row and each favicon flashed its letter placeholder before reloading.
+function ResultRow({ index, style, items, answerOffset, selectedIndex, query, onItemClick, onHover }) {
+  const item = items[index];
+  if (!item) return null;
+  const isSelected = index + answerOffset === selectedIndex;
+  return (
+    <div style={style}>
+      <div
+        className={`search-result-row ${isSelected ? 'selected' : ''}`}
+        onClick={() => onItemClick(item, index)}
+        onMouseEnter={() => onHover(index + answerOffset)}
+      >
+        <div className="search-result-favicon-container">
+          <Favicon url={item.url} title={item.title} type={item.type} />
+        </div>
+        <div className="search-result-details">
+          <div className="search-result-title">
+            <HighlightText text={item.title} highlight={query} />
+          </div>
+          <div className="search-result-url">{resultSubtitle(item)}</div>
+        </div>
+        {isSelected && <kbd className="search-result-enter" aria-hidden="true">↩</kbd>}
+      </div>
+    </div>
+  );
+}
 
 export const SearchResult = ({ isOpen, onClose }) => {
   const {
@@ -39,12 +118,33 @@ export const SearchResult = ({ isOpen, onClose }) => {
     if (query.trim() === '') {
       return suggestions;
     }
+    // "/" lists iWeb's slash commands (/music, /notes, …) instead of search results.
+    if (query.trim().startsWith('/')) {
+      const seen = new Set(); // a past search for "/notes" would repeat the command
+      return suggestions.filter((item) => {
+        // Commands carry a description in `url`; a past search for "/…" has none.
+        if (item.type !== 'command' || !item.title.startsWith('/') || !item.url || seen.has(item.title)) return false;
+        seen.add(item.title);
+        return true;
+      });
+    }
     return results;
   }, [query, suggestions, results]);
 
   // When an answer card is shown it takes selection index 0 and list rows shift down by one
   const answerOffset = hasAnswer ? 1 : 0;
   const navCount = activeItems.length + answerOffset;
+
+  // Top-hit hint after the typed text ("— Reddit Home"): the result Enter would open.
+  const measureRef = useRef(null);
+  const completionRef = useRef(null);
+  const hinted = activeTab === 'all' && query.trim() ? activeItems[selectedIndex - answerOffset] : null;
+  const completion = hinted && hinted.title.trim().toLowerCase() !== query.trim().toLowerCase() ? hinted.title : '';
+  useLayoutEffect(() => {
+    if (completionRef.current && measureRef.current) {
+      completionRef.current.style.left = `${measureRef.current.offsetWidth}px`;
+    }
+  }, [query, completion]);
 
   const scrollToSelection = (index) => {
     if (index < answerOffset) {
@@ -130,7 +230,7 @@ export const SearchResult = ({ isOpen, onClose }) => {
           window.dispatchEvent(new CustomEvent('music:openSettings'));
           onClose();
         } else if (cmd === '/notes') {
-          const notesBtn = document.querySelector('.dock-icon[title="Notes"]');
+          const notesBtn = document.querySelector('[data-action="notes"] button');
           notesBtn?.click();
           onClose();
         } else if (cmd === '/weather') {
@@ -164,80 +264,6 @@ export const SearchResult = ({ isOpen, onClose }) => {
       setActiveTab('all');
     }
   }, [isOpen]);
-
-  // Highlights text matching query
-  const HighlightText = ({ text, highlight }) => {
-    if (!highlight.trim()) return <span>{text}</span>;
-    const regex = new RegExp(`(${highlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
-    const parts = text.split(regex);
-    return (
-      <span>
-        {parts.map((part, i) => 
-          regex.test(part) ? (
-            <span key={i} className="search-highlight">{part}</span>
-          ) : (
-            part
-          )
-        )}
-      </span>
-    );
-  };
-
-  // Virtualized row renderer for react-window
-  const VirtualRow = ({ index, style }) => {
-    const item = activeItems[index];
-    if (!item) return null;
-
-    const isSelected = index + answerOffset === selectedIndex;
-    const formatTime = (ts) => {
-      if (!ts) return '';
-      const diff = Date.now() - ts;
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      if (hours < 1) return 'Just now';
-      if (hours < 24) return `${hours}h ago`;
-      return `${Math.floor(hours / 24)}d ago`;
-    };
-
-    return (
-      <div style={style}>
-        <div 
-          className={`search-result-row ${isSelected ? 'selected' : ''}`}
-          onClick={() => handleItemClick(item, index)}
-          onMouseEnter={() => setSelectedIndex(index + answerOffset)}
-        >
-          <div className="search-result-favicon-container">
-            <Favicon url={item.url} title={item.title} type={item.type} />
-          </div>
-          <div className="search-result-details">
-            <div className="search-result-title">
-              <HighlightText text={item.title} highlight={query} />
-            </div>
-            {item.url && (
-              <div className="search-result-url">
-                <HighlightText text={item.url} highlight={query} />
-              </div>
-            )}
-          </div>
-          {item.type && (
-            <span className={`search-result-badge ${item.type}`}>
-              {item.type === 'typesense' ? 'semantic' : item.type}
-            </span>
-          )}
-          {item.visitCount !== undefined && item.visitCount > 0 && (
-            <div className="search-result-meta-info">
-              <span>📈 {item.visitCount} visits</span>
-              {item.lastVisit && <span>• {formatTime(item.lastVisit)}</span>}
-            </div>
-          )}
-          {item.folder && (
-            <div className="search-result-meta-info">
-              <span>📂 {item.folder}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   // Mock search engine data generators based on query
   const mockImages = useMemo(() => {
@@ -308,72 +334,60 @@ export const SearchResult = ({ isOpen, onClose }) => {
               >
                 <Dialog.Content asChild>
                   <motion.div 
-                    className="search-modal-content"
+                    className="search-modal-content glass-host"
                     initial={{ scale: 0.95, y: 15, opacity: 0 }}
                     animate={{ scale: 1, y: 0, opacity: 1 }}
                     exit={{ scale: 0.95, y: 15, opacity: 0 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 350 }}
                     onKeyDown={handleKeyDown}
                   >
+                    <GlassSurface preset="spotlight" />
                     {/* Search Bar Input */}
                     <div className="search-input-wrapper">
                       <div className="search-icon-left">
                         {isLoading ? (
-                          <svg className="animate-spin" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <svg className="animate-spin" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2">
                             <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12"></circle>
                           </svg>
                         ) : (
-                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                            <circle cx="10.5" cy="10.5" r="7"></circle>
+                            <line x1="20.5" y1="20.5" x2="15.6" y2="15.6"></line>
                           </svg>
                         )}
                       </div>
-                      <input 
-                        ref={inputRef}
-                        type="text" 
-                        className="search-input-field"
-                        placeholder="Search browser history, bookmarks, or type command (/music, /settings, /notes)..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                      {query && (
-                        <button className="search-clear-btn" onClick={() => setQuery('')}>
-                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                          </svg>
-                        </button>
-                      )}
-                      <button className="search-close-btn" onClick={onClose}>
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                      </button>
-                      <div className="search-hotkey-hint">ESC</div>
+                      <div className="search-input-box">
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          className="search-input-field"
+                          placeholder="Spotlight Search"
+                          aria-label="Search history, bookmarks and commands (/music, /settings, /notes)"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                        />
+                        {/* Measures the typed text so the top-hit hint can follow it. */}
+                        <span ref={measureRef} className="search-input-measure" aria-hidden="true">{query}</span>
+                        {completion && (
+                          <span ref={completionRef} className="search-completion" aria-hidden="true">
+                            — {completion}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Tabs bar */}
-                    <div className="search-tabs-list">
-                      {['all', 'images', 'videos', 'reddit', 'maps', 'settings'].map((tab) => (
+                    <div className="search-tabs-list" role="tablist" aria-label="Search categories">
+                      {SEARCH_TABS.map((tab) => (
                         <button
-                          key={tab}
-                          className={`search-tab-trigger ${activeTab === tab ? 'active' : ''}`}
-                          onClick={() => setActiveTab(tab)}
+                          key={tab.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={activeTab === tab.id}
+                          className={`search-tab-trigger ${activeTab === tab.id ? 'active' : ''}`}
+                          onClick={() => setActiveTab(tab.id)}
                         >
-                          {tab === 'all' && '🌐 All'}
-                          {tab === 'images' && '🖼️ Images'}
-                          {tab === 'videos' && '🎥 Videos'}
-                          {tab === 'reddit' && '💬 Reddit'}
-                          {tab === 'maps' && '🗺️ Maps'}
-                          {tab === 'settings' && '⚙️ Settings'}
-                          
-                          {activeTab === tab && (
-                            <motion.div 
-                              className="search-tab-active-indicator" 
-                              layoutId="activeTabIndicator"
-                            />
-                          )}
+                          {tab.label}
                         </button>
                       ))}
                     </div>
@@ -405,13 +419,26 @@ export const SearchResult = ({ isOpen, onClose }) => {
                             rowCount={activeItems.length}
                             rowHeight={60}
                             width="100%"
-                            rowComponent={VirtualRow}
-                            rowProps={{}}
+                            rowComponent={ResultRow}
+                            rowProps={{
+                              items: activeItems,
+                              answerOffset,
+                              selectedIndex,
+                              query,
+                              onItemClick: handleItemClick,
+                              onHover: setSelectedIndex,
+                            }}
                           />
                         ) : !hasAnswer && (
-                          <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)' }}>
-                            <p style={{ fontSize: '15px' }}>No matches found inside history or bookmarks.</p>
-                            <p style={{ fontSize: '12px', marginTop: '6px' }}>Press Enter to search Web for "{query}"</p>
+                          <div className="search-empty">
+                            {query.trim() ? (
+                              <>
+                                <p className="search-empty-title">No Results in History or Bookmarks</p>
+                                <p className="search-empty-hint">Press Enter to search the web for “{query.trim()}”.</p>
+                              </>
+                            ) : (
+                              <p className="search-empty-hint">Search your history and bookmarks, or type / for commands.</p>
+                            )}
                           </div>
                         )
                       )}

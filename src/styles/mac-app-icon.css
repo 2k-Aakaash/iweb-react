@@ -1,0 +1,36 @@
+/* macOS app icons (src/components/icons/MacAppIcon.jsx), cropped to the tile.
+   The tile spans about x 9.8–89.8% and y 10.7–90.6% of the icon canvas. Enlarging the
+   image to 127% and centring the tile overscans it by ~1% per side, which cuts off the
+   dark shadow ring around it. */
+.mac-app-icon {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 24%;
+}
+
+/* Doubled class: beats generic `img` rules of the host (e.g. the Dock's `.app img`). */
+.mac-app-icon.mac-app-icon > img {
+  position: absolute;
+  left: -13.25%;
+  top: -14.26%;
+  width: 127%;
+  height: 127%;
+  max-width: none;
+  border-radius: 0;
+  object-fit: fill;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mac-app-icon.mac-app-icon > img.is-loaded {
+  opacity: 1;
+}
+
+/* The fallback (a drawn icon) fills the tile underneath. */
+.mac-app-icon > :not(img) {
+  position: absolute;
+  inset: 0;
+}

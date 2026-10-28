@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import styles from "./Dock.module.css";
+import GlassSurface from "./glass/GlassSurface";
+import DockAppIcon from "./dock/DockAppIcon";
+import { WINDOW_EVENT } from "../libs/window/useMacWindow";
+import { useFavicons } from "../libs/favicons/useFavicons";
 
 const defaultFavicon = "https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100";
 const maxAdditionalSize = 5;
@@ -13,14 +17,76 @@ const scaleValue = (value, from, to) => {
 export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenNotes, onOpenSettings, onOpenMusicLibrary }) {
   const [isJiggling, setIsJiggling] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  // Escape closes the Add App dialog.
+  useEffect(() => {
+    if (!showAddModal) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setShowAddModal(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showAddModal]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState({ show: false, bookmark: null });
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
 
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [faviconSteps, setFaviconSteps] = useState({});
+  // Bookmark icons from iWebDB (refreshed weekly from /api/favicon); a broken cached image
+  // falls back to the network chain below.
+  const [badCached, setBadCached] = useState({});
 
   const dockRef = useRef(null);
+  // Apps with an open or minimized window get the running dot under their icon (macOS).
+  const [running, setRunning] = useState({});
+  // Hover labels. Their glass is mounted only for the label showing and the one fading out,
+  // not for every icon (in Liquid mode each glass surface is a live WebGL pass).
+  const [labelGlass, setLabelGlass] = useState([]);
+  const showLabel = (key) =>
+    setLabelGlass((prev) => (prev[0] === key ? prev : [key, ...prev.filter((k) => k !== key)].slice(0, 2)));
+  const labelProps = (key) => ({
+    onMouseEnter: () => showLabel(key),
+    onFocus: (e) => {
+      if (e.target.matches(":focus-visible")) showLabel(key);
+    },
+  });
+  const label = (key, text) => (
+    <span className={`${styles.tooltip} glass-host`}>
+      {labelGlass.includes(key) && <GlassSurface preset="label" />}
+      {text}
+    </span>
+  );
+  useEffect(() => {
+    const onWindow = (e) => {
+      const { app, state } = e.detail || {};
+      if (app) setRunning((prev) => (prev[app] === state ? prev : { ...prev, [app]: state }));
+    };
+    window.addEventListener(WINDOW_EVENT, onWindow);
+    return () => window.removeEventListener(WINDOW_EVENT, onWindow);
+  }, []);
+  const runningProps = (app) => (running[app] && running[app] !== "closed" ? { "data-running": running[app] } : {});
+
+  // A click that opens a new tab leaves Chrome's :hover stuck on that icon (the page gets no
+  // mouse events while it is in the background), so on return the icon was still magnified
+  // with its label up until the next click. Hover effects pause when the page loses focus and
+  // resume on the next real pointer move over the Dock.
+  const [hoverOff, setHoverOff] = useState(false);
+  useEffect(() => {
+    const pause = () => {
+      setHoverOff(true);
+      dockRef.current?.style.setProperty("--dock-offset-left", "0px");
+      dockRef.current?.style.setProperty("--dock-offset-right", "0px");
+    };
+    const onVisibility = () => {
+      if (document.hidden) pause();
+    };
+    window.addEventListener("blur", pause);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", pause);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
   const longPressTimer = useRef(null);
 
   // Exiting edit/jiggle mode when clicking outside
@@ -80,6 +146,8 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
       return url.replace(/^https?:\/\/|www\./g, "");
     }
   };
+
+  const cachedIcons = useFavicons(bookmarks.map((app) => getWebsiteDomain(app.url)));
 
   // Drag and Drop reordering
   const handleDragStart = (e, index) => {
@@ -174,24 +242,40 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
         ref={dockRef}
         className={styles.dock}
         data-glass="dock"
+        data-hover-off={hoverOff || undefined}
+        onPointerMove={hoverOff ? () => setHoverOff(false) : undefined}
         onMouseLeave={handleMouseLeave}
       >
-        <div className={styles.dockBg} />
-        <ul className={styles.list}>
+        <div className={`${styles.dockBg} glass-host`}>
+          <GlassSurface preset="dock" />
+        </div>
+        <ul
+          className={styles.list}
+          // Like macOS, a clicked Dock icon doesn't keep focus: otherwise the next key press
+          // (Escape closing the window it opened) turns it into keyboard focus and its label
+          // reappears. Keyboard users still focus icons with Tab.
+          onPointerUp={(e) => e.target.closest("a, button")?.blur()}
+        >
           {/* ── Bookmark Icons Section ── */}
           {bookmarks.map((app, index) => {
             const domain = getWebsiteDomain(app.url);
             const step = faviconSteps[app.url] || 0;
+            const lookedUp = domain in cachedIcons;
+            const cached = !badCached[domain] ? cachedIcons[domain] : null;
 
             let src;
-            if (step === 0) {
+            if (cached) {
+              src = cached;
+            } else if (!lookedUp) {
+              src = undefined; // checking iWebDB first, so the network isn't hit on every load
+            } else if (step === 0) {
               src = `https://www.google.com/s2/favicons?sz=256&domain_url=https://${domain}`;
             } else if (step === 1) {
-              src = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-            } else if (step === 2) {
+              // Not DuckDuckGo here: for unknown sites it answers 404 with a grey-arrow image,
+              // which an <img> still shows (no error). The /api/favicon proxy checks it properly.
               src = `https://${domain}/favicon.ico`;
             } else {
-              src = defaultFavicon;
+              src = defaultFavicon; // no favicon anywhere: the iWeb icon
             }
 
             return (
@@ -199,6 +283,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                 key={app.websiteName}
                 className={`${styles.app} ${isJiggling ? styles.jiggling : ""}`}
                 onMouseMove={handleAppHover}
+                {...labelProps(`app:${app.url}`)}
                 draggable={isJiggling}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
@@ -218,30 +303,33 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                   target="_blank"
                   rel="noreferrer"
                   className={styles.link}
-                  title={app.websiteName}
                   onClick={(e) => handleAppClick(e, app.url)}
                   onMouseDown={handlePressStart}
                   onMouseUp={handlePressEnd}
                   onTouchStart={handlePressStart}
                   onTouchEnd={handlePressEnd}
                 >
+                  {/* While the cached icon is still being read, an empty tile, never the alt text. */}
+                  {src === undefined ? (
+                    <span className={styles.iconPlaceholder} aria-hidden="true" />
+                  ) : (
                   <img
                     src={src}
                     onLoad={(e) => {
                       // Google S2 returns a 16x16 globe icon when a favicon is not found
-                      if (step === 0 && e.currentTarget.naturalWidth === 16 && e.currentTarget.naturalHeight === 16) {
+                      if (!cached && step === 0 && e.currentTarget.naturalWidth === 16 && e.currentTarget.naturalHeight === 16) {
                         setFaviconSteps((prev) => ({ ...prev, [app.url]: 1 }));
                       }
                     }}
                     onError={() => {
-                      setFaviconSteps((prev) => ({ ...prev, [app.url]: step + 1 }));
+                      if (cached) setBadCached((prev) => ({ ...prev, [domain]: true }));
+                      else setFaviconSteps((prev) => ({ ...prev, [app.url]: step + 1 }));
                     }}
                     alt={app.websiteName}
                     draggable={false}
                   />
-                  <span className={`${styles.tooltip} ${styles.liquidBtn}`}>
-                    {app.websiteName}
-                  </span>
+                  )}
+                  {label(`app:${app.url}`, app.websiteName)}
                 </a>
               </li>
             );
@@ -253,126 +341,59 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
           )}
 
           {/* ── Add App Button ── */}
-          <li className={`${styles.app} ${styles.action}`} data-action="add" onMouseMove={handleAppHover}>
+          <li className={`${styles.app} ${styles.action}`} data-action="add" onMouseMove={handleAppHover} {...labelProps("add")}>
             <button
               type="button"
               className={styles.actionBtn}
-              title="Add app"
               onClick={() => setShowAddModal(true)}
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={styles.actionIcon}
-              >
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Add app</span>
+              <DockAppIcon name="add" className={styles.appIcon} />
+              {label("add", "Add app")}
             </button>
           </li>
 
           {/* ── Change Background Button ── */}
-          <li className={`${styles.app} ${styles.action}`} data-action="bg" onMouseMove={handleAppHover}>
+          <li className={`${styles.app} ${styles.action}`} data-action="bg" onMouseMove={handleAppHover} {...labelProps("bg")}>
             <button
               type="button"
               className={styles.actionBtn}
-              title="Change background"
               onClick={onChangeBg}
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={styles.actionIcon}
-              >
-                {/* Mountains / landscape wallpaper icon */}
-                <rect x="3" y="3" width="18" height="18" rx="3" ry="3" />
-                <polyline points="3 16 8 11 12 14 16 9 21 14" />
-                <circle cx="8.5" cy="7.5" r="1.5" />
-              </svg>
-              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Change BG</span>
+              <DockAppIcon name="bg" className={styles.appIcon} />
+              {label("bg", "Change BG")}
             </button>
           </li>
           {/* ── Notes Button ── */}
-          <li className={`${styles.app} ${styles.action}`} data-action="notes" onMouseMove={handleAppHover}>
+          <li className={`${styles.app} ${styles.action}`} data-action="notes" {...runningProps("notes")} onMouseMove={handleAppHover} {...labelProps("notes")}>
             <button
               type="button"
               className={styles.actionBtn}
-              title="Notes"
               onClick={onOpenNotes}
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={styles.actionIcon}
-              >
-                {/* Note / Notepad icon */}
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="9" y1="9" x2="15" y2="9" />
-                <line x1="9" y1="13" x2="15" y2="13" />
-                <line x1="9" y1="17" x2="13" y2="17" />
-              </svg>
-              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Notes</span>
+              <DockAppIcon name="notes" className={styles.appIcon} />
+              {label("notes", "Notes")}
             </button>
           </li>
           {/* ── Music Library Button ── */}
-          <li className={`${styles.app} ${styles.action}`} data-action="music" onMouseMove={handleAppHover}>
+          <li className={`${styles.app} ${styles.action}`} data-action="music" {...runningProps("music")} onMouseMove={handleAppHover} {...labelProps("music")}>
             <button
               type="button"
               className={styles.actionBtn}
-              title="Music Library"
               onClick={onOpenMusicLibrary}
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={styles.actionIcon}
-              >
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Music Library</span>
+              <DockAppIcon name="music" className={styles.appIcon} />
+              {label("music", "Music Library")}
             </button>
           </li>
           {/* ── Settings Button ── */}
-          <li className={`${styles.app} ${styles.action}`} data-action="settings" onMouseMove={handleAppHover}>
+          <li className={`${styles.app} ${styles.action}`} data-action="settings" {...runningProps("settings")} onMouseMove={handleAppHover} {...labelProps("settings")}>
             <button
               type="button"
               className={styles.actionBtn}
-              title="Settings"
               onClick={onOpenSettings}
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={styles.actionIcon}
-              >
-                {/* Gear settings icon */}
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              <span className={`${styles.tooltip} ${styles.liquidBtn}`}>Settings</span>
+              <DockAppIcon name="settings" className={styles.appIcon} />
+              {label("settings", "Settings")}
             </button>
           </li>
         </ul>
@@ -381,7 +402,8 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm.show && (
         <div className={styles.confirmOverlay}>
-          <div className="confirmation-dialog">
+          <div className="confirmation-dialog glass-host">
+            <GlassSurface preset="window" />
             <p>
               Are you sure you want to delete the selected link? This action cannot be undone.
             </p>
@@ -401,14 +423,14 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
       {/* Add App Modal */}
       {showAddModal && (
         <div className="remove-bg-window" style={{ display: "block" }}>
-          <div className="remove-bg-content" style={{ maxWidth: "400px", padding: "20px", position: "relative" }}>
-            <div className="window-controls">
-              <span className="window-dot dot-close" onClick={() => setShowAddModal(false)}></span>
-              <span className="window-dot dot-minimize"></span>
-              <span className="window-dot dot-maximize"></span>
-            </div>
-            <div className="navbar" style={{ borderBottom: "none", paddingTop: "15px" }}>
-              <p className="navbar-text">Add New App Link</p>
+          <div className="remove-bg-content glass-host" style={{ maxWidth: "400px", padding: "20px", position: "relative" }}>
+            <GlassSurface preset="window" />
+            {/* A small dialog, not an app window: close only, title centred (macOS sheet). */}
+            <div className={styles.dialogHeader}>
+              <div className={`window-controls ${styles.dialogControls}`}>
+                <span className="window-dot dot-close" role="button" aria-label="Close" onClick={() => setShowAddModal(false)}></span>
+              </div>
+              <h2 className={styles.dialogTitle}>Add New App Link</h2>
             </div>
             <div
               style={{
@@ -446,7 +468,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               />
               <button
                 className="add-bookmark"
-                style={{ width: "100%", height: "40px", marginTop: "10px" }}
+                style={{ width: "100%", height: "40px", marginTop: 0 }}
                 onClick={handleAddApp}
               >
                 Add App

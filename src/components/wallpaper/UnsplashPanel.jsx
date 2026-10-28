@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CURATED_TOPICS, acquirePhoto, changeUnsplashBackground, searchWallpapers } from '../../libs/wallpaper/discovery';
+import { CURATED_TOPICS, acquirePhoto, changeUnsplashBackground, prefetchNextUnsplash, searchWallpapers } from '../../libs/wallpaper/discovery';
 import { getActiveWallpaper, setActiveWallpaper } from '../../libs/wallpaper/settings';
 import SegmentedControl from './SegmentedControl';
 import Attribution from './Attribution';
@@ -23,53 +23,12 @@ const EMPTY_SEARCH = {
   submitted: false
 };
 
-const MAX_QUOTA_DOTS = 10;
-
-function QuotaMeter({ quota }) {
-  if (!quota) {
-    return <p className="wp-quota-text">Checking today’s allowance…</p>;
-  }
-  const limit = quota.limit;
-  const remaining = Math.max(0, quota.remaining);
-  const used = Math.max(0, limit - remaining);
-  const resetTime = formatResetTime(quota.resetsAt);
-
-  return (
-    <div
-      className="wp-quota"
-      role="meter"
-      aria-label="New Unsplash photos left today"
-      aria-valuemin={0}
-      aria-valuemax={limit}
-      aria-valuenow={remaining}
-      aria-valuetext={`${remaining} of ${limit} new photos left today`}
-    >
-      {limit <= MAX_QUOTA_DOTS ? (
-        <span className="wp-quota-dots" aria-hidden="true">
-          {Array.from({ length: limit }, (_, i) => (
-            <span key={i} className={`wp-quota-dot ${i < used ? 'is-used' : ''}`} />
-          ))}
-        </span>
-      ) : (
-        // Large limits (dev override) get a bar instead of one dot per slot.
-        <span className="wp-quota-bar" aria-hidden="true">
-          <span className="wp-quota-bar-fill" style={{ width: `${limit > 0 ? (remaining / limit) * 100 : 0}%` }} />
-        </span>
-      )}
-      <span className="wp-quota-text">
-        {remaining} of {limit} new photos left today
-        {remaining === 0 && resetTime && <span className="wp-quota-reset"> · Resets at {resetTime}</span>}
-      </span>
-    </div>
-  );
-}
-
 function ResultCard({ photo, cached, isActive, loading, blocked, onClick }) {
   const name = photo.photographer?.name || 'Unknown photographer';
   let label = `Use photo by ${name}`;
   if (cached) label += ' (cached)';
   if (isActive) label += ' (active)';
-  if (blocked) label += ', unavailable until the daily limit resets';
+  if (blocked) label += ', unavailable until new downloads resume';
 
   return (
     <li className={`wp-card ${isActive ? 'is-active' : ''} ${blocked ? 'is-blocked' : ''}`}>
@@ -248,7 +207,9 @@ export default function UnsplashPanel({ settings, onSettingsChange, quota, onlin
     }
 
     if (limitReached) {
-      const text = `This photo isn’t saved yet and today’s new-photo limit is used up.${resetTime ? ` Try again after ${resetTime}.` : ''}`;
+      const text = quota?.paused
+        ? `This photo isn’t saved yet and Unsplash is busy right now.${resetTime ? ` Try again after ${resetTime}.` : ''}`
+        : `This photo isn’t saved yet and today’s new-photo limit is used up.${resetTime ? ` Try again after ${resetTime}.` : ''}`;
       setNotice({ tone: 'warning', text });
       onAnnounce(text);
       return;
@@ -277,6 +238,7 @@ export default function UnsplashPanel({ settings, onSettingsChange, quota, onlin
     setNotice(null);
     try {
       const result = await changeUnsplashBackground({ settings });
+      prefetchNextUnsplash({ settings }); // next change is then instant
       const record = result?.record;
       if (record?.photoId) {
         const ref = { source: 'unsplash', id: record.photoId };
@@ -318,6 +280,10 @@ export default function UnsplashPanel({ settings, onSettingsChange, quota, onlin
   let allowanceMessage = '';
   if (!online) {
     allowanceMessage = 'You’re offline. Change Background will shuffle photos already saved on this device.';
+  } else if (limitReached && quota?.paused) {
+    allowanceMessage = cachedIds.size > 0
+      ? `Unsplash is busy right now. Change Background will shuffle your saved photos${resetTime ? ` until ${resetTime}` : ''}.`
+      : `Unsplash is busy right now. New photos are available again${resetTime ? ` at ${resetTime}` : ' shortly'}.`;
   } else if (limitReached) {
     allowanceMessage = cachedIds.size > 0
       ? `Today’s new-photo limit is reached. Change Background will shuffle your saved Unsplash photos${resetTime ? ` until ${resetTime}` : ''}.`
@@ -331,7 +297,7 @@ export default function UnsplashPanel({ settings, onSettingsChange, quota, onlin
       <div className="settings-group-card-title">Unsplash</div>
       <div className="settings-group-card">
         <div className="settings-row wp-row-wrap">
-          <QuotaMeter quota={quota} />
+          <span className="wp-hint wp-change-hint">Sets a new Unsplash photo as your background.</span>
           <button
             type="button"
             className="settings-btn settings-btn-primary wp-btn-hero"
@@ -421,7 +387,7 @@ export default function UnsplashPanel({ settings, onSettingsChange, quota, onlin
             {search.fromCache && !search.loading && (
               <p className="wp-hint">
                 {search.limitReached
-                  ? 'Daily limit reached: showing matches from your saved photos only.'
+                  ? (quota?.paused ? 'Unsplash is busy: showing matches from your saved photos only.' : 'Daily limit reached: showing matches from your saved photos only.')
                   : 'Offline: showing matches from your saved photos only.'}
               </p>
             )}

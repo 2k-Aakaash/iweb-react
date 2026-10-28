@@ -1,0 +1,49 @@
+/* One scrollbar for the whole app, after macOS 26: a slim floating capsule with no track and
+   no arrow buttons; faint at rest, brighter when the pointer is over it. (Chrome doesn't
+   reliably repaint scrollbars on hover of the scrolling area, so it isn't hidden.) Places that hide
+   their scrollbar on purpose (scrollbar-width: none, e.g. the search tabs or forecast strip)
+   keep doing so. */
+
+/* Chromium / the extension. These pseudo-elements are ignored on any element that sets the
+   standard scrollbar-color / scrollbar-width, so those are only set for Firefox below. */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* The capsule: a 5px pill inset by a transparent border, so it floats off the edge. */
+::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  border-width: 1px; /* grows a little under the pointer, like macOS */
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: rgba(255, 255, 255, 0.62);
+}
+
+/* Firefox has no pseudo-elements: a thin, translucent bar is the closest match. */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import GlassSurface from '../glass/GlassSurface';
 import Sparkline from './shared/Sparkline';
 import {
   MarketError,
@@ -119,7 +120,8 @@ export default function MarketsWidget({ active = true }) {
   }
 
   return (
-    <div className={`cw-card mw-card cw-mood-${mood}`}>
+    <div className={`cw-card glass-host mw-card cw-mood-${mood}`}>
+      <GlassSurface preset="card" />
       <button
         type="button"
         className="mw-open"

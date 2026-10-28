@@ -36,6 +36,7 @@ vi.mock('../quotaLimiter.js', () => {
       state.reservations.delete(requestId);
       return { counted: true };
     }),
+    pauseAcquisitions: vi.fn(),
     releaseSlot: vi.fn(async (requestId) => {
       if (state.reservations.delete(requestId)) state.remaining += 1;
     }),
@@ -95,6 +96,7 @@ vi.mock('../unsplashClient.js', async (importOriginal) => {
     getRandomPhotos: vi.fn(async () => []),
     searchPhotos: vi.fn(async () => ({ results: [], total: 0, totalPages: 0 })),
     trackDownload: vi.fn(async () => undefined),
+    getApiRateInfo: vi.fn(() => null),
   };
 });
 
@@ -103,7 +105,7 @@ const repo = await import('../repository.js');
 const settingsModule = await import('../settings.js');
 const loader = await import('../imageLoader.js');
 const client = await import('../unsplashClient.js');
-const { acquirePhoto, changeUnsplashBackground, searchWallpapers, CURATED_TOPICS } = await import('../discovery.js');
+const { acquirePhoto, changeUnsplashBackground, prefetchNextUnsplash, searchWallpapers, CURATED_TOPICS } = await import('../discovery.js');
 
 function photo(id, overrides = {}) {
   return {
@@ -353,6 +355,47 @@ describe('changeUnsplashBackground', () => {
     expect(settingsModule.setActiveWallpaper).toHaveBeenCalledWith({ source: 'unsplash', id: 'unseen' });
   });
 
+  it('prefetches the next photo without the download ping, and pings when it is shown', async () => {
+    seed(cachedRecord('seen', { lastUsedAt: 5000 }));
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    client.getRandomPhotos.mockResolvedValueOnce([photo('next')]);
+
+    const prefetched = await prefetchNextUnsplash({ settings: topicSettings });
+    expect(prefetched.photoId).toBe('next');
+    expect(prefetched.downloadPending).toBe(true);
+    expect(client.trackDownload).not.toHaveBeenCalled();
+
+    const res = await changeUnsplashBackground({ settings: topicSettings });
+    expect(res.origin).toBe('cache');
+    expect(res.record.photoId).toBe('next');
+    expect(client.trackDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('pauses new downloads when Unsplash reports its shared limit nearly used', async () => {
+    seed(cachedRecord('seen', { lastUsedAt: 5000 }));
+    client.getApiRateInfo.mockReturnValue({ limit: 1000, remaining: 10, updatedAt: Date.now() });
+    client.getRandomPhotos.mockResolvedValueOnce([photo('fresh')]);
+    await changeUnsplashBackground({ settings: topicSettings });
+    expect(quota.pauseAcquisitions).toHaveBeenCalledWith(expect.any(Number));
+    client.getApiRateInfo.mockReturnValue(null);
+  });
+
+  it('pauses new downloads after a rate-limit response and falls back to the cache', async () => {
+    seed(cachedRecord('seen', { lastUsedAt: 5000 }));
+    client.getRandomPhotos.mockRejectedValueOnce(Object.assign(new client.UnsplashError('RATE_LIMITED', 'busy'), { retryAfter: 120 }));
+    const res = await changeUnsplashBackground({ settings: topicSettings });
+    expect(res.origin).toBe('cache');
+    const until = quota.pauseAcquisitions.mock.calls.at(-1)[0];
+    expect(until - Date.now()).toBeGreaterThan(110 * 1000);
+    expect(until - Date.now()).toBeLessThanOrEqual(120 * 1000);
+  });
+
+  it('skips the prefetch when an unseen matching photo is already cached', async () => {
+    seed(cachedRecord('unseen'));
+    expect(await prefetchNextUnsplash({ settings: topicSettings })).toBeNull();
+    expect(client.getRandomPhotos).not.toHaveBeenCalled();
+  });
+
   it('fetches a new photo when no unseen cached image matches', async () => {
     seed(cachedRecord('seen', { lastUsedAt: 5000 }));
     vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -360,7 +403,7 @@ describe('changeUnsplashBackground', () => {
 
     const res = await changeUnsplashBackground({ settings: topicSettings });
 
-    expect(client.getRandomPhotos).toHaveBeenCalledWith(expect.objectContaining({ query: 'mountains', count: 10 }));
+    expect(client.getRandomPhotos).toHaveBeenCalledWith(expect.objectContaining({ query: 'mountains', count: 30 }));
     expect(res.origin).toBe('new');
     expect(res.record.photoId).toBe('fresh');
     expect(res.quota.remaining).toBe(2);

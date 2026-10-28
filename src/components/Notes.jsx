@@ -1,4 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useMacWindow } from '../libs/window/useMacWindow';
+import GlassSurface from './glass/GlassSurface';
+import { applyFormat, markdownToText, renderMarkdown, toggleTask } from '../libs/notes/markdown';
+import { canRedo, canUndo, createHistory, record, redo, undo, typingKind } from '../libs/notes/history';
+import { groupNotes, rowDate } from '../libs/notes/groups';
+import '../styles/notes-sidebar.css';
+import '../styles/notes-markdown.css';
+
+// Formatting toolbar (Write mode): [format, label, title]; null is a separator.
+const TOOLBAR = [
+  ['heading', 'H', 'Heading'],
+  ['bold', 'B', 'Bold (Ctrl+B)'],
+  ['italic', 'I', 'Italic (Ctrl+I)'],
+  ['strike', 'S', 'Strikethrough'],
+  null,
+  ['bullet', '•', 'Bulleted list'],
+  ['number', '1.', 'Numbered list'],
+  ['task', '☐', 'Checklist'],
+  ['quote', '❝', 'Quote'],
+  null,
+  ['code', '</>', 'Inline code'],
+  ['codeblock', '{ }', 'Code block'],
+  ['link', '🔗', 'Link'],
+];
+
+const MODE_KEY = 'iweb:notesMode';
+const readMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'preview' ? 'preview' : 'write';
+  } catch {
+    return 'write';
+  }
+};
 
 const DB_NAME = 'iweb-notes-db';
 const STORE_NAME = 'notes';
@@ -66,7 +99,27 @@ export default function Notes() {
   const [db, setDb] = useState(null);
   const [notes, setNotes] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const overlayRef = useRef(null);
+  const windowRef = useRef(null);
+  // macOS window: genies out of the Dock's Notes icon; red closes, yellow minimizes into the
+  // icon, green zooms to full size.
+  const win = useMacWindow({ app: 'notes', open: showModal, setOpen: setShowModal, windowRef, overlayRef });
+  const mounted = win.mounted;
   const [searchQuery, setSearchQuery] = useState('');
+  // Markdown: write the source, or preview it rendered. Remembered between sessions.
+  const [mode, setModeState] = useState(readMode);
+  const setMode = (next) => {
+    setModeState(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      /* private mode */
+    }
+  };
+  const textareaRef = useRef(null);
+  // Undo / redo: one history per note, kept in memory while iWeb is open.
+  const historiesRef = useRef(new Map());
+  const [history, setHistory] = useState(null);
   const [activeNoteId, setActiveNoteId] = useState(null);
 
   // Open modal via custom event
@@ -139,6 +192,10 @@ export default function Notes() {
       if (activeNote) {
         setEditorTitle(activeNote.title);
         setEditorContent(activeNote.content);
+        const known = historiesRef.current.get(activeNote.id);
+        const h = known && known.present.value === activeNote.content ? known : createHistory(activeNote.content);
+        historiesRef.current.set(activeNote.id, h);
+        setHistory(h);
         setSaveStatus('Saved');
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
@@ -263,6 +320,14 @@ export default function Notes() {
     }
   };
 
+  // Save a pending edit right away (before the window closes or minimizes).
+  const flushSave = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      performSave();
+    }
+  };
+
   // Global escape and key bindings
   useEffect(() => {
     const handleGlobalKeys = (e) => {
@@ -273,6 +338,12 @@ export default function Notes() {
           performSave();
         }
         setShowModal(false);
+      }
+      // Ctrl/Cmd + Shift + P: switch between Write and Preview
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p' && showModal && activeNoteId !== null) {
+        e.preventDefault();
+        setMode(mode === 'preview' ? 'write' : 'preview');
+        return;
       }
       // Ctrl + S (manual save trigger)
       if ((e.ctrlKey || e.metaKey) && e.key === 's' && showModal) {
@@ -290,21 +361,80 @@ export default function Notes() {
     };
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, [showModal, db, activeNoteId, editorTitle, editorContent, notes]);
+  }, [showModal, db, activeNoteId, editorTitle, editorContent, notes, mode]);
 
-  // Format date helper
-  const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+  // Every content change goes through here so it lands in the note's undo history.
+  const changeContent = (value, { kind, start = value.length, end = start, before }) => {
+    const base = history ?? createHistory(editorContent);
+    const h = record(base, { value, start, end }, { kind, before });
+    historiesRef.current.set(activeNoteId, h);
+    setHistory(h);
+    handleEditorChange('content', value);
+  };
+
+  // Put the textarea's caret / selection back after a programmatic change.
+  const restoreSelection = (start, end) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start, end);
     });
   };
 
+  const stepHistory = (direction) => {
+    if (!history) return;
+    const can = direction === 'undo' ? canUndo(history) : canRedo(history);
+    if (!can) return;
+    const h = direction === 'undo' ? undo(history) : redo(history);
+    historiesRef.current.set(activeNoteId, h);
+    setHistory(h);
+    handleEditorChange('content', h.present.value);
+    if (mode === 'write') restoreSelection(h.present.start, h.present.end);
+  };
+
+  // Ctrl/Cmd+Z undo; Ctrl/Cmd+Shift+Z or Ctrl+Y redo. Returns true when handled.
+  const handleUndoKeys = (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
+    const key = e.key.toLowerCase();
+    if (key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      stepHistory('undo');
+      return true;
+    }
+    if ((key === 'z' && e.shiftKey) || (key === 'y' && !e.shiftKey)) {
+      e.preventDefault();
+      stepHistory('redo');
+      return true;
+    }
+    return false;
+  };
+
+  // Apply a toolbar format to the textarea's selection, keeping focus and selecting the result.
+  const format = (name) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const before = { start: el.selectionStart, end: el.selectionEnd };
+    const next = applyFormat(editorContent, before.start, before.end, name);
+    changeContent(next.value, { kind: 'format', start: next.start, end: next.end, before });
+    restoreSelection(next.start, next.end);
+  };
+
+  // Ticking a checklist box in the Preview updates the Markdown source.
+  const handlePreviewClick = (e) => {
+    const box = e.target.closest?.('input[data-task]');
+    if (!box) return;
+    e.preventDefault();
+    changeContent(toggleTask(editorContent, Number(box.dataset.task)), { kind: 'task' });
+  };
+
+  const previewHtml = useMemo(
+    () => (mode === 'preview' ? renderMarkdown(editorContent) : ''),
+    [mode, editorContent],
+  );
+
   const getWordCount = () => {
-    const text = editorContent.trim();
+    const text = markdownToText(editorContent);
     return text ? text.split(/\s+/).length : 0;
   };
 
@@ -321,89 +451,131 @@ export default function Notes() {
 
   return (
     <>
-      {showModal && (
-        <div className="remove-bg-window" style={{ display: 'block' }}>
-          <div className="remove-bg-content notes-overhaul-modal">
+      {mounted && (
+        <div className="remove-bg-window" ref={overlayRef} style={{ display: 'block' }}>
+          <div className={`remove-bg-content notes-overhaul-modal glass-host${win.maximized ? ' window-maximized' : ''}`} ref={windowRef}>
+            <GlassSurface preset="window" />
             {/* macOS window dots */}
             <div className="window-controls">
               <span
                 className="window-dot dot-close"
+                role="button"
+                aria-label="Close"
                 onClick={() => {
-                  if (saveTimeoutRef.current) {
-                    clearTimeout(saveTimeoutRef.current);
-                    performSave();
-                  }
-                  setShowModal(false);
+                  flushSave();
+                  win.close();
                 }}
               ></span>
-              <span className="window-dot dot-minimize"></span>
-              <span className="window-dot dot-maximize"></span>
+              <span
+                className="window-dot dot-minimize"
+                role="button"
+                aria-label="Minimize"
+                onClick={() => {
+                  flushSave();
+                  win.minimize();
+                }}
+              ></span>
+              <span
+                className="window-dot dot-maximize"
+                role="button"
+                aria-label={win.maximized ? 'Exit full size' : 'Zoom'}
+                onClick={win.toggleMaximize}
+              ></span>
             </div>
 
 
             {/* Split Pane macOS Layout */}
             <div className="notes-app-layout">
               {/* Left Sidebar */}
-              <aside className="notes-sidebar">
-                <div className="notes-sidebar-header">
-                  <h2>Notes</h2>
+              <aside className="notes-sidebar nsb">
+                {/* macOS 26 Notes: large title + count, compose button, search, dated sections. */}
+                <div className="nsb-header">
+                  <div className="nsb-heading">
+                    <h2>Notes</h2>
+                    <span className="nsb-count">
+                      {notes.length} {notes.length === 1 ? 'note' : 'notes'}
+                    </span>
+                  </div>
                   <button
-                    className="notes-new-btn"
+                    type="button"
+                    className="nsb-compose"
                     title="New Note (Ctrl+N)"
+                    aria-label="New note"
                     onClick={handleAddNewNote}
                   >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                      <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" />
+                      <path d="M17.6 3.4a2 2 0 0 1 2.9 2.9L12 14.8l-3.6.8.8-3.6z" />
                     </svg>
                   </button>
                 </div>
 
-                <div className="notes-search-wrapper">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <label className="nsb-search">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <line x1="20.5" y1="20.5" x2="16" y2="16" />
                   </svg>
                   <input
                     type="text"
-                    placeholder="Search notes..."
+                    placeholder="Search"
+                    aria-label="Search notes"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                </div>
+                  {searchQuery && (
+                    <button type="button" className="nsb-search-clear" aria-label="Clear search" onClick={() => setSearchQuery('')}>
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor" /><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#1c1c1e" strokeWidth="1.6" strokeLinecap="round" /></svg>
+                    </button>
+                  )}
+                </label>
 
-                <div className="notes-list custom-scrollbar">
+                <div className="nsb-list custom-scrollbar">
                   {filteredNotes.length === 0 ? (
-                    <div className="notes-empty-state">No Notes</div>
+                    <div className="nsb-empty">
+                      {searchQuery ? `No results for “${searchQuery}”` : 'No Notes'}
+                    </div>
                   ) : (
-                    filteredNotes.map((note) => {
-                      const isActive = note.id === activeNoteId;
-                      // Snippet: skip the title line
-                      const lines = note.content.split('\n');
-                      const snippet = lines.slice(1).join(' ').trim() || 'No additional text';
-                      return (
-                        <div
-                          key={note.id}
-                          className={`notes-list-item ${isActive ? 'active' : ''}`}
-                          onClick={() => selectNote(note.id)}
-                        >
-                          <div className="notes-list-item-meta">
-                            <span className="notes-list-item-title">{note.title || 'Untitled Note'}</span>
-                            <button
-                              className="notes-list-item-delete"
-                              title="Delete note"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteNote(note.id);
-                              }}
-                            >
-                              &times;
-                            </button>
-                          </div>
-                          <p className="notes-list-item-snippet">{snippet}</p>
-                          <span className="notes-list-item-date">{formatDate(note.updatedAt)}</span>
-                        </div>
-                      );
-                    })
+                    groupNotes(filteredNotes).map((group) => (
+                      <section key={group.label} className="nsb-group" aria-label={group.label}>
+                        <h3 className="nsb-group-title">{group.label}</h3>
+                        <ul className="nsb-rows">
+                          {group.notes.map((note) => {
+                            const isActive = note.id === activeNoteId;
+                            const snippet = markdownToText(note.content) || 'No additional text';
+                            return (
+                              <li key={note.id} className={`nsb-row${isActive ? ' is-active' : ''}`}>
+                                <button
+                                  type="button"
+                                  className="nsb-row-main"
+                                  aria-current={isActive ? 'true' : undefined}
+                                  onClick={() => selectNote(note.id)}
+                                >
+                                  <span className="nsb-row-title">{note.title || 'Untitled Note'}</span>
+                                  <span className="nsb-row-sub">
+                                    <span className="nsb-row-date">{rowDate(note.updatedAt)}</span>
+                                    <span className="nsb-row-snippet">{snippet}</span>
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="nsb-row-delete"
+                                  title="Delete note"
+                                  aria-label={`Delete ${note.title || 'note'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteNote(note.id);
+                                  }}
+                                >
+                                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                                  </svg>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </section>
+                    ))
                   )}
                 </div>
               </aside>
@@ -440,6 +612,21 @@ export default function Notes() {
                         </span>
                       </div>
                       <div className="notes-editor-actions">
+                        <div className="notes-mode-switch" role="tablist" aria-label="Editor mode">
+                          {[['write', 'Write'], ['preview', 'Preview']].map(([id, label]) => (
+                            <button
+                              key={id}
+                              type="button"
+                              role="tab"
+                              aria-selected={mode === id}
+                              className={mode === id ? 'is-active' : ''}
+                              title={id === 'preview' ? 'Preview Markdown (Ctrl+Shift+P)' : 'Edit Markdown (Ctrl+Shift+P)'}
+                              onClick={() => setMode(id)}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
                         <button
                           className="notes-action-btn notes-delete-btn"
                           title="Delete Note"
@@ -458,12 +645,81 @@ export default function Notes() {
                       onChange={(e) => handleEditorChange('title', e.target.value)}
                     />
 
-                    <textarea
-                      className="notes-editor-textarea custom-scrollbar"
-                      placeholder="Start writing here..."
-                      value={editorContent}
-                      onChange={(e) => handleEditorChange('content', e.target.value)}
-                    />
+                    {mode === 'write' ? (
+                      <>
+                        <div className="notes-md-toolbar" role="toolbar" aria-label="Markdown formatting">
+                          <button
+                            type="button"
+                            className="notes-md-btn notes-md-history"
+                            title="Undo (Ctrl+Z)"
+                            aria-label="Undo"
+                            disabled={!history || !canUndo(history)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => stepHistory('undo')}
+                          >
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+                          </button>
+                          <button
+                            type="button"
+                            className="notes-md-btn notes-md-history"
+                            title="Redo (Ctrl+Shift+Z)"
+                            aria-label="Redo"
+                            disabled={!history || !canRedo(history)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => stepHistory('redo')}
+                          >
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></svg>
+                          </button>
+                          <span className="notes-md-sep" aria-hidden="true" />
+                          {TOOLBAR.map((item, i) => (item ? (
+                            <button
+                              key={item[0]}
+                              type="button"
+                              className={`notes-md-btn notes-md-${item[0]}`}
+                              title={item[2]}
+                              aria-label={item[2]}
+                              onMouseDown={(e) => e.preventDefault() /* keep the textarea selection */}
+                              onClick={() => format(item[0])}
+                            >
+                              {item[1]}
+                            </button>
+                          ) : <span key={`sep-${i}`} className="notes-md-sep" aria-hidden="true" />))}
+                          <span className="notes-md-hint">Markdown</span>
+                        </div>
+                        <textarea
+                          ref={textareaRef}
+                          className="notes-editor-textarea custom-scrollbar"
+                          placeholder={'Start writing in Markdown…\n\n# Heading   **bold**   _italic_   - [ ] task   `code`'}
+                          value={editorContent}
+                          onChange={(e) => changeContent(e.target.value, {
+                            kind: typingKind(editorContent, e.target.value),
+                            start: e.target.selectionStart,
+                            end: e.target.selectionEnd,
+                          })}
+                          onKeyDown={(e) => {
+                            if (handleUndoKeys(e)) return;
+                            if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+                            const key = e.key.toLowerCase();
+                            if (key === 'b' || key === 'i') {
+                              e.preventDefault();
+                              format(key === 'b' ? 'bold' : 'italic');
+                            }
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div
+                        className="notes-md-preview custom-scrollbar"
+                        tabIndex={0}
+                        onKeyDown={handleUndoKeys /* undo / redo after ticking checklists */}
+                        onClick={(e) => {
+                          e.currentTarget.focus({ preventScroll: true });
+                          handlePreviewClick(e);
+                        }}
+                        // renderMarkdown() sanitizes the HTML with DOMPurify.
+                        dangerouslySetInnerHTML={{ __html: previewHtml || '<p class="notes-md-empty">Nothing to preview yet.</p>' }}
+                      />
+                    )}
                   </div>
                 )}
               </main>

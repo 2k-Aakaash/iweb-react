@@ -1,4 +1,10 @@
-// Daily limit for new Unsplash acquisitions (3 per local calendar day).
+// Limits on new Unsplash acquisitions.
+//
+// Production has NO per-user daily cap (Unsplash production access: 1000 API requests/hour,
+// shared by every user, with search/random answered by the CDN). Instead, new downloads
+// PAUSE only while Unsplash's shared hourly limit is nearly used up (pauseAcquisitions,
+// triggered from discovery.js); during a pause users get their cached wallpapers. The
+// per-day cap machinery stays for tests and the dev override.
 //
 // Invariant: acquisitions + live reservations <= DAILY_LIMIT for the current local day.
 // Every operation runs as ONE readwrite IndexedDB transaction on `wallpaper_meta`
@@ -9,8 +15,8 @@
 import {openIwebDB, STORES, txDone} from "./db.js"
 import {broadcast} from "./sync.js"
 
-// Dev-only override (VITE_UNSPLASH_DAILY_LIMIT in .env). Ignored in production builds,
-// where import.meta.env.DEV is false, so the shipped limit is always 3.
+// Dev-only override (VITE_UNSPLASH_DAILY_LIMIT in .env). Tests run with a cap of 3 to
+// exercise the limit; everywhere else there is no daily cap.
 function resolveDailyLimit() {
   const env = import.meta.env || {}
   const override = Number.parseInt(env.UNSPLASH_DAILY_LIMIT, 10)
@@ -21,7 +27,7 @@ function resolveDailyLimit() {
     override > 0
   )
     return override
-  return 3
+  return env.MODE === "test" ? 3 : Infinity
 }
 
 export const DAILY_LIMIT = resolveDailyLimit()
@@ -100,16 +106,44 @@ function normalizeState(raw, now) {
   return {key: QUOTA_KEY, date, acquisitions, reservations}
 }
 
+// ── Rate-limit pause (shared by every tab through localStorage) ───────────────────────────
+
+const PAUSE_KEY = "iweb:unsplashPausedUntil"
+
+export function getPausedUntil(now = Date.now()) {
+  try {
+    const until = Number(localStorage.getItem(PAUSE_KEY))
+    return Number.isFinite(until) && until > now ? until : null
+  } catch {
+    return null
+  }
+}
+
+/** Stops new acquisitions until `until` (ms); cached wallpapers keep working meanwhile. */
+export function pauseAcquisitions(until) {
+  if (!Number.isFinite(until) || until <= Date.now()) return
+  try {
+    if ((getPausedUntil() ?? 0) >= until) return
+    localStorage.setItem(PAUSE_KEY, String(Math.round(until)))
+  } catch {
+    /* storage unavailable: the next request simply hits the limit again */
+  }
+  broadcast("quota-changed")
+}
+
 function toStatus(state, now) {
   const used = state.acquisitions.length
   const reserved = state.reservations.length
+  const pausedUntil = getPausedUntil(now)
   return {
     date: state.date,
     used,
     reserved,
-    remaining: Math.max(0, DAILY_LIMIT - used - reserved),
+    remaining: pausedUntil ? 0 : Math.max(0, DAILY_LIMIT - used - reserved),
     limit: DAILY_LIMIT,
-    resetsAt: nextLocalMidnight(new Date(now)),
+    unlimited: !Number.isFinite(DAILY_LIMIT),
+    paused: Boolean(pausedUntil),
+    resetsAt: pausedUntil ?? nextLocalMidnight(new Date(now)),
   }
 }
 
@@ -182,6 +216,13 @@ export async function reserveSlot({requestId, now} = {}) {
     // Already committed under this id: the slot is consumed, nothing to reserve.
     if (state.acquisitions.some((a) => a.requestId === id)) return
 
+    const pausedUntil = getPausedUntil(t)
+    if (pausedUntil) {
+      throw new QuotaError(
+        "Unsplash is busy right now; new wallpapers resume shortly.",
+        {code: "RATE_PAUSED", resetsAt: pausedUntil},
+      )
+    }
     if (state.acquisitions.length + state.reservations.length >= DAILY_LIMIT) {
       throw new QuotaError(
         `Daily limit of ${DAILY_LIMIT} new wallpapers reached.`,

@@ -6,7 +6,7 @@ export const ACCEPTED_LOCAL_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 
 const WIDTH_STEP = 320;
-const MAX_WIDTH = 3840;
+const MAX_WIDTH = 2560; // larger is invisible behind the page's UI, and doubles the download
 const DEFAULT_VIEWPORT = { width: 1920, height: 1080, dpr: 1 };
 const MAX_DPR = 4;
 const THUMB_QUALITY = 0.8;
@@ -49,7 +49,7 @@ function httpsUnsplashUrl(value) {
 /**
  * Builds a hotlinkable, size-appropriate Unsplash image URL from `urls.raw`
  * (keeps the `ixid` parameter, as the API requires). Width = viewport long edge × dpr,
- * rounded up to a 320px step, capped at 3840 and never above the photo's own width.
+ * rounded up to a 320px step, capped at 2560 and never above the photo's own width.
  */
 export function pickUnsplashUrl(urls, { width, height, dpr, photoWidth } = {}) {
   const defaults = viewportDefaults();
@@ -72,8 +72,9 @@ export function pickUnsplashUrl(urls, { width, height, dpr, photoWidth } = {}) {
   if (ownWidth) target = Math.min(target, Math.floor(ownWidth));
 
   raw.searchParams.set('w', String(target));
-  raw.searchParams.set('q', '80');
-  raw.searchParams.set('fm', 'jpg');
+  // WebP at q75 is about a third of the q80 JPEG for the same look (decoded everywhere iWeb runs).
+  raw.searchParams.set('q', '75');
+  raw.searchParams.set('fm', 'webp');
   raw.searchParams.set('fit', 'max');
   return raw.href;
 }

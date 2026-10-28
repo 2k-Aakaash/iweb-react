@@ -15,7 +15,9 @@
   --gw-track: rgba(0, 0, 0, 0.18);
   --gw-track-hover: rgba(0, 0, 0, 0.28);
   --gw-thumb: rgba(255, 255, 255, 0.16);
-  background: linear-gradient(to top, rgba(82, 55, 8, 0.9), rgba(130, 92, 17, 0.92));
+  --glass-tint: linear-gradient(to top, rgba(82, 55, 8, 0.9), rgba(130, 92, 17, 0.92));
+  /* Kept strong: white text must stay readable over bright wallpapers. */
+  --glass-tint-opacity: 0.85;
 }
 
 /* ── Collapsed tile ──────────────────────────────────────────────────────────

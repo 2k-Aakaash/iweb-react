@@ -14,92 +14,116 @@
   padding: 20px;
 }
 
-/* Modal Content Panel */
+/* Modal Content Panel: macOS 26 Spotlight. */
 .search-modal-content {
-  background: rgba(20, 20, 28, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 
-              inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  /* Frost and refraction come from <GlassSurface> (src/components/glass). */
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55),
+              inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
   width: 100%;
-  max-width: 800px;
+  max-width: 720px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: #f3f4f6;
-  font-family: 'sf_pro_displaysemibold', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  color: #f5f5f7;
+  /* Undo legacy globals from style.css: `body { text-align: center }` centred the results. */
+  text-align: left;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* Search Bar Wrapper */
-.search-input-wrapper {
+/* Legacy `button { margin-top: 20px }` pushed the tabs down. */
+.search-modal-content button {
+  margin: 0;
+}
+
+/* Search Bar Wrapper. Scoped: the Music app's .search-input-wrapper in style.css would
+   otherwise add a 24px margin (an empty band above the tabs) and a boxed background. */
+.search-modal-content .search-input-wrapper {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  gap: 12px;
+  padding: 18px 24px 16px;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  box-shadow: none;
+  gap: 14px;
   position: relative;
+  flex-shrink: 0; /* only the results area gives way in a long list */
 }
 
 .search-icon-left {
-  color: #9ca3af;
+  display: flex;
+  color: rgba(235, 235, 245, 0.7);
   flex-shrink: 0;
 }
 
-.search-input-field {
+/* The field, its hidden twin that measures the typed text, and the top-hit hint after it. */
+.search-input-box {
+  position: relative;
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-field,
+.search-input-measure {
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+}
+
+.search-input-field {
+  width: 100%;
   background: transparent;
   border: none;
   outline: none;
   color: #ffffff;
-  font-size: 17px;
-  font-weight: 500;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .search-input-field::placeholder {
-  color: rgba(156, 163, 175, 0.7);
+  color: rgba(235, 235, 245, 0.42);
 }
 
-.search-clear-btn, .search-close-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: none;
-  color: #9ca3af;
-  padding: 6px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  width: 28px;
-  height: 28px;
+.search-input-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
 }
 
-.search-clear-btn:hover, .search-close-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+.search-completion {
+  position: absolute;
+  top: 50%;
+  margin-left: 10px;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(235, 235, 245, 0.55);
+  font-size: 17px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
-.search-hotkey-hint {
-  font-size: 11px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 3px 6px;
-  border-radius: 4px;
-  color: #9ca3af;
-  user-select: none;
-}
-
-/* Tab Bar */
+/* Category chips: equal-width rounded rectangles. */
 .search-tabs-list {
   display: flex;
-  padding: 8px 16px 0 16px;
-  gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0; /* a long result list squashed the chips to slivers */
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -109,95 +133,102 @@
 }
 
 .search-tab-trigger {
-  background: transparent;
+  flex: 1 1 0;
+  flex-shrink: 0;
+  min-width: 72px;
+  white-space: nowrap;
+  padding: 6px 12px;
   border: none;
-  color: #9ca3af;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(235, 235, 245, 0.6);
+  font-size: 13.5px;
   cursor: pointer;
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.2s ease;
-  border-radius: 6px 6px 0 0;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .search-tab-trigger:hover {
+  background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
 }
 
 .search-tab-trigger.active {
-  color: #6366f1; /* purple/indigo accent */
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
-.search-tab-active-indicator {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #6366f1;
-  border-radius: 2px;
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
+.search-tab-trigger:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 1px;
 }
 
 /* Scroll Area Container */
 .search-results-panel {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.05);
+  padding: 8px 10px 10px;
   min-height: 250px;
 }
 
-/* Virtualized Row Styles */
+/* Result rows: icon, title, grey subtitle; ↩ on the selected one. */
 .search-result-row {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 14px;
+  height: 56px;
+  padding: 0 14px;
+  border-radius: 12px;
   cursor: pointer;
   user-select: none;
+  transition: background 0.12s ease;
 }
 
-.search-result-row:hover, .search-result-row.selected {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateY(-1px);
+.search-result-row:hover,
+.search-result-row.selected {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .search-result-favicon-container {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
   flex-shrink: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* App icons and the command glyph bring their own tile. */
+.search-result-favicon-container:has(.search-result-app-icon),
+.search-result-favicon-container:has(.search-result-letter-avatar) {
+  background: none;
+  box-shadow: none;
 }
 
 .search-result-favicon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: 5px;
+}
+
+/* Slash commands for iWeb's apps: their macOS app icon (MacAppIcon). */
+.search-result-app-icon {
+  width: 36px;
+  height: 36px;
 }
 
 .search-result-letter-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 15px;
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
   color: #ffffff;
   text-transform: uppercase;
 }
@@ -207,84 +238,66 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 1px;
 }
 
 .search-result-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #f3f4f6;
+  font-size: 16px;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .search-result-url {
-  font-size: 11.5px;
-  color: rgba(156, 163, 175, 0.85);
+  font-size: 13px;
+  color: rgba(235, 235, 245, 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
 }
 
-/* Badge System */
-.search-result-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  margin-left: 10px;
-  letter-spacing: 0.5px;
+.search-result-enter {
   flex-shrink: 0;
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
 }
 
-.search-result-badge.history {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+/* Shown while an app icon loads, or if it can't. */
+.search-result-app-fallback {
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
 }
 
-.search-result-badge.bookmark {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+.search-empty {
+  padding: 48px 16px;
+  text-align: center;
 }
 
-.search-result-badge.command {
-  background: rgba(139, 92, 246, 0.15);
-  color: #a78bfa;
-  border: 1px solid rgba(139, 92, 246, 0.3);
+.search-empty-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.search-result-badge.typesense {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+.search-empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(235, 235, 245, 0.5);
 }
 
-.search-result-badge.web {
-  background: rgba(6, 182, 212, 0.15);
-  color: #22d3ee;
-  border: 1px solid rgba(6, 182, 212, 0.3);
-}
-
-.search-result-meta-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: rgba(156, 163, 175, 0.6);
-  margin-left: 12px;
-  flex-shrink: 0;
-}
-
+/* Matched characters: just brighter and bolder, as Spotlight does. */
 .search-highlight {
-  color: #818cf8; /* indigo highlight */
-  font-weight: 700;
-  background: rgba(129, 140, 248, 0.1);
-  padding: 0 2px;
-  border-radius: 2px;
+  color: #ffffff;
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
 }
 
 /* Live Search Bar Dashboard UI */
@@ -292,10 +305,8 @@
   width: 100%;
   max-width: 500px;
   margin: 16px auto 0 auto;
-  background: rgba(14, 14, 20, 0.40) !important;
+  /* Frost and refraction: <GlassSurface preset="bar"> in SearchBar.jsx. */
   border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
   border-radius: 30px;
   padding: 10px 18px;
   display: flex;
@@ -315,23 +326,6 @@
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-}
-
-.dashboard-search-trigger::before {
-  content: "";
-  position: absolute;
-  inset: -40px;
-  border-radius: inherit;
-  pointer-events: none;
-  background-image: var(--page-bg-url, none);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-  background-repeat: no-repeat;
-  filter: blur(20px);
-  will-change: transform, filter;
-  transform: translate3d(0, 0, 0);
-  z-index: -1;
 }
 
 .dashboard-search-trigger:hover {

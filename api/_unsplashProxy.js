@@ -12,6 +12,22 @@ const ALLOWED_PATHS = [
   /^\/photos\/[A-Za-z0-9_-]{1,64}\/download$/,
 ];
 
+// Shared CDN caching. The 1000 requests/hour production limit is one pool for every iWeb
+// user, so identical requests must be answered by Vercel's edge cache, not Unsplash:
+//   search  — same query + page for everyone; cached an hour, served stale while refreshing.
+//   random  — a batch of up to 30 photos per query, shared for 10 minutes; each client picks
+//             a photo it hasn't stored yet, so users still get variety.
+//   download — Unsplash's required "photo was used" ping: never cached.
+const CDN_CACHE = [
+  [/^\/search\/photos$/, 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'],
+  [/^\/photos\/random$/, 'public, max-age=0, s-maxage=600, stale-while-revalidate=3600'],
+];
+
+function cacheControlFor(path, status) {
+  if (status < 200 || status >= 300) return 'no-store';
+  return CDN_CACHE.find(([re]) => re.test(path))?.[1] ?? 'no-store';
+}
+
 const PASSTHROUGH_HEADERS = ['content-type', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'retry-after'];
 
 export const CORS_HEADERS = {
@@ -56,8 +72,11 @@ export async function proxyUnsplash(query, accessKey) {
     return json(502, { errors: ['Could not reach Unsplash.'] });
   }
 
-  const headers = { ...CORS_HEADERS, 'cache-control': 'no-store' };
+  const cacheControl = cacheControlFor(path, upstream.status);
+  const headers = { ...CORS_HEADERS, 'cache-control': cacheControl };
   for (const name of PASSTHROUGH_HEADERS) {
+    // A CDN-cached response may be an hour old; its rate-limit numbers would mislead clients.
+    if (cacheControl !== 'no-store' && name.startsWith('x-ratelimit')) continue;
     const value = upstream.headers.get(name);
     if (value) headers[name] = value;
   }

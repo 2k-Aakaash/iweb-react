@@ -16,6 +16,8 @@
   overflow: visible;
 }
 
+/* The Dock's glass: <GlassSurface preset="dock"> inside this layer (see Dock.jsx). The
+   border and float shadows stay here; frost, sheen and refraction come from the glass. */
 .dockBg {
   position: absolute;
   inset: 0;
@@ -23,66 +25,10 @@
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
-
-  /* --- Premium Liquid Glass Base --- */
-  background: rgba(14, 14, 20, 0.40);
-  /* backdrop-filter works in normal browser tabs — falls back to ::before blur in extension */
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
     0 22px 60px rgba(0, 0, 0, 0.5),
-    0 4px 16px rgba(0, 0, 0, 0.3),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
-
-  will-change: filter, backdrop-filter;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-/*
-  EXTENSION-SAFE FAKE BACKDROP BLUR
-  ───────────────────────────────────
-  Uses standard CSS filter: blur() on a layer pointing to the same wallpaper
-  to bypass the backdrop-filter sandbox limitation in Chrome Extensions.
-*/
-.dockBg::before {
-  content: "";
-  position: absolute;
-  inset: -40px; /* expands to prevent white blur edge artifacts */
-  border-radius: inherit;
-  pointer-events: none;
-  background-image: var(--page-bg-url, none);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-  background-repeat: no-repeat;
-  filter: blur(20px);
-  will-change: transform, filter;
-  transform: translate3d(0, 0, 0);
-  z-index: -1;
-}
-
-/* Top catch-light sheen — simulates curved glass refraction */
-.dockBg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.10) 0%,
-    rgba(255, 255, 255, 0.03) 45%,
-    transparent 100%
-  );
-  box-shadow:
-    inset 6px 6px 0px -6px rgba(255, 255, 255, 0.75),
-    inset 0 0 14px 1px rgba(255, 255, 255, 0.40),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.32);
-  opacity: 0.9;
+    0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* keep list above */
@@ -131,6 +77,15 @@
   image-rendering: auto;
 }
 
+/* Shown for the few ms before a bookmark's cached icon is read from iWebDB. */
+.iconPlaceholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ── macOS-style vertical separator ── */
 .separator {
   width: 1px;
@@ -153,52 +108,37 @@
 .actionBtn {
   width: 70%;
   height: 70%;
-  border: 0;
   margin-top: 0;
+  padding: 0;
+  border: 0;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, transform 0.2s;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   position: relative;
-  padding: 10px;
+  transition: filter 0.15s ease;
 }
 
-.actionBtn:hover {
-  background: rgba(255, 255, 255, 0.22);
+/* Built-in apps (Add, Change BG, Notes, Music, Settings): macOS 26 icons from DockAppIcon,
+   cropped to their tile by .mac-app-icon (src/styles/mac-app-icon.css). */
+.appIcon {
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
-.actionIcon {
-  width: 22px;
-  height: 22px;
-  color: rgba(255, 255, 255, 0.8);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.dock:not([data-hover-off]) .actionBtn:hover {
+  filter: brightness(1.08);
 }
 
-/* Add app rotates on hover — uses data-action attribute for precise targeting */
-.action[data-action="add"] .actionBtn:hover .actionIcon {
-  transform: rotate(90deg);
-  color: #ffffff;
-}
-
-/* Change BG scales on hover */
-.action[data-action="bg"] .actionBtn:hover .actionIcon {
-  transform: scale(1.15);
-  color: #ffffff;
-}
-
-/* Music Library scales on hover */
-.action[data-action="music"] .actionBtn:hover .actionIcon {
-  transform: scale(1.15);
-  color: #ffffff;
+.actionBtn:active {
+  filter: brightness(0.82);
 }
 
 /* ── Tooltip ── */
+/* A glass capsule (<GlassSurface preset="label">, mounted by Dock.jsx) above the icon. */
 .tooltip {
   position: absolute;
   top: -48px;
@@ -209,85 +149,65 @@
   transition:
     opacity 140ms ease,
     transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
-  padding: 6px 12px;
-  border-radius: 10px;
+  padding: 7px 13px;
+  border-radius: 14px;
   height: auto;
   width: max-content;
   white-space: nowrap;
   font-size: 13px;
   line-height: 14px;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(18, 18, 18, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  will-change: transform, opacity, filter, backdrop-filter;
-  backface-visibility: hidden;
-  contain: paint;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  will-change: transform, opacity;
 }
 
-/* Shine highlight like Apple */
-.tooltip::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.2),
-    rgba(255, 255, 255, 0.03) 55%,
-    rgba(255, 255, 255, 0.02)
-  );
-  opacity: 0.9;
-}
+/* Hover effects are written under .dock:not([data-hover-off]): Dock.jsx sets data-hover-off while
+   the page is in the background, where Chrome's :hover can go stale (see Dock.jsx). */
 
-/* show tooltip */
-.app:hover .tooltip,
-.app:focus-within .tooltip,
-.action:hover .tooltip {
+/* Shown while hovered, or focused from the keyboard. Not on any focus: a clicked (or held)
+   icon keeps focus, which kept its label up after the pointer had left. */
+.dock:not([data-hover-off]) .app:hover .tooltip,
+.app:has(:focus-visible) .tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
 /* Main hover magnification */
-.app:not(.action):hover {
+.dock:not([data-hover-off]) .app:not(.action):hover {
   width: 90px;
   height: 90px;
   margin-top: -30px;
 }
 
 /* Right side scaling */
-.app:not(.action):hover + .app:not(.action) {
+.dock:not([data-hover-off]) .app:not(.action):hover + .app:not(.action) {
   width: calc(80px + var(--dock-offset-right, 0px));
   height: calc(80px + var(--dock-offset-right, 0px));
   margin-top: calc(-20px + var(--dock-offset-right, 0px) * -1);
 }
 
-.app:not(.action):hover + .app + .app:not(.action) {
+.dock:not([data-hover-off]) .app:not(.action):hover + .app + .app:not(.action) {
   width: calc(70px + var(--dock-offset-right, 0px));
   height: calc(70px + var(--dock-offset-right, 0px));
   margin-top: calc(-10px + var(--dock-offset-right, 0px) * -1);
 }
 
 /* Left side scaling (requires :has support) */
-.app:not(.action):has(+ .app:not(.action):hover) {
+.dock:not([data-hover-off]) .app:not(.action):has(+ .app:not(.action):hover) {
   width: calc(80px + var(--dock-offset-left, 0px));
   height: calc(80px + var(--dock-offset-left, 0px));
   margin-top: calc(-20px + var(--dock-offset-left, 0px) * -1);
 }
 
-.app:not(.action):has(+ .app + .app:not(.action):hover) {
+.dock:not([data-hover-off]) .app:not(.action):has(+ .app + .app:not(.action):hover) {
   width: calc(70px + var(--dock-offset-left, 0px));
   height: calc(70px + var(--dock-offset-left, 0px));
   margin-top: calc(-10px + var(--dock-offset-left, 0px) * -1);
 }
 
 /* action buttons don't magnify */
-.action:hover {
+.dock:not([data-hover-off]) .action:hover {
   width: 60px;
   height: 60px;
   margin-top: 0;
@@ -295,9 +215,15 @@
 
 /* iOS Jiggle / Wobble Edit State */
 @keyframes jiggle {
-  0% { transform: rotate(-1.5deg) translateY(0); }
-  50% { transform: rotate(1.5deg) translateY(-1px); }
-  100% { transform: rotate(-1.5deg) translateY(0); }
+  0% {
+    transform: rotate(-1.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1.5deg) translateY(-1px);
+  }
+  100% {
+    transform: rotate(-1.5deg) translateY(0);
+  }
 }
 
 .jiggling {
@@ -342,4 +268,46 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Running dot under an app with an open or minimized window (macOS Dock). */
+.app[data-running]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px; /* inside the Dock's padding, clear of its bright rim */
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 6px rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+/* Add App dialog title bar: close dot on the left, title centred. */
+.dialogHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  margin: 2px 0 6px;
+}
+
+.dialogControls {
+  position: absolute !important;
+  top: 50% !important;
+  left: 2px !important;
+  transform: translateY(-50%);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  text-align: center;
 }

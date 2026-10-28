@@ -4,6 +4,8 @@ import * as musicMetadata from 'music-metadata-browser';
 import { directoryOpen } from 'browser-fs-access';
 import Fuse from 'fuse.js';
 import { Index } from 'flexsearch';
+import GlassSurface from './glass/GlassSurface';
+import { useMacWindow } from '../libs/window/useMacWindow';
 import { parseSearchIntent } from '../libs/intentParser';
 
 // Supported formats
@@ -83,6 +85,12 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   const [localShowModal, setLocalShowModal] = useState(false);
   const showModal = propShowModal !== undefined ? propShowModal : localShowModal;
   const setShowModal = propSetShowModal !== undefined ? propSetShowModal : setLocalShowModal;
+  // macOS window for the Library: genies out of the Dock's Music icon; red closes, yellow
+  // minimizes into the icon, green zooms. The window stays mounted (playback state lives
+  // here), so `mounted` only drives whether it is displayed.
+  const libraryOverlayRef = useRef(null);
+  const libraryWindowRef = useRef(null);
+  const libraryWindow = useMacWindow({ app: 'music', open: showModal, setOpen: setShowModal, windowRef: libraryWindowRef, overlayRef: libraryOverlayRef });
   const [islandState, setIslandState] = useState('collapsed'); // 'collapsed', 'hovered', 'expanded'
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -1456,10 +1464,11 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
           onMouseLeave={() => { setIslandState('collapsed'); }}
         >
           <div 
-            className={`dynamic-island-pill ${islandState}`} 
+            className={`dynamic-island-pill glass-host ${islandState}`} 
             id="island-pill"
             onClick={handleIslandClick}
           >
+            <GlassSurface preset="pill" />
             {/* 1. Collapsed State Content */}
             {activeTrack && (
               <div className="island-collapsed-content">
@@ -1601,14 +1610,19 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       <div 
         id="music-player-modal" 
         className="remove-bg-window"
-        style={{ display: showModal ? 'block' : 'none' }}
+        ref={libraryOverlayRef}
+        style={{ display: libraryWindow.mounted ? 'block' : 'none' }}
       >
-        <div className="remove-bg-content music-overhaul-modal">
+        <div
+          ref={libraryWindowRef}
+          className={`remove-bg-content music-overhaul-modal glass-host${libraryWindow.maximized ? ' window-maximized' : ''}`}
+        >
+          <GlassSurface preset="window" />
           {/* macOS window dots */}
           <div className="window-controls">
-            <span className="window-dot dot-close" onClick={() => setShowModal(false)}></span>
-            <span className="window-dot dot-minimize"></span>
-            <span className="window-dot dot-maximize"></span>
+            <span className="window-dot dot-close" role="button" aria-label="Close" onClick={libraryWindow.close}></span>
+            <span className="window-dot dot-minimize" role="button" aria-label="Minimize" onClick={libraryWindow.minimize}></span>
+            <span className="window-dot dot-maximize" role="button" aria-label={libraryWindow.maximized ? 'Exit full size' : 'Zoom'} onClick={libraryWindow.toggleMaximize}></span>
           </div>
           <div className="music-app-layout">
             {/* Left Sidebar */}

@@ -1,0 +1,64 @@
+/* Liquid Glass surfaces (src/components/glass/GlassSurface.jsx). */
+
+/* A surface hosting <GlassSurface>: its own stacking context so the glass layer can sit
+   behind the content, and no CSS frost of its own (the glass is the material). */
+.glass-host {
+  isolation: isolate;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Old CSS frost layers: the fake blurred wallpaper (::before) and painted sheen/inner
+   glow (::after). The glass draws its own rim light and sheen. */
+.glass-host::before,
+.glass-host::after {
+  display: none !important;
+}
+
+.glass-surface {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Static glass: the rendered still. */
+.glass-surface-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+/* Until the static glass has rendered (the wallpaper is still decoding), a plain CSS frost
+   stands in so the surface is never empty. */
+.glass-surface.is-pending {
+  background: rgba(20, 22, 32, 0.38);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+/* The page background as the body paints it: the wallpaper cover-fit to the viewport over
+   the page colour. Positioned by GlassSurface so it lines up with the real page. */
+/* Optional colour over the glass, set by the host through --glass-tint. */
+.glass-surface-tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--glass-tint, none);
+  opacity: var(--glass-tint-opacity, 0.5);
+  pointer-events: none;
+}
+
+.glass-surface-wallpaper {
+  position: absolute;
+  background-color: var(--glass-page-color, #0b0b10);
+  background-image: var(--page-bg-url, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import MacAppIcon from '../../components/icons/MacAppIcon';
+
+const COMMAND_APP_ICONS = {
+  '/music': 'music',
+  '/settings': 'settings',
+  '/notes': 'notes',
+  '/weather': 'weather',
+};
 
 const PRESET_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#10b981', 
   '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899'
 ];
 
+// The first source to try (Google's favicon service), or '' for commands and unparseable URLs.
+function firstSrc(url, type) {
+  if (!url || type === 'command') return '';
+  try {
+    const { origin } = new URL(url.startsWith('http') ? url : `https://${url}`);
+    return `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(origin)}`;
+  } catch {
+    return '';
+  }
+}
+
 export const Favicon = ({ url, title, className = '', type }) => {
-  const [src, setSrc] = useState('');
+  // Start with the image, not the letter placeholder, so a newly shown row doesn't flash.
+  const [src, setSrc] = useState(() => firstSrc(url, type));
   const [failedGoogle, setFailedGoogle] = useState(false);
   const [failedDirect, setFailedDirect] = useState(false);
 
@@ -34,17 +54,8 @@ export const Favicon = ({ url, title, className = '', type }) => {
     setFailedGoogle(false);
     setFailedDirect(false);
 
-    if (!url || type === 'command') {
-      setSrc('');
-      return;
-    }
-
-    if (domain.origin) {
-      // Step 1: Try Google Favicon service
-      setSrc(`https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(domain.origin)}`);
-    } else {
-      setSrc('');
-    }
+    // Step 1: Google's favicon service (a new row already starts with it).
+    setSrc(firstSrc(url, type));
   }, [url, type]);
 
   const handleLoadError = () => {
@@ -67,6 +78,18 @@ export const Favicon = ({ url, title, className = '', type }) => {
     const index = Math.abs(hash) % PRESET_COLORS.length;
     return PRESET_COLORS[index];
   };
+
+  // iWeb's own apps (slash commands) show their macOS app icon.
+  const appIcon = type === 'command' && COMMAND_APP_ICONS[title.trim()];
+  if (appIcon) {
+    return (
+      <MacAppIcon
+        name={appIcon}
+        className={`search-result-app-icon ${className}`}
+        fallback={<span className="search-result-app-fallback" />}
+      />
+    );
+  }
 
   // Render direct SVG for command/suggestions if no url exists
   if (!url || type === 'command' || failedDirect) {

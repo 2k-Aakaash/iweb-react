@@ -1,17 +1,18 @@
-// Unsplash discovery: picks, acquires and caches new wallpapers within the daily
-// acquisition limit, and falls back to the local cache when the limit is reached,
-// the browser is offline or the API fails.
+// Unsplash discovery: picks, acquires and caches new wallpapers, and falls back to the
+// local cache while new downloads are paused (Unsplash's shared rate limit), the browser
+// is offline or the API fails.
 
 import {
   getRandomPhotos,
   searchPhotos,
   trackDownload,
+  getApiRateInfo,
   isUnsplashConfigured,
   normalizeQuery,
   UnsplashError,
 } from './unsplashClient.js';
 import { pickUnsplashUrl, fetchImageBlob, decodeImage, makeThumbnail } from './imageLoader.js';
-import { reserveSlot, commitSlot, releaseSlot, getQuotaStatus, QuotaError } from './quotaLimiter.js';
+import { reserveSlot, commitSlot, releaseSlot, getQuotaStatus, pauseAcquisitions, QuotaError } from './quotaLimiter.js';
 import {
   getUnsplash,
   putUnsplash,
@@ -40,7 +41,8 @@ export const CURATED_TOPICS = Object.freeze([
   { id: 'dark-moody', label: 'Dark & Moody', query: 'dark moody' },
 ].map((topic) => Object.freeze(topic)));
 
-const RANDOM_COUNT = 10;
+// One request returns up to 30 photos; the proxy shares that batch between users at the CDN.
+const RANDOM_COUNT = 30;
 const SEARCH_PER_PAGE = 30;
 const SEARCH_PAGE_SPREAD = 3;
 const MAX_KEYWORDS = 64;
@@ -208,7 +210,7 @@ async function storeRecord(record) {
  * record without reserving when the photo is already cached. The reservation is
  * released on any failure or abort; a stale or aborted operation never commits.
  */
-export async function acquirePhoto(photo, { query, topic, signal } = {}) {
+export async function acquirePhoto(photo, { query, topic, signal, deferTracking = false } = {}) {
   if (!photo || typeof photo.photoId !== 'string' || !photo.photoId || !photo.urls?.raw) {
     throw new UnsplashError('BAD_RESPONSE', 'Invalid Unsplash photo.');
   }
@@ -250,6 +252,8 @@ export async function acquirePhoto(photo, { query, topic, signal } = {}) {
       keywords: buildKeywords([query, topic, photo.description, ...(photo.tags || [])]),
       acquiredAt: Date.now(),
       lastUsedAt: null,
+      // Prefetched: Unsplash's download ping is sent when the photo is first shown.
+      downloadPending: deferTracking,
     });
     stored = true;
     throwIfAborted(signal);
@@ -269,7 +273,7 @@ export async function acquirePhoto(photo, { query, topic, signal } = {}) {
     throw err;
   }
 
-  if (photo.downloadLocation) {
+  if (photo.downloadLocation && !deferTracking) {
     trackDownload(photo.downloadLocation).catch((err) => {
       console.warn('[wallpaper] Unsplash download tracking failed:', err?.code || err?.message);
     });
@@ -300,14 +304,36 @@ async function fetchCandidates(selection, signal) {
   return getRandomPhotos({ query: selection.query, count: RANDOM_COUNT, signal });
 }
 
-async function fetchAndAcquire(selection, signal) {
+// Unsplash's production limit is 1000 requests/hour for ALL users together. Keep the last
+// RATE_RESERVE requests for download pings of photos already chosen: below that, pause new
+// acquisitions for a while. A hard rate-limit response pauses until Unsplash resets.
+const RATE_RESERVE = 50;
+const LOW_RATE_PAUSE_MS = 10 * 60 * 1000;
+const RATE_LIMITED_PAUSE_MS = 60 * 60 * 1000;
+
+function pauseIfRateLimited(err) {
+  if (err?.code !== 'RATE_LIMITED') return;
+  const retry = Number(err.retryAfter);
+  pauseAcquisitions(Date.now() + (Number.isFinite(retry) && retry > 0 ? retry * 1000 : RATE_LIMITED_PAUSE_MS));
+}
+
+function pauseIfRateLow() {
+  const info = getApiRateInfo();
+  // Only trust fresh numbers (the proxy strips them from CDN-cached responses).
+  if (info?.remaining != null && info.remaining < RATE_RESERVE && Date.now() - info.updatedAt < 5 * 60 * 1000) {
+    pauseAcquisitions(Date.now() + LOW_RATE_PAUSE_MS);
+  }
+}
+
+async function fetchAndAcquire(selection, signal, { deferTracking = false } = {}) {
+  pauseIfRateLow();
   const candidates = await fetchCandidates(selection, signal);
   throwIfAborted(signal);
   const cachedFlags = await Promise.all(candidates.map((p) => getUnsplash(p.photoId)));
   const fresh = candidates.filter((_, i) => !cachedFlags[i]);
   if (!fresh.length) return null;
   const photo = randomItem(fresh);
-  return acquirePhoto(photo, { query: selection.query ?? null, topic: selection.topic, signal });
+  return acquirePhoto(photo, { query: selection.query ?? null, topic: selection.topic, signal, deferTracking });
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +356,12 @@ export async function changeUnsplashBackground({ settings, signal } = {}) {
 
     const activate = async (record, origin) => {
       throwIfAborted(sig);
+      // A prefetched photo is "used" now: send the download ping Unsplash requires.
+      if (record.downloadPending && record.lastUsedAt == null && record.downloadLocation) {
+        trackDownload(record.downloadLocation).catch((err) => {
+          console.warn('[wallpaper] Unsplash download tracking failed:', err?.code || err?.message);
+        });
+      }
       const ref = { source: 'unsplash', id: record.photoId };
       const touched = await touchWallpaper(ref);
       throwIfAborted(sig);
@@ -355,6 +387,7 @@ export async function changeUnsplashBackground({ settings, signal } = {}) {
         if (record) return await activate(record, 'new');
       } catch (err) {
         if (isAbort(err, sig)) throw err;
+        pauseIfRateLimited(err);
         lastError = err;
       }
     }
@@ -382,6 +415,35 @@ export async function changeUnsplashBackground({ settings, signal } = {}) {
   } finally {
     change.dispose();
   }
+}
+
+let prefetching = null;
+
+/**
+ * Downloads the next wallpaper in the background, so the next "Change background" is
+ * instant (it is picked from the cache, step 1 above). Does nothing when an unseen matching
+ * photo is already cached, the daily limit is used up, or the browser is offline. Uses one
+ * slot of the daily limit, as the change would have; the download ping waits for first use.
+ */
+export function prefetchNextUnsplash({ settings } = {}) {
+  if (prefetching) return prefetching;
+  prefetching = (async () => {
+    try {
+      if (!isOnline() || !isUnsplashConfigured()) return null;
+      const selection = resolveSelection(settings ?? getWallpaperSettings());
+      const records = await listUnsplash();
+      if (records.some((r) => r.lastUsedAt == null && recordMatches(r, selection) && !isActiveRecord(r))) return null;
+      if ((await getQuotaStatus()).remaining <= 0) return null;
+      return await fetchAndAcquire(selection, undefined, { deferTracking: true });
+    } catch (err) {
+      pauseIfRateLimited(err);
+      console.warn('[wallpaper] prefetch skipped:', err?.code || err?.message);
+      return null;
+    } finally {
+      prefetching = null;
+    }
+  })();
+  return prefetching;
 }
 
 /**

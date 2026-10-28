@@ -34,8 +34,8 @@ describe('pickUnsplashUrl', () => {
     expect(url.origin + url.pathname).toBe('https://images.unsplash.com/photo-123');
     expect(url.searchParams.get('ixid')).toBe('abc');
     expect(url.searchParams.get('w')).toBe('1920');
-    expect(url.searchParams.get('q')).toBe('80');
-    expect(url.searchParams.get('fm')).toBe('jpg');
+    expect(url.searchParams.get('q')).toBe('75');
+    expect(url.searchParams.get('fm')).toBe('webp');
     expect(url.searchParams.get('fit')).toBe('max');
   });
 
@@ -45,13 +45,13 @@ describe('pickUnsplashUrl', () => {
     expect(widthOf(pickUnsplashUrl(urls, { width: 100, height: 100, dpr: 1 }))).toBe(320);
   });
 
-  it('caps the width at 3840', () => {
-    expect(widthOf(pickUnsplashUrl(urls, { width: 2560, height: 1440, dpr: 2 }))).toBe(3840);
-    expect(widthOf(pickUnsplashUrl(urls, { width: 7680, height: 4320, dpr: 3 }))).toBe(3840);
+  it('caps the width at 2560', () => {
+    expect(widthOf(pickUnsplashUrl(urls, { width: 2560, height: 1440, dpr: 2 }))).toBe(2560);
+    expect(widthOf(pickUnsplashUrl(urls, { width: 7680, height: 4320, dpr: 3 }))).toBe(2560);
   });
 
   it('never upscales beyond the photo width', () => {
-    expect(widthOf(pickUnsplashUrl(urls, { width: 2560, height: 1440, dpr: 2, photoWidth: 3000 }))).toBe(3000);
+    expect(widthOf(pickUnsplashUrl(urls, { width: 2560, height: 1440, dpr: 2, photoWidth: 2200 }))).toBe(2200);
     expect(widthOf(pickUnsplashUrl(urls, { width: 1920, height: 1080, dpr: 1, photoWidth: 6000 }))).toBe(1920);
     expect(widthOf(pickUnsplashUrl(urls, { width: 1920, height: 1080, dpr: 1, photoWidth: null }))).toBe(1920);
   });

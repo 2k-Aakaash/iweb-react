@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSearchPhrase } from '../../libs/search-bar-text';
+import GlassSurface from '../../components/glass/GlassSurface';
 
 export const SearchBar = ({ onOpenSearch }) => {
   const [placeholder, setPlaceholder] = useState('Search or type command...');
@@ -18,7 +19,8 @@ export const SearchBar = ({ onOpenSearch }) => {
   const isMac = typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 
   return (
-    <div className="dashboard-search-trigger" onClick={onOpenSearch}>
+    <div className="dashboard-search-trigger glass-host" onClick={onOpenSearch}>
+      <GlassSurface preset="bar" />
       <div className="dashboard-search-trigger-left">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="11" cy="11" r="8"></circle>

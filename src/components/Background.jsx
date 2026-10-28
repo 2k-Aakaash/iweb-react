@@ -5,7 +5,7 @@ import { subscribe, broadcast } from '../libs/wallpaper/sync';
 import { listLocal, listUnsplash, getWallpaperRecord, addLocalRecord, findLocalByHash } from '../libs/wallpaper/repository';
 import { ACCEPTED_LOCAL_TYPES, makeThumbnail, sha256Hex } from '../libs/wallpaper/imageLoader';
 import { importLocalFiles } from '../libs/wallpaper/importManager';
-import { changeUnsplashBackground } from '../libs/wallpaper/discovery';
+import { changeUnsplashBackground, prefetchNextUnsplash } from '../libs/wallpaper/discovery';
 import { showWallpaper, showDefaultWallpaper } from '../libs/wallpaper/wallpaperRenderer';
 
 const DEFAULT_KEY = 'default';
@@ -93,6 +93,8 @@ function unsplashErrorMessage(err) {
   switch (err?.code) {
     case 'DAILY_LIMIT':
       return 'Daily Unsplash limit reached and no saved wallpapers match your topics. New photos will be available after midnight.';
+    case 'RATE_PAUSED':
+      return 'Unsplash is busy right now and no saved wallpapers match your topics. New photos will be available again shortly.';
     case 'NOT_CONFIGURED':
       return 'Unsplash is not configured. Add an access key to use Unsplash wallpapers.';
     case 'UNAUTHORIZED':
@@ -290,6 +292,7 @@ export default function Background({
         try {
           const { record } = await changeUnsplashBackground({ settings });
           setActiveWallpaper({ source: 'unsplash', id: record.photoId });
+          prefetchNextUnsplash({ settings }); // next change is then instant
         } catch (err) {
           console.warn('[wallpaper] Could not change the Unsplash wallpaper:', err);
           window.dispatchEvent(new CustomEvent('wallpaper:error', {

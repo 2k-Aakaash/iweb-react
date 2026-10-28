@@ -3,6 +3,7 @@ import { getActiveWallpaper } from '../libs/wallpaper/settings';
 import { getUnsplash } from '../libs/wallpaper/repository';
 import { subscribe } from '../libs/wallpaper/sync';
 import { withUtm } from '../libs/wallpaper/unsplashClient';
+import GlassSurface from './glass/GlassSurface';
 import '../styles/unsplash-credit.css';
 
 // Unsplash API guideline: wherever a photo is displayed, credit the photographer and Unsplash
@@ -48,7 +49,8 @@ export default function UnsplashCredit() {
   if (!credit) return null;
 
   return (
-    <p className="unsplash-credit">
+    <p className="unsplash-credit glass-host">
+      <GlassSurface preset="label" />
       Photo by{' '}
       <a href={credit.profileUrl} target="_blank" rel="noopener noreferrer">{credit.name}</a>
       {' '}on{' '}

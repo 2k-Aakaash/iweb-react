@@ -17,6 +17,7 @@ import LocalImportPanel from './wallpaper/LocalImportPanel';
 import UnsplashPanel from './wallpaper/UnsplashPanel';
 import WallpaperGallery from './wallpaper/WallpaperGallery';
 import ConfirmDialog from './wallpaper/ConfirmDialog';
+import { downloadWallpaper } from '../libs/wallpaper/downloadWallpaper';
 import { describeWallpaperError, isAbortError, plural, refKey, sameRef } from './wallpaper/wallpaperUi';
 import '../styles/wallpaper-settings.css';
 
@@ -115,6 +116,7 @@ export default function WallpaperSettings({ isOpen }) {
   const [filter, setFilter] = useState('all');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
+  const [downloadingKeys, setDownloadingKeys] = useState(() => new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [galleryNotice, setGalleryNotice] = useState(null);
@@ -183,7 +185,7 @@ export default function WallpaperSettings({ isOpen }) {
     };
   }, [isOpen, refreshLibrary, refreshQuota]);
 
-  // Re-read the allowance right after local midnight so the meter resets on its own.
+  // Re-read the allowance when it resets, so a "busy" or limit notice clears on its own.
   useEffect(() => {
     if (!quota || quota.resetsAt === null || quota.resetsAt === undefined) return undefined;
     const at = new Date(quota.resetsAt).getTime();
@@ -327,6 +329,29 @@ export default function WallpaperSettings({ isOpen }) {
     setSelected(new Set());
   };
 
+  // Download a wallpaper to the computer (Unsplash downloads are reported to Unsplash).
+  const handleDownload = async (item) => {
+    if (downloadingKeys.has(item.key)) return;
+    setDownloadingKeys((prev) => new Set(prev).add(item.key));
+    try {
+      const fileName = await downloadWallpaper(item.ref);
+      setGalleryNotice({ tone: 'success', text: `Downloaded “${fileName}”.` });
+    } catch (err) {
+      console.error('Failed to download wallpaper:', err);
+      const text = err?.name === 'DownloadError'
+        ? err.message
+        : describeWallpaperError(err) || 'The wallpaper couldn’t be downloaded.';
+      setGalleryNotice({ tone: 'error', text });
+      setAnnouncement(text);
+    } finally {
+      setDownloadingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(item.key);
+        return next;
+      });
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (deletingRef.current) return;
     const refs = [...selectedKeys].map((key) => itemsByKey.get(key)?.ref).filter(Boolean);
@@ -449,6 +474,8 @@ export default function WallpaperSettings({ isOpen }) {
         onClearSelection={() => setSelected(new Set())}
         onRequestDelete={() => selectedCount > 0 && setConfirmingDelete(true)}
         onCardClick={handleCardClick}
+        onDownload={handleDownload}
+        downloadingKeys={downloadingKeys}
         deleting={deleting}
         loaded={library.loaded}
         loadError={library.error}

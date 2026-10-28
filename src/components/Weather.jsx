@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import GlassSurface from './glass/GlassSurface';
 
 export default function Weather({ onExpandedChange }) {
   const [weatherData, setWeatherData] = useState(null);
@@ -277,7 +278,8 @@ export default function Weather({ onExpandedChange }) {
 
   if (!weatherData) {
     return (
-      <div className="weather-container" style={{ background: 'linear-gradient(to top, rgba(20, 24, 45, 0.85), rgba(10, 11, 20, 0.9))' }}>
+      <div className="weather-container glass-host" style={{ '--glass-tint': 'linear-gradient(to top, rgba(20, 24, 45, 0.85), rgba(10, 11, 20, 0.9))' }}>
+        <GlassSurface preset="card" />
         <div id="weatherInfo">
           <p className="weather-error">Loading Weather...</p>
         </div>
@@ -288,7 +290,8 @@ export default function Weather({ onExpandedChange }) {
   const timeseries = weatherData.properties.timeseries || [];
   if (timeseries.length === 0) {
     return (
-      <div className="weather-container" style={{ background: 'linear-gradient(to top, rgba(20, 24, 45, 0.85), rgba(10, 11, 20, 0.9))' }}>
+      <div className="weather-container glass-host" style={{ '--glass-tint': 'linear-gradient(to top, rgba(20, 24, 45, 0.85), rgba(10, 11, 20, 0.9))' }}>
+        <GlassSurface preset="card" />
         <div id="weatherInfo">
           <p className="weather-error">No forecast data available.</p>
         </div>
@@ -342,11 +345,12 @@ export default function Weather({ onExpandedChange }) {
 
   return (
     <div 
-      className="weather-container" 
+      className="weather-container glass-host" 
       ref={containerRef}
-      style={{ background: backgroundGradient }}
+      style={{ '--glass-tint': backgroundGradient }}
       onClick={toggleExpand}
     >
+      <GlassSurface preset="card" />
       <div className="weather-search" ref={searchRef} onClick={(e) => e.stopPropagation()}>
         <input 
           type="text" 
