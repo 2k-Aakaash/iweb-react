@@ -6,7 +6,6 @@
 // overlay that holds the OLD image on top of the body and fades out once the
 // NEW image (already decoded off-screen) has been painted underneath.
 
-import Vibrant from '../vibrant';
 import { getWallpaperRecord, touchWallpaper } from './repository';
 import { pickUnsplashUrl, decodeImage } from './imageLoader';
 
@@ -181,26 +180,40 @@ function swapTo(nextUrl, { allowFade = true } = {}) {
   });
 }
 
-// Dominant colour of the displayed image (used for the clock colour).
-// Runs after the swap and never blocks it.
+// Dominant colour of the displayed image, for the clock's Vibrant Colour style only (the Glass
+// clock takes its colour from the wallpaper itself), so it runs on request: with `onColor`
+// passed to showWallpaper (and `wantsColor`, asked once the image is on screen, returning
+// true), or later through requestWallpaperColor. Vibrant is loaded the first
+// time a colour is needed. Runs after the swap and never blocks it.
+let colorSource = null; // the image on screen: { url, fallbackHex }, null for the default
+const colorCache = new Map(); // url -> hex
+
 function extractColor(url, token, onColor, fallbackHex) {
   if (typeof onColor !== 'function' || !url) return;
 
   const deliver = (hex) => {
     if (token === renderToken && hex) onColor(hex);
   };
+  if (colorCache.has(url)) {
+    deliver(colorCache.get(url));
+    return;
+  }
 
   const img = new Image();
   if (!url.startsWith('blob:') && !url.startsWith('data:')) {
     img.crossOrigin = 'anonymous';
   }
-  img.onload = () => {
+  img.onload = async () => {
     if (token !== renderToken) return;
     try {
+      const { default: Vibrant } = await import('../vibrant');
+      if (token !== renderToken) return;
       const vibrant = new Vibrant(img);
       const swatches = vibrant.swatches();
       const dominantColor = swatches['Vibrant'] || swatches['Muted'] || swatches['DarkVibrant'] || swatches['DarkMuted'] || swatches['LightVibrant'] || swatches['LightMuted'];
-      deliver(dominantColor ? dominantColor.getHex() : fallbackHex);
+      const hex = dominantColor ? dominantColor.getHex() : fallbackHex;
+      if (hex) colorCache.set(url, hex);
+      deliver(hex);
     } catch (err) {
       console.error('Vibrant error:', err);
       deliver(fallbackHex);
@@ -208,6 +221,15 @@ function extractColor(url, token, onColor, fallbackHex) {
   };
   img.onerror = () => deliver(fallbackHex);
   img.src = url;
+}
+
+/** The colour of the wallpaper on screen, for a clock switching to Vibrant Colour. */
+export function requestWallpaperColor(onColor) {
+  if (!colorSource) {
+    onColor?.(DEFAULT_TEXT_COLOR);
+    return;
+  }
+  extractColor(colorSource.url, renderToken, onColor, colorSource.fallbackHex);
 }
 
 async function decodeBlob(blob) {
@@ -256,7 +278,7 @@ async function resolveSource(ref) {
  * a newer call superseded this one. Rejects (keeping the current wallpaper)
  * when the record is missing or the image cannot be decoded.
  */
-export async function showWallpaper(ref, { onColor } = {}) {
+export async function showWallpaper(ref, { onColor, wantsColor } = {}) {
   if (!ref || (ref.source !== 'local' && ref.source !== 'unsplash') || ref.id == null) {
     throw new Error('showWallpaper: invalid wallpaper reference');
   }
@@ -285,7 +307,8 @@ export async function showWallpaper(ref, { onColor } = {}) {
       .catch((err) => console.warn('[wallpaper] Could not update lastUsedAt:', err));
   }
 
-  extractColor(url, token, onColor, ref.source === 'unsplash' ? record.color : null);
+  colorSource = { url, fallbackHex: ref.source === 'unsplash' ? record.color : null };
+  if (!wantsColor || wantsColor()) extractColor(url, token, onColor, colorSource.fallbackHex);
   return true;
 }
 
@@ -298,6 +321,7 @@ export async function showDefaultWallpaper({ onColor } = {}) {
   retire(activeUrl);
   paintBody(null);
   flushRetiredUrls();
+  colorSource = null;
   if (token === renderToken) onColor?.(DEFAULT_TEXT_COLOR);
   return true;
 }
@@ -311,4 +335,5 @@ export function clearWallpaper() {
   retire(activeUrl);
   paintBody(null);
   flushRetiredUrls();
+  colorSource = null;
 }

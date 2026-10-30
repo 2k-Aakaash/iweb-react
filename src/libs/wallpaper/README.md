@@ -103,6 +103,7 @@ Local and Unsplash records live in separate stores, so a local `id` can never co
 - `searchWallpapers({ query, page, signal }) -> { results: (NormalizedPhoto & { cached: boolean })[], fromCache: boolean, limitReached: boolean, totalPages }`. When the limit is reached or the browser is offline, only the local cache is searched (no API call).
 
 ### `wallpaperRenderer.js`
-- `showWallpaper(ref, { onColor } = {}) -> Promise<boolean>`: resolves the URL (Unsplash: hotlinked `pickUnsplashUrl` when online with a blob fallback; local: blob object URL), decodes it, then crossfades. Sets `body` `background-image` and `--page-bg-url`. Revokes the previous object URL only after the swap. A newer call supersedes an older one (returns false). On failure it keeps the current wallpaper and rejects.
+- `showWallpaper(ref, { onColor } = {}) -> Promise<boolean>`: resolves the URL (Unsplash: hotlinked `pickUnsplashUrl` when online with a blob fallback; local: blob object URL), decodes it, then crossfades. Sets `body` `background-image` and `--page-bg-url`. Revokes the previous object URL only after the swap. A newer call supersedes an older one (returns false). On failure it keeps the current wallpaper and rejects. `onColor(hex)` is for the clock's Vibrant Colour style, called only when `wantsColor()` (asked once the image is on screen) returns true: it gets the wallpaper's dominant colour (Vibrant, loaded on first use; cached per URL).
+- `requestWallpaperColor(onColor)`: the colour of the wallpaper on screen, for a clock switching to Vibrant Colour.
 - `showDefaultWallpaper()` (the existing default Unsplash URL)
 - `clearWallpaper()`

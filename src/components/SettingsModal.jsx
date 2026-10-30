@@ -6,6 +6,7 @@ import { useMacWindow } from '../libs/window/useMacWindow';
 import GlassSurface from './glass/GlassSurface';
 import { setGlassMode, useGlassMode } from './glass/glassMode';
 import { MENUBAR_MODES, setMenubarMode, useMenubarMode } from '../libs/menubar/menubarPrefs';
+import { CLOCK_STYLES, setClockStyle, useClockStyle } from '../libs/clock/clockStyle';
 import ConfirmDialog from './wallpaper/ConfirmDialog';
 import SettingsTabIcon from './settings/SettingsTabIcon';
 import AboutPane from './settings/AboutPane';
@@ -44,6 +45,7 @@ export default function SettingsModal({
   const windowRef = useRef(null);
   const glassMode = useGlassMode();
   const menubarMode = useMenubarMode();
+  const clockStyle = useClockStyle();
 
   // Escape closes Settings, like the other macOS-style windows.
   useEffect(() => {
@@ -668,6 +670,28 @@ export default function SettingsModal({
                           : 'Live refraction. Uses more GPU while things animate.'}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="settings-group-card-title">Clock</div>
+                <div className="settings-group-card">
+                  <div className="settings-row">
+                    <label className="settings-label" htmlFor="clock-style">Clock style</label>
+                    <select
+                      id="clock-style"
+                      className="settings-select"
+                      value={clockStyle}
+                      onChange={(e) => setClockStyle(e.target.value)}
+                    >
+                      {CLOCK_STYLES.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="settings-row-hint">
+                    {clockStyle === 'glass'
+                      ? 'Frosted glass over the wallpaper, as on the iOS 26 Lock Screen.'
+                      : 'Painted in the most vibrant colour of the wallpaper.'}
                   </div>
                 </div>
 

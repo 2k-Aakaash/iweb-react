@@ -19,20 +19,47 @@
 .dt-item-widget[data-size='medium'] { --widget-w: 316px; --widget-h: 150px; }
 .dt-item-widget[data-size='large'] { --widget-w: 316px; --widget-h: 316px; }
 
-/* Clock sizes. */
+/* Clock and quote sizes. */
 .dt-item[data-desktop-item='clock'] .center {
   text-align: center;
 }
 
 .dt-item[data-desktop-item='clock'] .clock-time,
-.dt-item[data-desktop-item='clock'] .name-intro {
+.dt-item[data-desktop-item='quote'] .name-intro {
   transition: font-size 0.35s cubic-bezier(0.34, 1.32, 0.64, 1);
 }
 
 .dt-item[data-desktop-item='clock'][data-size='small'] .clock-time { font-size: 50px; }
-.dt-item[data-desktop-item='clock'][data-size='small'] .name-intro { font-size: 18px; }
+.dt-item[data-desktop-item='quote'][data-size='small'] .name-intro { font-size: 18px; }
 .dt-item[data-desktop-item='clock'][data-size='large'] .clock-time { font-size: 104px; }
-.dt-item[data-desktop-item='clock'][data-size='large'] .name-intro { font-size: 30px; }
+.dt-item[data-desktop-item='quote'][data-size='large'] .name-intro { font-size: 30px; }
+
+/* The glass clock (iOS 26 Lock Screen; Clock.jsx, libs/clock/clockGlass.js). The digits show
+   the blurred wallpaper behind them (--glass-*: lined up and magnified like a lens) under a
+   milky lift that is brighter at the top; neutral glass, its colour all from the wallpaper.
+   The fill stays transparent (the colour rule is an id selector, so the fill colour is
+   overridden instead); the SVG filter adds the lit rim and the shadow. */
+.dt-item[data-desktop-item='clock'] .clock-time.is-glass {
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.1) 55%, rgba(255, 255, 255, 0.14)),
+    var(--glass-image, linear-gradient(rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.32)));
+  background-size: 100% 100%, var(--glass-size, 100% 100%);
+  background-position: 0 0, var(--glass-position, 0 0);
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: url(#iweb-clock-glass);
+}
+
+.clock-glass-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 
 /* Search bar widths (it no longer sizes itself from the clock column). */
 .dt-item[data-desktop-item='search'] .dashboard-search-trigger {

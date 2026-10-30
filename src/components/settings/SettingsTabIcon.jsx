@@ -94,6 +94,13 @@ const TILES = {
       <path d="M8.5 18h8a2.8 2.8 0 0 0 0-5.6 4 4 0 0 0-7.6 1.1A2.3 2.3 0 0 0 8.5 18z" fill="#fff" />
     </>
   ) },
+  quote: { from: '#c58cff', to: '#8e44e0', glyph: (
+    <>
+      <circle cx="8.4" cy="14.3" r="2.1" fill="#fff" stroke="none" />
+      <circle cx="15.6" cy="14.3" r="2.1" fill="#fff" stroke="none" />
+      <path d="M6.4 14c0-2.7 1.1-4.7 3.4-6M13.6 14c0-2.7 1.1-4.7 3.4-6" />
+    </>
+  ) },
   markets: { from: '#3a3a3e', to: '#0d0d0f', glyph: (
     <path d="m5 16 4.5-4.5 3 3L19 8" />
   ) },

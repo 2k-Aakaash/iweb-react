@@ -6,7 +6,8 @@ import { listLocal, listUnsplash, getWallpaperRecord, addLocalRecord, findLocalB
 import { ACCEPTED_LOCAL_TYPES, makeThumbnail, sha256Hex } from '../libs/wallpaper/imageLoader';
 import { importLocalFiles } from '../libs/wallpaper/importManager';
 import { changeUnsplashBackground, prefetchNextUnsplash } from '../libs/wallpaper/discovery';
-import { showWallpaper, showDefaultWallpaper } from '../libs/wallpaper/wallpaperRenderer';
+import { requestWallpaperColor, showWallpaper, showDefaultWallpaper } from '../libs/wallpaper/wallpaperRenderer';
+import { getClockStyle, useClockStyle } from '../libs/clock/clockStyle';
 
 const DEFAULT_KEY = 'default';
 
@@ -134,11 +135,21 @@ export default function Background({
     colorCallbackRef.current = onClockColorChange;
   }, [onClockColorChange]);
 
+  // The wallpaper's colour is only for the Vibrant Colour clock (the Glass clock shows the
+  // wallpaper itself): picked when a wallpaper is shown in that style, or on switching to it.
+  const clockStyle = useClockStyle();
+  useEffect(() => {
+    if (clockStyle === 'vibrant') requestWallpaperColor((hex) => colorCallbackRef.current?.(hex));
+  }, [clockStyle]);
+
   useEffect(() => {
     let disposed = false;
-    const onColor = (hex) => {
+    const deliverColor = (hex) => {
       if (!disposed) colorCallbackRef.current?.(hex);
     };
+    // Only the Vibrant Colour clock needs the wallpaper's colour: asked once each wallpaper is on
+    // screen (the saved style may arrive from iWebDB while it loads).
+    const colorOption = () => ({ onColor: deliverColor, wantsColor: () => getClockStyle() === 'vibrant' });
 
     const persistActive = (ref) => {
       if (refKey(getActiveWallpaper()) === refKey(ref)) return;
@@ -155,7 +166,7 @@ export default function Background({
 
     const display = async (ref) => {
       requestedKeyRef.current = refKey(ref);
-      const ok = await showWallpaper(ref, { onColor });
+      const ok = await showWallpaper(ref, colorOption());
       if (ok) displayedKeyRef.current = refKey(ref);
       return ok;
     };
@@ -163,7 +174,7 @@ export default function Background({
     const displayDefault = async () => {
       if (isSettledOn(DEFAULT_KEY)) return true;
       requestedKeyRef.current = DEFAULT_KEY;
-      const ok = await showDefaultWallpaper({ onColor });
+      const ok = await showDefaultWallpaper(colorOption());
       if (ok) displayedKeyRef.current = DEFAULT_KEY;
       return ok;
     };

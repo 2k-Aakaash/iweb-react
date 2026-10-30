@@ -19,9 +19,10 @@ import '../../styles/settings-widgets.css';
 // and every size as a preview. Click a size to put it on the desktop (or resize it there), or
 // drag it out: Settings fades away so it can be dropped where it should go.
 
-const ORDER = ['clock', 'search', 'news', 'stack', 'weather', 'currency', 'metals', 'markets'];
+const ORDER = ['clock', 'quote', 'search', 'news', 'stack', 'weather', 'currency', 'metals', 'markets'];
 const DESCRIPTIONS = {
-  clock: 'The time and your greeting. Always on the desktop.',
+  clock: 'The time. Always on the desktop.',
+  quote: 'A line to start the day, with your name.',
   search: 'Opens Spotlight. Without it, Ctrl K still does.',
   news: 'Top stories from your feeds, rotating.',
   stack: 'Several widgets in one place: scroll or swipe to flip.',
@@ -32,9 +33,10 @@ const DESCRIPTIONS = {
 };
 const STATUS = { desktop: 'On Desktop', stack: 'In Smart Stack', hidden: 'Not on Desktop' };
 
-// Full-size dimensions, as on the desktop; the clock and search bar scale with their size.
+// Full-size dimensions, as on the desktop; the clock, quote and search bar scale with their size.
 const SCALE_SIZES = {
-  clock: { small: { w: 240, h: 100 }, medium: { w: 300, h: 128 }, large: { w: 420, h: 160 } },
+  clock: { small: { w: 240, h: 84 }, medium: { w: 300, h: 104 }, large: { w: 420, h: 140 } },
+  quote: { small: { w: 280, h: 46 }, medium: { w: 340, h: 54 }, large: { w: 420, h: 62 } },
   search: { small: { w: 260, h: 46 }, medium: { w: 360, h: 46 }, large: { w: 480, h: 46 } },
 };
 const dimsOf = (id, size) => SCALE_SIZES[id]?.[size] || WIDGET_SIZES[size];

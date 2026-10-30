@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { db as searchDB } from '../search/db/searchDB';
 import { openIwebDB } from './wallpaper/db';
+import { getStoredClockStyle, setClockStyle } from './clock/clockStyle';
 
 // Generic Promise-based IndexedDB helpers for notes DB
 function getNotesDB() {
@@ -250,6 +251,13 @@ export async function exportToIwebBackup(selectedModules) {
       settingsData.localStorage[key] = val;
     }
   });
+  // The clock style (Glass or Vibrant Colour) lives in iWebDB.
+  try {
+    const clockStyle = await getStoredClockStyle();
+    if (clockStyle) settingsData.clockStyle = clockStyle;
+  } catch (err) {
+    console.error('Error reading the clock style:', err);
+  }
 
   // 2. Export Stored Images (wallpapers, custom backgrounds, gifs)
   if (selectedModules.images) {
@@ -407,6 +415,7 @@ export async function restoreFromIwebBackup(zip, metadata, selectedModules) {
           localStorage.setItem(key, settingsData.localStorage[key]);
         });
       }
+      if (settingsData.clockStyle) await setClockStyle(settingsData.clockStyle);
 
       // Restore search history, suggestions, clicks, etc.
       await searchDB.transaction('rw', [searchDB.searches, searchDB.suggestions, searchDB.clicks, searchDB.history], async () => {

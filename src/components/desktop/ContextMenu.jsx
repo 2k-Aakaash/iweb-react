@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ITEMS, addableItems, sizeLabel } from '../../libs/desktop/layout';
 import { getDesktopState, moveToStack, setEditing, showOnDesktop, updateItem } from '../../libs/desktop/layoutStore';
 import { openNews } from '../../libs/news/newsEvents';
+import { CLOCK_STYLES, getClockStyle, setClockStyle } from '../../libs/clock/clockStyle';
 import '../../styles/desktop.css';
 
 // iWeb's right-click menu, in place of the browser's, styled after macOS 26 menus (plain
@@ -38,7 +39,18 @@ function buildMenu(target, actions) {
     const current = layout[id];
     const extras = [];
     if (id === 'news') extras.push({ label: 'Open News', onSelect: () => openNews() });
-    if (id === 'clock') extras.push({ label: 'Change Clock Font…', onSelect: () => actions.openSettings('general') });
+    if (id === 'clock') {
+      extras.push(
+        ...CLOCK_STYLES.map((option) => ({
+          label: option.label,
+          checked: getClockStyle() === option.id,
+          onSelect: () => setClockStyle(option.id),
+        })),
+        { type: 'separator' },
+        { label: 'Change Clock Font…', onSelect: () => actions.openSettings('general') },
+      );
+    }
+    if (id === 'quote') extras.push({ label: 'Change Name…', onSelect: () => actions.openSettings('general') });
     if (id === 'search') extras.push({ label: 'Spotlight Search', shortcut: 'Ctrl K', onSelect: actions.openSpotlight });
     // The stack's visible widget can leave it; a widget on its own can join it.
     const page = id === 'stack' ? itemEl.querySelector('[data-active-page]')?.dataset.activePage : null;

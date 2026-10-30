@@ -108,9 +108,12 @@ function Clock() {
   return (
     <div className="wgp-clock">
       <div className="wgp-clock-time">10:41</div>
-      <div className="wgp-clock-greet">Good morning</div>
     </div>
   );
+}
+
+function Quote() {
+  return <div className="wgp-quote">Stay curious, friend!</div>;
 }
 
 function Search() {
@@ -125,7 +128,7 @@ function Search() {
   );
 }
 
-const PREVIEWS = { weather: Weather, currency: Currency, metals: Metals, markets: Markets, news: News, stack: Stack, clock: Clock, search: Search };
+const PREVIEWS = { weather: Weather, currency: Currency, metals: Metals, markets: Markets, news: News, stack: Stack, clock: Clock, quote: Quote, search: Search };
 
 export default function WidgetPreview({ id, size }) {
   const Preview = PREVIEWS[id];

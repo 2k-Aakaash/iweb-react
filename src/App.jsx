@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
 import Background from './components/Background';
 import Clock from './components/Clock';
+import Quote from './components/Quote';
 import Dock from './components/Dock';
 import SmartStack from './components/widgets/SmartStack';
 import { STACK_WIDGETS } from './components/widgets/stackWidgets';
@@ -210,12 +211,12 @@ export default function App() {
         <NewsWidget size={desktop.layout.news.size} />
       </DesktopItem>
 
-      {/* 3. Clock and greeting, and the Spotlight search bar */}
+      {/* 3. The clock, the quote under it, and the Spotlight search bar */}
       <DesktopItem id="clock">
-        <Clock
-          customName={customName}
-          clockFont={clockFont}
-        />
+        <Clock clockFont={clockFont} />
+      </DesktopItem>
+      <DesktopItem id="quote">
+        <Quote customName={customName} />
       </DesktopItem>
       <DesktopItem id="search">
         <SearchBar onOpenSearch={() => setIsSearchOpen(true)} />

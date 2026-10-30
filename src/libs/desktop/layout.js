@@ -36,11 +36,12 @@ export const EDGE = 16;
 export const GUTTER = 16;
 export const PITCH = WIDGET_SIZES.small.w + GUTTER; // 166
 
-// Movable items. Widgets have fixed sizes from WIDGET_SIZES; the clock and search bar scale.
-// `stackable` widgets can live in the Smart Stack (stack.pages) or on the desktop on their own,
-// never both. The search bar can be removed: Ctrl K still opens Spotlight.
+// Movable items. Widgets have fixed sizes from WIDGET_SIZES; the clock, quote and search bar
+// scale. `stackable` widgets can live in the Smart Stack (stack.pages) or on the desktop on
+// their own, never both. The search bar can be removed: Ctrl K still opens Spotlight.
 export const ITEMS = Object.freeze({
   clock: { label: 'Clock', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: false },
+  quote: { label: 'Quote', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: true },
   search: { label: 'Search Bar', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: true },
   news: { label: 'News', kind: 'widget', sizes: ['small', 'medium', 'large'], removable: true },
   stack: { label: 'Smart Stack', kind: 'widget', sizes: ['small', 'medium'], removable: true },
@@ -65,10 +66,11 @@ export function sizeLabel(id, size) {
 
 // Today's arrangement (measured from the original layout; rows sit lower when the menu bar
 // stays on the desktop: snapToSlots moves them): News top-left, Smart Stack
-// top-right, the clock centred just above the middle with the search bar under it.
+// top-right, the clock centred just above the middle with the quote and the search bar under it.
 // The stack holds Weather, Currency, Gold & Silver and Markets; on their own they start hidden.
 export const DEFAULT_LAYOUT = Object.freeze({
-  clock: { ax: 'center', x: 0, ay: 'middle', y: -8, size: 'medium', hidden: false },
+  clock: { ax: 'center', x: 0, ay: 'middle', y: -24, size: 'medium', hidden: false },
+  quote: { ax: 'center', x: 0, ay: 'middle', y: 39, size: 'medium', hidden: false },
   search: { ax: 'center', x: 0, ay: 'middle', y: 96, size: 'medium', hidden: false },
   news: { ax: 'left', x: 16, ay: 'top', y: 16, size: 'medium', hidden: false },
   stack: { ax: 'right', x: 16, ay: 'top', y: 16, size: 'small', hidden: false, pages: ['weather', 'currency', 'metals', 'markets'] },
@@ -81,15 +83,37 @@ export const DEFAULT_LAYOUT = Object.freeze({
 const AX = ['left', 'center', 'right'];
 const AY = ['top', 'middle', 'bottom'];
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
+const validPos = (item) => item && AX.includes(item.ax) && AY.includes(item.ay) && finite(item.x) && finite(item.y);
+
+// The quote used to sit inside the clock (one item). Heights of the two parts at each size,
+// measured with the default fonts, to split an arrangement saved before without moving either.
+const TIME_H = { small: 67, medium: 94, large: 139 };
+const QUOTE_H = { small: 24, medium: 33, large: 40 };
+
+function splitQuote(raw) {
+  const clock = raw.clock;
+  if (raw.quote || !validPos(clock)) return raw;
+  const size = TIME_H[clock.size] ? clock.size : 'medium';
+  const [clockY, quoteY] = {
+    top: [clock.y, clock.y + TIME_H[size]],
+    middle: [clock.y - QUOTE_H[size] / 2, clock.y + TIME_H[size] / 2],
+    bottom: [clock.y + QUOTE_H[size], clock.y],
+  }[clock.ay];
+  return {
+    ...raw,
+    clock: { ...clock, y: Math.round(clockY) },
+    quote: { ax: clock.ax, x: clock.x, ay: clock.ay, y: Math.round(quoteY), size, hidden: false },
+  };
+}
 
 /** A layout with every item present and valid (unknown or broken entries fall back). */
-export function normalizeLayout(raw) {
+export function normalizeLayout(input) {
+  const raw = input && typeof input === 'object' ? splitQuote(input) : null;
   const out = {};
   for (const [id, def] of Object.entries(DEFAULT_LAYOUT)) {
-    const item = raw && typeof raw === 'object' ? raw[id] : null;
-    const ok = item && AX.includes(item.ax) && AY.includes(item.ay) && finite(item.x) && finite(item.y);
+    const item = raw ? raw[id] : null;
     out[id] = {
-      ...(ok ? { ax: item.ax, x: item.x, ay: item.ay, y: item.y } : { ax: def.ax, x: def.x, ay: def.ay, y: def.y }),
+      ...(validPos(item) ? { ax: item.ax, x: item.x, ay: item.ay, y: item.y } : { ax: def.ax, x: def.x, ay: def.ay, y: def.y }),
       size: ITEMS[id].sizes.includes(item?.size) ? item.size : def.size,
       hidden: ITEMS[id].removable ? Boolean(item?.hidden ?? def.hidden) : false,
     };

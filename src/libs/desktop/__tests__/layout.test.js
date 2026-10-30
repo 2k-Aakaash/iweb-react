@@ -52,7 +52,7 @@ describe('desktop layout', () => {
   it('anchors a rect to the edge or centre it is nearest to, on the grid', () => {
     expect(toAnchored({ left: 21, top: 17, w: 150, h: 150 }, VW, VH)).toEqual({ ax: 'left', x: 24, ay: 'top', y: 16 });
     expect(toAnchored({ left: 1270, top: 700, w: 150, h: 150 }, VW, VH)).toEqual({ ax: 'right', x: 24, ay: 'bottom', y: 48 });
-    // Today's clock: centred, 6.5px above the middle → snapped to −8 (the default layout).
+    // The clock with its quote, as one item: centred, 6.5px above the middle → snapped to −8.
     expect(toAnchored({ left: 571, top: 380, w: 297, h: 127 }, VW, VH)).toEqual({ ax: 'center', x: 0, ay: 'middle', y: -8 });
     // Round trip: a rect on the grid (120px from the right, 152px from the bottom) resolves
     // back to itself; anything else lands on the nearest grid position.
@@ -115,9 +115,32 @@ describe('desktop layout', () => {
     expect(addableItems(empty)).not.toContain('stack');
   });
 
-  it('lets the search bar be removed (Ctrl K still opens Spotlight)', () => {
+  it('lets the search bar and the quote be removed (Ctrl K still opens Spotlight)', () => {
     expect(normalizeLayout({ search: { ...DEFAULT_LAYOUT.search, hidden: true } }).search.hidden).toBe(true);
+    expect(normalizeLayout({ quote: { ...DEFAULT_LAYOUT.quote, hidden: true } }).quote.hidden).toBe(true);
     expect(normalizeLayout({ clock: { ...DEFAULT_LAYOUT.clock, hidden: true } }).clock.hidden).toBe(false);
+    const removed = normalizeLayout({ ...normalizeLayout(null), quote: { ...DEFAULT_LAYOUT.quote, hidden: true } });
+    expect(addableItems(removed)).toEqual(['quote']);
+  });
+
+  it('splits the quote out of a clock saved before, without moving either', () => {
+    // The default arrangement before: the clock with its quote, centred 8px above the middle.
+    const before = { clock: { ax: 'center', x: 0, ay: 'middle', y: -8, size: 'medium', hidden: false } };
+    const after = normalizeLayout(before);
+    expect(after.clock).toEqual({ ax: 'center', x: 0, ay: 'middle', y: -24, size: 'medium', hidden: false });
+    expect(after.quote).toEqual({ ax: 'center', x: 0, ay: 'middle', y: 39, size: 'medium', hidden: false });
+    expect(after).toEqual(normalizeLayout(DEFAULT_LAYOUT));
+    // Hanging from the top: the clock keeps its top, the quote goes under the digits.
+    const top = normalizeLayout({ clock: { ax: 'left', x: 40, ay: 'top', y: 100, size: 'large' } });
+    expect(top.clock).toMatchObject({ ax: 'left', x: 40, ay: 'top', y: 100 });
+    expect(top.quote).toMatchObject({ ax: 'left', x: 40, ay: 'top', y: 239, size: 'large' });
+    // From the bottom: the quote keeps the bottom, the clock sits on it.
+    const bottom = normalizeLayout({ clock: { ax: 'right', x: 40, ay: 'bottom', y: 200, size: 'small' } });
+    expect(bottom.clock).toMatchObject({ ay: 'bottom', y: 224 });
+    expect(bottom.quote).toMatchObject({ ax: 'right', x: 40, ay: 'bottom', y: 200, size: 'small' });
+    // Saved since: left alone.
+    const saved = { clock: { ...after.clock, y: 0 }, quote: { ...after.quote, y: 300, hidden: true } };
+    expect(normalizeLayout(saved)).toMatchObject(saved);
   });
 
   it('snaps widgets to slots: 150px cells, 16px gutters, rows from the top', () => {
