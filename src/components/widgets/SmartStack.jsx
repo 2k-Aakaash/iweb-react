@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
-import Weather from '../Weather';
-import CurrencyWidget from './CurrencyWidget';
-import GoldWidget from './GoldWidget';
-import MarketsWidget from './MarketsWidget';
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import { STACK_WIDGETS } from './stackWidgets';
 import '../../styles/widgets.css';
 
 // macOS-style Smart Stack for the top-right widgets: one card-sized slot that flips between
@@ -13,12 +10,7 @@ import '../../styles/widgets.css';
 // Page registry: every widget receives { active, onExpandedChange }. `active` is true while
 // the page is the visible one (use it to pause polling); a widget that expands in place
 // reports it through onExpandedChange so flipping is disabled meanwhile.
-const PAGES = [
-  { id: 'weather', label: 'Weather', Component: Weather },
-  { id: 'currency', label: 'Currency Converter', Component: CurrencyWidget },
-  { id: 'metals', label: 'Gold & Silver', Component: GoldWidget },
-  { id: 'markets', label: 'Markets', Component: MarketsWidget },
-];
+// The widgets a stack can hold live in ./stackWidgets.js (also placeable on their own).
 
 const WHEEL_THRESHOLD = 60; // px of accumulated wheel delta that flips one page
 const WHEEL_COOLDOWN_MS = 450; // minimum time between two wheel flips
@@ -49,7 +41,10 @@ function wheelDelta(e) {
   return Math.abs(dy) >= Math.abs(dx) ? dy : dx;
 }
 
-export default function SmartStack() {
+// `size`: small (150px square cards) or medium (316 × 150), chosen in Edit Widgets.
+// `pages`: the widget ids in the stack, in order (the rest can sit on the desktop alone).
+export default function SmartStack({ size = 'small', pages: pageIds = Object.keys(STACK_WIDGETS) }) {
+  const PAGES = pageIds.map((id) => STACK_WIDGETS[id]).filter(Boolean);
   const [view, setView] = useState({ active: 0, leaving: null, direction: 1 });
   const [expanded, setExpanded] = useState({});
   const [hint, setHint] = useState(false);
@@ -61,9 +56,13 @@ export default function SmartStack() {
   const timersRef = useRef({ transition: 0, hint: 0 });
   const helpId = useId();
 
-  const activePage = PAGES[view.active];
+  // An expanded widget is in front (e.g. Spotlight's `/weather` command clicks the weather
+  // card while another page shows). Otherwise the chosen page, clamped when pages leave.
+  const expandedIndex = PAGES.findIndex((page) => expanded[page.id]);
+  const activeIndex = expandedIndex >= 0 ? expandedIndex : Math.min(view.active, Math.max(0, PAGES.length - 1));
+  const activePage = PAGES[activeIndex];
   // Flipping is disabled while the visible widget is expanded.
-  const locked = Boolean(expanded[activePage.id]);
+  const locked = Boolean(activePage && expanded[activePage.id]);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -73,23 +72,14 @@ export default function SmartStack() {
     };
   }, []);
 
-  // A widget reports its expanded state. If a hidden one expands (e.g. Spotlight's
-  // `/weather` command clicks the weather card), bring it to the front.
-  const reportExpanded = useCallback((id, value) => {
-    setExpanded((prev) => (prev[id] === value ? prev : { ...prev, [id]: value }));
-    if (!value) return;
-    const index = PAGES.findIndex((page) => page.id === id);
-    setView((prev) => (prev.active === index ? prev : { active: index, leaving: null, direction: 1 }));
-  }, []);
-
-  // One stable callback per page.
-  const expandHandlers = useMemo(
-    () => Object.fromEntries(PAGES.map((page) => [page.id, (value) => reportExpanded(page.id, value)])),
-    [reportExpanded],
-  );
+  // One stable callback per page: a widget reports its expanded state (see activeIndex above).
+  const [expandHandlers] = useState(() => Object.fromEntries(Object.keys(STACK_WIDGETS).map((id) => [
+    id,
+    (value) => setExpanded((prev) => (prev[id] === value ? prev : { ...prev, [id]: value })),
+  ])));
 
   const showPage = (index, direction) => {
-    if (locked || index === view.active) return false;
+    if (locked || index === activeIndex) return false;
     const timers = timersRef.current;
     const animate = !prefersReducedMotion();
 
@@ -100,7 +90,7 @@ export default function SmartStack() {
       stack.focus({ preventScroll: true });
     }
 
-    setView({ active: index, leaving: animate ? view.active : null, direction });
+    setView({ active: index, leaving: animate ? activeIndex : null, direction });
     clearTimeout(timers.transition);
     if (animate) {
       timers.transition = setTimeout(() => {
@@ -117,7 +107,8 @@ export default function SmartStack() {
 
   // +1 = next page (enters from below), -1 = previous. The stack wraps around.
   const flip = (direction) => {
-    const next = (view.active + direction + PAGES.length) % PAGES.length;
+    if (PAGES.length < 2) return false;
+    const next = (activeIndex + direction + PAGES.length) % PAGES.length;
     return showPage(next, direction);
   };
 
@@ -192,7 +183,7 @@ export default function SmartStack() {
   };
 
   const pageClass = (index) => {
-    if (index === view.active) {
+    if (index === activeIndex) {
       if (view.leaving === null) return 'ws-page ws-page-active';
       return `ws-page ws-page-active ${view.direction > 0 ? 'ws-enter-next' : 'ws-enter-prev'}`;
     }
@@ -208,9 +199,11 @@ export default function SmartStack() {
     <div
       ref={stackRef}
       className={stackClass}
+      data-size={size}
+      data-active-page={activePage?.id}
       role="region"
       aria-roledescription="widget stack"
-      aria-label={activePage.label}
+      aria-label={activePage?.label || 'Smart Stack'}
       aria-describedby={helpId}
       aria-keyshortcuts="ArrowUp ArrowDown"
       tabIndex={0}
@@ -220,7 +213,7 @@ export default function SmartStack() {
       onTouchCancel={handleTouchCancel}
     >
       {PAGES.map((page, index) => {
-        const isActive = index === view.active;
+        const isActive = index === activeIndex;
         return (
           <div
             key={page.id}
@@ -236,7 +229,7 @@ export default function SmartStack() {
         );
       })}
 
-      <div className="ws-indicator">
+      {PAGES.length > 1 && <div className="ws-indicator">
         <div className="ws-dots">
           {PAGES.map((page, index) => (
             <button
@@ -244,12 +237,12 @@ export default function SmartStack() {
               type="button"
               className="ws-dot"
               aria-label={`Show ${page.label}`}
-              aria-current={index === view.active ? 'true' : undefined}
-              onClick={() => showPage(index, index > view.active ? 1 : -1)}
+              aria-current={index === activeIndex ? 'true' : undefined}
+              onClick={() => showPage(index, index > activeIndex ? 1 : -1)}
             />
           ))}
         </div>
-      </div>
+      </div>}
 
       <span id={helpId} className="ws-sr-only">Scroll, swipe or use the arrow keys to switch widgets.</span>
       <span className="ws-sr-only" aria-live="polite" aria-atomic="true">{announcement}</span>

@@ -17,6 +17,7 @@ import { moveItem } from './listOrder';
 import { startPolling, usePageVisible } from './polling';
 import { useSymbolSearch } from './useSymbolSearch';
 import GlassSurface from '../glass/GlassSurface';
+import { useMacWindow } from '../../libs/window/useMacWindow';
 import '../../styles/markets.css';
 
 // The Markets app: a macOS Stocks-style window with the watchlist (and symbol search) in
@@ -31,7 +32,6 @@ const MINUTE = 60 * 1000;
 const OPEN_REFRESH_MS = MINUTE;
 const CLOSED_REFRESH_MS = 15 * MINUTE;
 const NARROW_QUERY = '(max-width: 720px)';
-const CLOSE_ANIMATION_MS = 180;
 const CHANGE_MODE_KEY = 'marketsChangeMode';
 const WATCHLIST_STORAGE_KEY = 'marketsWatchlist'; // marketService's storage key
 const WATCHLIST_LIMIT = 50; // setWatchlist keeps the first 50
@@ -64,10 +64,6 @@ function useMediaQuery(query) {
   return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => false);
 }
 
-function prefersReducedMotion() {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-}
-
 function isTypingTarget(target) {
   return target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 }
@@ -82,7 +78,10 @@ function findRowMain(list, symbol) {
   return row?.querySelector('.mk-row-main') || null;
 }
 
-export default function MarketsModal({ initialSymbol = null, onClose }) {
+// The window is a macOS app window (useMacWindow): red closes, yellow minimizes into its Dock
+// icon (shown while Markets runs), green zooms. App keeps this mounted after the first open, so
+// the watchlist, selection and view survive minimizing; only the window markup comes and goes.
+export default function MarketsModal({ open = true, setOpen = () => {}, initialSymbol = null }) {
   const [initial] = useState(() => {
     const list = getWatchlist();
     return { list, symbol: initialSymbol || list[0]?.symbol || null };
@@ -97,7 +96,6 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
   const [changeMode, setChangeMode] = useState(readChangeMode);
   const [query, setQuery] = useState('');
   const [view, setView] = useState(initialSymbol ? 'detail' : 'list');
-  const [closing, setClosing] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [notice, setNotice] = useState('');
   const [pendingSubmit, setPendingSubmit] = useState(null);
@@ -113,7 +111,11 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
   const headingRef = useRef(null);
   const namesRef = useRef({});
   const pendingFocusRef = useRef(null);
-  const onCloseRef = useRef(onClose);
+  const overlayRef = useRef(null);
+
+  const menusRef = useRef(null); // menu-bar menus, set below once the handlers exist
+  const macWin = useMacWindow({ app: 'markets', open, setOpen, windowRef, overlayRef, menus: menusRef });
+  const shown = macWin.mounted;
 
   const titleId = useId();
   const resultsId = useId();
@@ -129,10 +131,6 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
 
   const effectiveView = selected ? view : 'list';
   const searching = query.trim().length > 0;
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  });
 
   // ---- Watchlist sync (other components, Spotlight and other tabs) -------------------
 
@@ -167,7 +165,7 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
   }, [watchlist, selected]);
 
   useEffect(() => {
-    if (!visible || !symbolsKey) return undefined;
+    if (!shown || !visible || !symbolsKey) return undefined;
     const symbols = symbolsKey.split('|');
     return startPolling(async (signal) => {
       try {
@@ -185,7 +183,7 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
         return err?.code === 'NOT_CONFIGURED' ? null : OPEN_REFRESH_MS;
       }
     });
-  }, [symbolsKey, visible, retryToken]);
+  }, [shown, symbolsKey, visible, retryToken]);
 
   // Back online: refresh quotes and the chart straight away.
   useEffect(() => {
@@ -210,19 +208,32 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
 
   // Keep focus inside the window (registered first so it is removed before focus returns).
   useEffect(() => {
+    if (!shown) return undefined;
     const handleFocusIn = (e) => {
       const win = windowRef.current;
       if (win && !win.contains(e.target)) (tabbables(win)[0] || win).focus({ preventScroll: true });
     };
     document.addEventListener('focusin', handleFocusIn);
     return () => document.removeEventListener('focusin', handleFocusIn);
-  }, []);
+  }, [shown]);
 
   // Initial focus, and back to whatever opened the app (e.g. the Markets card) on close.
   useEffect(() => {
+    if (!shown) return undefined;
     const returnTo = document.activeElement;
-    applyFocus({ type: 'initial' });
+    // The window is hidden (visibility) while it genies out of the Dock, and hidden elements
+    // can't take focus: focus it once it is handed back.
+    let frame = 0;
+    const focusWhenShown = () => {
+      if (windowRef.current?.classList.contains('genie-hidden')) {
+        frame = requestAnimationFrame(focusWhenShown);
+        return;
+      }
+      applyFocus({ type: 'initial' });
+    };
+    focusWhenShown();
     return () => {
+      cancelAnimationFrame(frame);
       if (!(returnTo instanceof HTMLElement) || returnTo === document.body || !returnTo.isConnected) return;
       // The opener may have been hidden meanwhile (e.g. "Open in Markets" inside a Smart Stack
       // card that collapsed while the app was open): fall back to that card's header, then
@@ -235,7 +246,7 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
       ].find(isShown);
       target?.focus({ preventScroll: true });
     };
-  }, []);
+  }, [shown]);
 
   // Focus requested by an action, applied once the resulting render is on screen.
   useEffect(() => {
@@ -247,19 +258,7 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
 
   // ---- Closing ----------------------------------------------------------------------
 
-  const requestClose = useCallback(() => {
-    if (prefersReducedMotion()) {
-      onCloseRef.current?.();
-      return;
-    }
-    setClosing(true);
-  }, []);
-
-  useEffect(() => {
-    if (!closing) return undefined;
-    const timer = setTimeout(() => onCloseRef.current?.(), CLOSE_ANIMATION_MS);
-    return () => clearTimeout(timer);
-  }, [closing]);
+  const requestClose = macWin.close;
 
   // ---- Actions ----------------------------------------------------------------------
 
@@ -391,6 +390,16 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
     }
   };
 
+  // Menu bar: View → how changes are shown.
+  useEffect(() => {
+    menusRef.current = () => ({
+      View: [
+        { label: 'Show Change in Percent', checked: changeMode === 'percent', onSelect: () => changeMode !== 'percent' && toggleChangeMode() },
+        { label: 'Show Change in Points', checked: changeMode !== 'percent', onSelect: () => changeMode === 'percent' && toggleChangeMode() },
+      ],
+    });
+  });
+
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -430,11 +439,13 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
   const selectedItem = watchlist.find((item) => item.symbol === selected) || null;
   const anyStale = Object.values(quoteState.quotes).some((quote) => quote.stale);
 
+  if (!shown) return null;
+
   return (
-    <div className={`mk-overlay${closing ? ' is-closing' : ''}`} onPointerDown={handleOverlayPointerDown}>
+    <div ref={overlayRef} className="mk-overlay" onPointerDown={handleOverlayPointerDown}>
       <div
         ref={windowRef}
-        className="mk-window glass-host"
+        className={`mk-window glass-host${macWin.maximized ? ' window-maximized' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -449,8 +460,24 @@ export default function MarketsModal({ initialSymbol = null, onClose }) {
               <path d="m3.5 3.5 5 5m0-5-5 5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
           </button>
-          <span className="mk-light mk-light-minimize" aria-hidden="true" />
-          <span className="mk-light mk-light-zoom" aria-hidden="true" />
+          <button type="button" className="mk-light mk-light-minimize" aria-label="Minimize Markets" title="Minimize" onClick={macWin.minimize}>
+            <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+              <path d="M3 6h6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="mk-light mk-light-zoom"
+            aria-label={macWin.maximized ? 'Exit full size' : 'Zoom Markets'}
+            title={macWin.maximized ? 'Exit Full Size' : 'Zoom'}
+            onClick={macWin.toggleMaximize}
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+              {macWin.maximized
+                ? <path d="M5.5 5.5H2.9l2.6-2.6zM6.5 6.5h2.6L6.5 9.1z" fill="currentColor" />
+                : <path d="M3.5 3.5h3L3.5 6.5zM8.5 8.5h-3l3-3z" fill="currentColor" />}
+            </svg>
+          </button>
         </div>
 
         <aside className="mk-sidebar" aria-label="Watchlist and search">

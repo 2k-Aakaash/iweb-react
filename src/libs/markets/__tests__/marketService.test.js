@@ -258,6 +258,28 @@ describe('search', () => {
     expect((await searchSymbols('nsei', { now: NOW })).map((r) => r.symbol)).toEqual(['^NSEI']);
   });
 
+  it('finds renamed companies, short names and "&" names that Yahoo search misses', async () => {
+    routeFetch({ search: () => jsonResponse({ results: [] }) });
+    expect((await searchSymbols('zomato', { now: NOW })).map((r) => r.symbol)).toEqual(['ETERNAL.NS']);
+    expect((await searchSymbols('m&m', { now: NOW })).map((r) => r.symbol)).toEqual(['M&M.NS']);
+    expect((await searchSymbols('l&t', { now: NOW })).map((r) => r.symbol)).toEqual(['LT.NS']);
+    expect((await searchSymbols('hul', { now: NOW }))[0]).toMatchObject({ symbol: 'HINDUNILVR.NS', exchange: 'NSE', type: 'EQUITY' });
+    // One typed letter doesn't list every alias starting with it.
+    expect((await searchSymbols('h', { now: NOW })).map((r) => r.symbol)).not.toContain('HAL.NS');
+  });
+
+  it('does not repeat an alias that the remote search also returns', async () => {
+    routeFetch({
+      search: () => jsonResponse({
+        results: [
+          { symbol: 'RELIANCE.NS', name: 'Reliance Industries Limited', exchange: 'NSE', type: 'EQUITY' },
+          { symbol: 'RPOWER.NS', name: 'Reliance Power Limited', exchange: 'NSE', type: 'EQUITY' },
+        ],
+      }),
+    });
+    expect((await searchSymbols('reliance', { now: NOW })).map((r) => r.symbol)).toEqual(['RELIANCE.NS', 'RPOWER.NS']);
+  });
+
   it('still returns local matches when the search request fails', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     const results = await searchSymbols('nifty', { now: NOW });

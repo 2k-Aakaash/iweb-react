@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGenie } from '../genie/useGenie';
 import { prefersReducedMotion } from '../genie/genie';
+import { focusWindow, registerController, setWindowState } from './windowRegistry';
 import '../../styles/mac-window.css';
 
 // macOS-style window controls for iWeb's app windows (Settings, Notes, Music).
@@ -16,14 +17,17 @@ import '../../styles/mac-window.css';
 //            out, as it was left (zoomed state included).
 //   green  — zoom: the window grows to fill the screen (and back) with a spring-like ease.
 // Opening from the Dock always genies out of the icon. Each app reports its state on the
-// `iweb:window` event so the Dock can show its running dot.
+// `iweb:window` event so the Dock can show its running dot, and to the window registry
+// (windowRegistry.js) so the menu bar knows the front app. `menus` (a function, or a ref to
+// one) returns the app's own menu-bar items: { File: [...], View: [...], Controls: [...] },
+// each { label, onSelect, checked?, disabled?, shortcut? } or { type: 'separator' } (MenuBar.jsx).
 
 const ZOOM_MS = 460;
 const ZOOM_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft settle (macOS-like)
 
 export const WINDOW_EVENT = 'iweb:window';
 
-export function useMacWindow({ app, open, setOpen, windowRef, overlayRef }) {
+export function useMacWindow({ app, open, setOpen, windowRef, overlayRef, menus = null }) {
   const closeEffectRef = useRef('genie');
   const [minimized, setMinimized] = useState(false);
   const [maximized, setMaximized] = useState(false);
@@ -97,6 +101,29 @@ export function useMacWindow({ app, open, setOpen, windowRef, overlayRef }) {
     const state = mounted ? 'open' : minimized ? 'minimized' : 'closed';
     window.dispatchEvent(new CustomEvent(WINDOW_EVENT, { detail: { app, state } }));
   }, [app, mounted, minimized]);
+
+  // Window registry: state for the menu bar, the latest controls, and front-window tracking.
+  useEffect(() => {
+    setWindowState(app, { state: mounted ? 'open' : minimized ? 'minimized' : 'closed', maximized });
+  }, [app, mounted, minimized, maximized]);
+
+  const controllerRef = useRef(null);
+  useEffect(() => {
+    controllerRef.current = { close, minimize, toggleMaximize, open: () => setOpen(true), windowRef, menus };
+  });
+  useEffect(() => registerController(app, controllerRef), [app]);
+
+  useEffect(() => {
+    const el = overlayRef?.current || windowRef.current;
+    if (!mounted || !el) return undefined;
+    const bringToFront = () => focusWindow(app);
+    el.addEventListener('pointerdown', bringToFront, true);
+    el.addEventListener('focusin', bringToFront);
+    return () => {
+      el.removeEventListener('pointerdown', bringToFront, true);
+      el.removeEventListener('focusin', bringToFront);
+    };
+  }, [app, mounted, overlayRef, windowRef]);
 
   return { mounted, maximized, minimized, close, minimize, toggleMaximize };
 }

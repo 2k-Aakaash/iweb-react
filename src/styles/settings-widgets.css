@@ -1,0 +1,594 @@
+/* Settings → Widgets (src/components/settings/WidgetsPane.jsx), after macOS 26's widget
+   gallery, and the still previews it shows (WidgetPreview.jsx). */
+
+.wg-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  text-align: left;
+}
+
+/* The gallery scrolls on its own; search and the footer stay put. */
+.settings-content-body:has(> .wg-pane) {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.wg-pane button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font: inherit;
+}
+
+/* ---- Search ---- */
+.wg-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.wg-search:focus-within {
+  border-color: rgba(10, 132, 255, 0.8);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25);
+}
+
+.wg-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: #fff;
+  font-size: 13px;
+}
+
+.wg-search input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ---- List + gallery ---- */
+.wg-body {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
+}
+
+.wg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+.wg-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wg-list-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wg-list-item.is-active {
+  background: rgba(10, 132, 255, 0.85);
+  color: #fff;
+}
+
+.wg-list-item:focus-visible,
+.wg-btn:focus-visible,
+.wg-tile:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 2px;
+}
+
+.wg-list-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.wg-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 4px 4px 16px; /* room for the current-size ring */
+  overflow-y: auto;
+}
+
+.wg-section {
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.wg-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.wg-section-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.wg-section-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wg-section-text h3 {
+  margin: 0;
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 13.5px;
+  color: #fff;
+}
+
+.wg-section-text p {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wg-status {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.wg-status.is-desktop {
+  background: rgba(52, 199, 89, 0.18);
+  color: #5fe08a;
+}
+
+.wg-status.is-stack {
+  background: rgba(124, 118, 255, 0.2);
+  color: #b3afff;
+}
+
+.wg-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+.wg-size {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.wg-tile {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+  transition: transform 160ms ease;
+}
+
+.wg-tile:hover {
+  transform: scale(1.04);
+}
+
+.wg-tile:active {
+  cursor: grabbing;
+}
+
+.wg-tile::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 15px;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+
+.wg-tile.is-current::after {
+  border-color: rgba(10, 132, 255, 0.95);
+}
+
+/* The preview is laid out at full size and scaled down into the tile. */
+.wg-tile-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.wg-size-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.wg-actions:empty {
+  display: none;
+}
+
+.wg-btn {
+  padding: 4px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wg-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.wg-btn-quiet {
+  background: none;
+}
+
+.wg-btn-primary {
+  background: #0a84ff;
+  border-color: transparent;
+}
+
+.wg-btn-primary:hover {
+  background: #2e95ff;
+}
+
+.wg-empty {
+  margin: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.wg-footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 12px 24px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wg-footer > span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Dragging a widget out: Settings steps aside, the ghost follows the pointer ---- */
+.settings-overlay {
+  transition: opacity 200ms ease;
+}
+
+html.wg-dragging .settings-overlay {
+  opacity: 0;
+}
+
+html.wg-dragging,
+html.wg-dragging * {
+  cursor: grabbing !important;
+}
+
+.wg-ghost {
+  position: fixed;
+  z-index: 100000;
+  pointer-events: none;
+  border-radius: 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  transform: scale(1.03);
+  animation: wg-ghost-in 160ms ease-out;
+}
+
+@keyframes wg-ghost-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+}
+
+/* ---- Previews (full size; scaled by the gallery) ---- */
+.wgp {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  border-radius: 20px;
+  overflow: hidden;
+  color: #fff;
+  font-family: "sf_pro_displayregular", system-ui, sans-serif;
+  text-align: left;
+}
+
+.wgp-weather {
+  background: linear-gradient(180deg, #3d8bdc 0%, #1f5fae 100%);
+}
+
+.wgp-dark {
+  background: linear-gradient(180deg, #2c2c30 0%, #18181b 100%);
+}
+
+.wgp-gold {
+  background: linear-gradient(160deg, #3a2e12 0%, #1d170a 100%);
+  color: #f6dc91;
+}
+
+.wgp-news {
+  gap: 10px;
+  background: #fff;
+  color: #1d1d1f;
+}
+
+.wgp-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.wgp-place,
+.wgp-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wgp-temp {
+  font-size: 44px;
+  font-weight: 300;
+  line-height: 1.05;
+}
+
+.wgp-sun {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe27a 0 55%, rgba(255, 226, 122, 0.25) 56%);
+}
+
+.wgp-foot {
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+  font-size: 13px;
+}
+
+.wgp-weather:has(.wgp-forecast) .wgp-foot {
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.wgp-forecast {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  font-size: 12px;
+}
+
+.wgp-forecast span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.wgp-forecast b {
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.wgp-forecast i {
+  font-style: normal;
+  font-size: 14px;
+}
+
+.wgp-big {
+  margin-top: auto;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.wgp-big small {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.wgp-muted {
+  font-size: 12.5px;
+  opacity: 0.65;
+}
+
+.wgp-spark {
+  width: 100%;
+  height: 28px;
+  margin-top: 8px;
+}
+
+.wgp-quote {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.wgp-quote .is-up {
+  color: #34c759;
+}
+
+.wgp-quote .is-down {
+  color: #ff453a;
+}
+
+.wgp-news-brand {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e8233a;
+}
+
+.wgp-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wgp-source {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #86868b;
+}
+
+.wgp-line {
+  height: 9px;
+  border-radius: 5px;
+  background: #d2d2d7;
+}
+
+.wgp-line-short {
+  width: 62%;
+}
+
+.wgp-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.wgp-stack-layer {
+  position: absolute;
+  inset: -7px 10px auto;
+  height: 30px;
+  border-radius: 18px 18px 0 0;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.wgp-stack > .wgp {
+  position: relative;
+}
+
+.wgp-stack-dots {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transform: translateY(-50%);
+}
+
+.wgp-stack-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.wgp-stack-dots i:first-child {
+  background: #fff;
+}
+
+.wgp-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(110, 130, 190, 0.55), rgba(40, 50, 90, 0.55));
+  color: #fff;
+}
+
+.wgp-clock-time {
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 64px;
+  line-height: 1;
+}
+
+.wgp-clock-greet {
+  margin-top: 6px;
+  font-size: 20px;
+  opacity: 0.85;
+}
+
+.wgp-search {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 16px;
+}
+
+@media (max-width: 720px) {
+  .wg-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wg-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wg-tile,
+  .settings-overlay {
+    transition: none;
+  }
+
+  .wg-ghost {
+    animation: none;
+  }
+}

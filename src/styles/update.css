@@ -66,7 +66,7 @@
 
 .iu-notice {
   position: fixed;
-  top: 16px;
+  top: max(16px, calc(var(--menubar-space, 0px) + 12px));
   left: 16px;
   z-index: 50;
   display: flex;

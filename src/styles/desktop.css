@@ -1,0 +1,417 @@
+/* The iWeb desktop: movable items (src/components/desktop/DesktopItem.jsx), Edit Widgets mode
+   and the right-click menu. Plain frosted surfaces, no Liquid Glass. */
+
+/* ── Items ───────────────────────────────────────────────────────────────── */
+
+.dt-item {
+  position: fixed;
+  z-index: 10;
+  text-align: left;
+  transition: scale 0.25s cubic-bezier(0.34, 1.32, 0.64, 1), opacity 0.25s ease, filter 0.25s ease;
+}
+
+.dt-item-widget {
+  z-index: 1000; /* above the clock; widgets such as Weather expand over it */
+}
+
+/* Widget sizes (macOS): small square, medium = two smalls wide, large = 2 × 2. */
+.dt-item-widget[data-size='small'] { --widget-w: 150px; --widget-h: 150px; }
+.dt-item-widget[data-size='medium'] { --widget-w: 316px; --widget-h: 150px; }
+.dt-item-widget[data-size='large'] { --widget-w: 316px; --widget-h: 316px; }
+
+/* Clock sizes. */
+.dt-item[data-desktop-item='clock'] .center {
+  text-align: center;
+}
+
+.dt-item[data-desktop-item='clock'] .clock-time,
+.dt-item[data-desktop-item='clock'] .name-intro {
+  transition: font-size 0.35s cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+
+.dt-item[data-desktop-item='clock'][data-size='small'] .clock-time { font-size: 50px; }
+.dt-item[data-desktop-item='clock'][data-size='small'] .name-intro { font-size: 18px; }
+.dt-item[data-desktop-item='clock'][data-size='large'] .clock-time { font-size: 104px; }
+.dt-item[data-desktop-item='clock'][data-size='large'] .name-intro { font-size: 30px; }
+
+/* Search bar widths (it no longer sizes itself from the clock column). */
+.dt-item[data-desktop-item='search'] .dashboard-search-trigger {
+  box-sizing: border-box;
+  width: 335px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  transition: width 0.35s cubic-bezier(0.34, 1.32, 0.64, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dt-item[data-desktop-item='search'][data-size='small'] .dashboard-search-trigger { width: 260px; }
+.dt-item[data-desktop-item='search'][data-size='large'] .dashboard-search-trigger { width: 480px; }
+
+/* ── Edit Widgets mode ───────────────────────────────────────────────────── */
+
+.dt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.28);
+  animation: dt-fade-in 0.25s ease;
+}
+
+@keyframes dt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A widget expanded in place (Currency, Gold & Silver, Weather) comes to the front and the
+   rest of the desktop steps back, so it never ends up under a neighbour. The dimmed items
+   ignore the pointer: a click on them only collapses the card (outside-click handlers). */
+.dt-item:has(.cw-expanded, .weather-container.is-expanded) {
+  z-index: 1001;
+}
+
+body:has(.dt-item .cw-expanded, .dt-item .weather-container.is-expanded) .dt-item:not(:has(.cw-expanded, .weather-container.is-expanded)) {
+  opacity: 0.3;
+  filter: blur(3px) saturate(0.8);
+  pointer-events: none;
+}
+
+/* Press and hold (DesktopItem HOLD_MS): the item sinks slightly until edit mode starts. */
+.dt-item.is-holding {
+  scale: 0.96;
+  transition: scale 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dt-item.is-editing {
+  z-index: 1002;
+  scale: 0.97;
+}
+
+/* A soft ring marks what can be moved. */
+.dt-item.is-editing::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+.dt-item.is-dragging {
+  z-index: 1003;
+  scale: 1.03;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.4));
+}
+
+.dt-item.is-dragging::after {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+/* Covers the item's content in edit mode: drags instead of clicks. */
+.dt-shield {
+  position: absolute;
+  inset: -6px;
+  z-index: 5;
+  border-radius: 24px;
+  cursor: grab;
+  outline: none;
+}
+
+.dt-item.is-dragging .dt-shield {
+  cursor: grabbing;
+}
+
+.dt-shield:focus-visible {
+  box-shadow: 0 0 0 3px #0a84ff;
+}
+
+.dt-remove {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(60, 60, 64, 0.95);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  animation: dt-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dt-remove:hover {
+  background: #ff453a;
+}
+
+.dt-resize {
+  position: absolute;
+  right: -12px;
+  bottom: -12px;
+  z-index: 6;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(60, 60, 64, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: nwse-resize;
+  animation: dt-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* A diagonal grip mark. */
+.dt-resize::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-right: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 0 0 3px 0;
+}
+
+@keyframes dt-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+.dt-guide {
+  position: fixed;
+  z-index: 1004;
+  pointer-events: none;
+  background: rgba(255, 214, 10, 0.9);
+  box-shadow: 0 0 6px rgba(255, 214, 10, 0.6);
+}
+
+/* Where a dragged widget will land (its slot), like macOS 26's placeholder. */
+.dt-slot {
+  position: fixed;
+  z-index: 1001;
+  pointer-events: none;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  transition: left 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.18s ease, height 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-slot { transition: none; }
+}
+
+.dt-guide-x { top: 0; bottom: 0; width: 1px; }
+.dt-guide-y { left: 0; right: 0; height: 1px; }
+
+.dt-toolbar {
+  position: fixed;
+  bottom: 112px;
+  left: 50%;
+  z-index: 1005;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(36, 36, 40, 0.82);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  transform: translateX(-50%);
+  animation: dt-toolbar-in 0.32s cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+
+@keyframes dt-toolbar-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+
+.dt-toolbar-title {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+}
+
+.dt-toolbar-hint {
+  margin-right: 6px;
+  color: rgba(235, 235, 245, 0.55);
+  white-space: nowrap;
+}
+
+.dt-btn {
+  height: 28px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dt-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dt-btn-primary {
+  background: #0a84ff;
+}
+
+.dt-btn-primary:hover {
+  background: #0071e3;
+}
+
+.dt-btn:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .dt-toolbar-hint { display: none; }
+}
+
+/* ── Right-click menu (macOS 26 style) ───────────────────────────────────── */
+
+.dt-menu {
+  position: fixed;
+  z-index: 100000;
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(40, 40, 44, 0.8);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  text-align: left;
+  visibility: hidden; /* until placed on screen */
+  user-select: none;
+}
+
+.dt-menu.is-placed {
+  visibility: visible;
+  animation: dt-menu-in 0.12s ease-out;
+}
+
+@keyframes dt-menu-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.dt-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  outline: none;
+}
+
+.dt-menu-item:hover,
+.dt-menu-item:focus {
+  background: #0a84ff;
+}
+
+.dt-menu-check {
+  width: 18px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 12px;
+}
+
+.dt-menu-label {
+  flex: 1;
+}
+
+.dt-menu-shortcut {
+  margin-left: 24px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.dt-menu-item:hover .dt-menu-shortcut,
+.dt-menu-item:focus .dt-menu-shortcut {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.dt-menu-sep {
+  height: 1px;
+  margin: 5px 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dt-menu-header {
+  padding: 4px 10px 3px 22px;
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 11.5px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-item.is-holding {
+    scale: none;
+  }
+
+  .dt-item,
+  .dt-item .clock-time,
+  .dt-item .name-intro,
+  .dt-backdrop,
+  .dt-toolbar,
+  .dt-remove,
+  .dt-resize,
+  .dt-menu.is-placed {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── Smart Stack cards at medium size (316 × 150) ────────────────────────── */
+
+/* Weather: current conditions on the left, the next hours on the right (macOS medium). */
+.dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .weather-card {
+  flex-direction: row;
+  gap: 14px;
+}
+
+.dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .weather-info-main {
+  flex: 0 0 104px;
+}
+
+.dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .weather-forecast-container {
+  display: flex !important;
+  flex: 1;
+  align-items: flex-end;
+  height: auto !important;
+  min-width: 0;
+  padding: 0 0 2px;
+  opacity: 1 !important;
+}
+
+.dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .forecast-scroll-wrapper {
+  justify-content: space-between;
+  overflow: hidden !important;
+}
+
+.dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .forecast-item {
+  min-width: 0;
+}
+
+.dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .forecast-item:nth-child(n + 6) {
+  display: none;
+}

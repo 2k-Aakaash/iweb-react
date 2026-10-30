@@ -4,12 +4,18 @@ import gsap from 'gsap';
 // Expand / collapse behaviour shared by the Smart Stack cards (currency, gold & silver):
 // the same GSAP timeline values as the Weather card, plus "click outside to collapse".
 //
-//   cardRef      the card element (150×150 collapsed via CSS)
+//   cardRef      the card element (collapsed size from CSS: --widget-w × 150)
 //   panelRefs    sections shown only when expanded (display: flex)
 //   dividerRef   optional hairline between sections (display: block)
 
 export const COLLAPSED_SIZE = 150;
 export const EXPANDED_WIDTH = 320;
+
+/** The card's collapsed width: --widget-w from the desktop item (small or medium size). */
+export function collapsedWidth(card) {
+  const value = parseFloat(getComputedStyle(card).getPropertyValue('--widget-w'));
+  return Number.isFinite(value) && value > 0 ? value : COLLAPSED_SIZE;
+}
 const MOBILE_QUERY = '(max-width: 480px)';
 // The weather card's timeline passes a CSS cubic-bezier() string, which GSAP core can't
 // parse and resolves to its default 'power1.out'; use that so all cards move the same.
@@ -74,7 +80,7 @@ export function useCardExpand({ isExpanded, onCollapse, cardRef, panelRefs, divi
       // The card's height follows its content (min-height 150px) while the sections open,
       // so it grows smoothly and ends at the real height without a jump.
       gsap.set(card, { height: 'auto' });
-      const cardTo = { width: mobile ? '100%' : optionsRef.current.expandedWidth, padding: 16 };
+      const cardTo = { width: mobile ? '100%' : Math.max(optionsRef.current.expandedWidth, collapsedWidth(card)), padding: 16 };
       if (reducedMotion) {
         gsap.set(card, cardTo);
         gsap.set(panels, { height: 'auto', opacity: 1 });
@@ -99,7 +105,7 @@ export function useCardExpand({ isExpanded, onCollapse, cardRef, panelRefs, divi
     gsap.timeline({ defaults: { ease: COLLAPSE_EASE } })
       .to(sections, { height: 0, opacity: 0, duration: 0.22, onComplete: hideSections }, 0)
       .to(card, {
-        width: mobile ? '100%' : COLLAPSED_SIZE,
+        width: mobile ? '100%' : collapsedWidth(card),
         height: COLLAPSED_SIZE,
         padding: 12,
         duration: 0.28,

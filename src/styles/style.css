@@ -810,7 +810,7 @@ textarea {
     inset 0 1.5px 0 rgba(255, 255, 255, 0.32),
     inset 0 -1px 0 rgba(0, 0, 0, 0.15);
   padding: 12px;
-  width: 150px;
+  width: var(--widget-w, 150px);
   height: 150px;
   color: white;
   /* background handled by JS gradient; only hover shadow transitions via CSS */
@@ -2150,7 +2150,7 @@ body {
 
 .dynamic-island-container {
   position: fixed;
-  top: 15px;
+  top: max(15px, calc(var(--menubar-space, 0px) + 8px)); /* under the menu bar when it's shown (menubar.css) */
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
@@ -2166,7 +2166,8 @@ body {
   transition:
     opacity 0.3s var(--island-ease),
     visibility 0.3s var(--island-ease),
-    transform 0.3s var(--island-ease);
+    transform 0.3s var(--island-ease),
+    top 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dynamic-island-container.active {

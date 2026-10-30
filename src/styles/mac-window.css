@@ -1,8 +1,9 @@
-/* Zoomed app windows (green button, src/libs/window/useMacWindow.js): fill the screen with a
-   12px margin. Doubled class to win over the windows' own !important sizing. */
+/* Zoomed app windows (green button, src/libs/window/useMacWindow.js): fill the screen below
+   the menu bar when it's shown (its left end then holds the window's buttons) with a 12px
+   margin. Doubled class to win over the windows' own !important sizing. */
 .window-maximized.window-maximized {
   position: fixed !important;
-  inset: 12px !important;
+  inset: max(12px, calc(var(--menubar-space, 0px) + 8px)) 12px 12px !important;
   width: auto !important;
   height: auto !important;
   min-height: 0 !important;

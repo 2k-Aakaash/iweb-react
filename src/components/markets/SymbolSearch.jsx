@@ -80,7 +80,7 @@ export function SearchResults({ id, containerRef, search, watchSymbols, onOpen, 
     if (loading) message = 'Searching…';
     else if (status === 'error') message = error;
     else if (query.length < 2) message = 'Keep typing to search NSE and BSE.';
-    else message = `No matches for “${query}”. Try a company name or NSE symbol.`;
+    else message = `No NSE or BSE listings match “${query}”. Try a company name or NSE symbol.`;
   }
   const countText = loading
     ? ''

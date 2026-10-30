@@ -90,7 +90,8 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   // here), so `mounted` only drives whether it is displayed.
   const libraryOverlayRef = useRef(null);
   const libraryWindowRef = useRef(null);
-  const libraryWindow = useMacWindow({ app: 'music', open: showModal, setOpen: setShowModal, windowRef: libraryWindowRef, overlayRef: libraryOverlayRef });
+  const menusRef = useRef(null); // menu-bar menus, set below once the handlers exist
+  const libraryWindow = useMacWindow({ app: 'music', open: showModal, setOpen: setShowModal, windowRef: libraryWindowRef, overlayRef: libraryOverlayRef, menus: menusRef });
   const [islandState, setIslandState] = useState('collapsed'); // 'collapsed', 'hovered', 'expanded'
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -1411,6 +1412,35 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   };
 
   // Dynamic Island toggles
+  // Menu bar: File (playlists, library), View (back / forward), Controls (playback).
+  useEffect(() => {
+    const repeat = (mode, label) => ({ label, checked: isRepeat === mode, onSelect: () => handleUpdateSetting('isRepeat', mode) });
+    menusRef.current = () => ({
+      File: [
+        { label: 'New Playlist', onSelect: handleCreatePlaylist },
+        { type: 'separator' },
+        { label: 'Choose Music Folder…', onSelect: handleSelectFolder },
+        { label: 'Rescan Library', disabled: library.length === 0, onSelect: handleRescan },
+      ],
+      View: [
+        { label: 'Back', disabled: historyIndex <= 0, onSelect: handleGoBack },
+        { label: 'Forward', disabled: historyIndex >= history.length - 1, onSelect: handleGoForward },
+      ],
+      Controls: [
+        { label: isPlaying ? 'Pause' : 'Play', disabled: library.length === 0, onSelect: handlePlayPause },
+        { label: 'Next', disabled: library.length === 0, onSelect: handleNext },
+        { label: 'Previous', disabled: library.length === 0, onSelect: handlePrev },
+        { type: 'separator' },
+        { label: 'Shuffle', checked: isShuffle, onSelect: () => handleUpdateSetting('isShuffle', !isShuffle) },
+        repeat('off', 'Repeat Off'),
+        repeat('all', 'Repeat All'),
+        repeat('one', 'Repeat One'),
+        { type: 'separator' },
+        { label: 'Mute', checked: isMuted, onSelect: handleToggleMute },
+      ],
+    });
+  });
+
   const handleIslandClick = (e) => {
     // If user clicked inside control rows, ignore card toggle
     if (e.target.closest('.expanded-control-btn') || e.target.closest('.expanded-slider')) {

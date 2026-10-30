@@ -1,0 +1,319 @@
+/* The macOS 26 menu bar (src/components/menubar/MenuBar.jsx). Transparent over the wallpaper
+   like macOS 26, with a soft shade behind it so the text stays readable on light photos.
+   --menubar-space is the room it takes right now (set by MenuBar.jsx: --menubar-h, or 0 while
+   it auto-hides); the Dynamic Island, zoomed windows and the update notice keep clear of it. */
+
+:root {
+  --menubar-h: 32px;
+  --menubar-space: 0px;
+}
+
+.mb {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100500; /* over app windows (≈100000), under the genie layer */
+  display: flex;
+  align-items: center;
+  height: var(--menubar-h);
+  padding: 0 10px 0 8px;
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  user-select: none;
+  -webkit-user-select: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.12) 70%, rgba(0, 0, 0, 0));
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.2s ease;
+}
+
+/* Auto-hide (Settings → Appearance): off screen until the pointer reaches the top edge, then
+   over the page on frosted glass, like a revealed macOS menu bar. */
+.mb.is-autohide {
+  transform: translateY(-100%);
+  background: rgba(28, 28, 30, 0.62);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.mb.is-autohide.is-revealed,
+.mb.is-autohide.is-menu-open {
+  transform: none;
+}
+
+.mb-hotzone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100501;
+  height: 3px;
+}
+
+.mb button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font: inherit;
+  color: inherit;
+  text-shadow: inherit;
+}
+
+.mb-left {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mb-title {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.mb-title:hover,
+.mb-title.is-open {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mb-title:focus-visible,
+.mb-status-btn:focus-visible,
+.mb-light:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 1px;
+}
+
+.mb-logo {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.mb-logo-img {
+  width: 17px;
+  height: 17px;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+
+.mb-app {
+  font-family: 'sf_pro_displaybold', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ---- Status area ---- */
+.mb-right {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+}
+
+.mb-status {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
+}
+
+.mb-status-btn {
+  cursor: default;
+}
+
+.mb-status-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mb-clock {
+  display: inline-flex;
+  gap: 7px;
+  padding: 0 4px 0 7px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Menus (the same look as the desktop's right-click menu) ---- */
+.mb-menu {
+  position: absolute;
+  top: calc(var(--menubar-h) - 2px);
+  min-width: 230px;
+  max-height: calc(100vh - var(--menubar-h) - 16px);
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(40, 40, 44, 0.82);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.4);
+  text-shadow: none;
+  animation: mb-menu-in 0.1s ease-out;
+}
+
+@keyframes mb-menu-in {
+  from { opacity: 0; }
+}
+
+.mb-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 24px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.mb-menu-item.is-active {
+  background: #0a84ff;
+}
+
+.mb-menu-item[aria-disabled='true'] {
+  color: rgba(235, 235, 245, 0.3);
+}
+
+.mb-menu-check {
+  width: 18px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 12px;
+}
+
+.mb-menu-label {
+  flex: 1;
+}
+
+.mb-menu-shortcut {
+  margin-left: 28px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.mb-menu-item.is-active .mb-menu-shortcut {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.mb-menu-item[aria-disabled='true'] .mb-menu-shortcut {
+  color: rgba(235, 235, 245, 0.22);
+}
+
+.mb-menu-sep {
+  height: 1px;
+  margin: 5px 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---- A zoomed window's buttons, moved into the bar ---- */
+.mb-lights {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 0 10px 0 6px;
+  animation: mb-menu-in 0.2s ease-out;
+}
+
+.mb-light {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 12px 12px;
+  cursor: default;
+}
+
+.mb-light-close { background-color: #ff5f57; }
+.mb-light-minimize { background-color: #febc2e; }
+.mb-light-zoom { background-color: #28c840; }
+
+/* Symbols on all three while the pointer is over the group, as in a window. */
+.mb-lights:hover .mb-light-close {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.9 3.9l4.2 4.2M8.1 3.9l-4.2 4.2' stroke='%234d0000' stroke-width='1.25' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.mb-lights:hover .mb-light-minimize {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.3 6h5.4' stroke='%23995700' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.mb-lights:hover .mb-light-zoom {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M5.5 5.5H2.9l2.6-2.6zM6.5 6.5h2.6L6.5 9.1z' fill='%23006500'/%3E%3C/svg%3E");
+}
+
+/* …and hidden in the window meanwhile. */
+.lights-in-menubar :is(.window-controls, .settings-window-controls, .mk-window-controls, .news-lights) {
+  visibility: hidden;
+}
+
+@media (max-width: 720px) {
+  .mb-clock > span:first-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mb {
+    transition: none;
+  }
+
+  .mb-menu,
+  .mb-lights {
+    animation: none;
+  }
+}
+
+/* Settings → Appearance → Menu Bar (SettingsModal.jsx). */
+.settings-select {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 26px 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12'%3E%3Cpath d='M2 4.5 5 1.5l3 3M2 7.5l3 3 3-3' fill='none' stroke='white' stroke-opacity='0.75' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center / 9px 11px;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.settings-select:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 1px;
+}
+
+.settings-select option {
+  background: #2c2c2e;
+  color: #fff;
+}
+
+.settings-row-hint {
+  padding: 0 0 10px;
+  font-size: 11.5px;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.5);
+}

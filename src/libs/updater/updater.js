@@ -13,7 +13,8 @@
 import JSZip from 'jszip';
 import { openIwebDB, reqToPromise, STORES } from '../wallpaper/db';
 
-const REPO = import.meta.env.VITE_IWEB_RELEASES_REPO || '2k-Aakaash/iWeb';
+export const RELEASES_REPO = import.meta.env.VITE_IWEB_RELEASES_REPO || '2k-Aakaash/iWeb';
+const REPO = RELEASES_REPO;
 const LATEST_RELEASE_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const ZIP_ASSET = 'iWeb.Extension.zip';
 const SHA_ASSET = 'iWeb.Extension.zip.sha256';

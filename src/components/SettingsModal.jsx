@@ -5,11 +5,13 @@ import WallpaperSettings from './WallpaperSettings';
 import { useMacWindow } from '../libs/window/useMacWindow';
 import GlassSurface from './glass/GlassSurface';
 import { setGlassMode, useGlassMode } from './glass/glassMode';
+import { MENUBAR_MODES, setMenubarMode, useMenubarMode } from '../libs/menubar/menubarPrefs';
 import ConfirmDialog from './wallpaper/ConfirmDialog';
 import SettingsTabIcon from './settings/SettingsTabIcon';
 import AboutPane from './settings/AboutPane';
 import ProfileCard from './settings/ProfileCard';
 import DataControlsPane from './settings/DataControlsPane';
+import WidgetsPane from './settings/WidgetsPane';
 import { deleteCustomFonts, listCustomFonts } from '../libs/fonts/customFonts';
 
 export default function SettingsModal({
@@ -41,6 +43,7 @@ export default function SettingsModal({
   const overlayRef = useRef(null);
   const windowRef = useRef(null);
   const glassMode = useGlassMode();
+  const menubarMode = useMenubarMode();
 
   // Escape closes Settings, like the other macOS-style windows.
   useEffect(() => {
@@ -322,9 +325,9 @@ export default function SettingsModal({
   const setSettingsOpen = useCallback((value) => {
     if (!value) onClose();
   }, [onClose]);
-  const win = useMacWindow({ app: 'settings', open: isOpen, setOpen: setSettingsOpen, windowRef, overlayRef });
+  const menusRef = useRef(null); // menu-bar menus, set below once the tabs exist
+  const win = useMacWindow({ app: 'settings', open: isOpen, setOpen: setSettingsOpen, windowRef, overlayRef, menus: menusRef });
   const mounted = win.mounted;
-  if (!mounted) return null;
 
   // Filter tabs for search (icons: SettingsTabIcon)
   // `group`: the sidebar leaves a gap between groups, as System Settings does.
@@ -332,11 +335,27 @@ export default function SettingsModal({
     { id: 'general', name: 'General', group: 1 },
     { id: 'appearance', name: 'Appearance', group: 1 },
     { id: 'wallpaper', name: 'Wallpaper', group: 1 },
+    { id: 'widgets', name: 'Widgets', group: 1 },
     { id: 'music', name: 'Music', group: 2 },
     { id: 'bookmarks', name: 'Bookmarks', group: 2 },
     { id: 'data_controls', name: 'Data Controls', group: 3 },
     { id: 'about', name: 'About', group: 3 }
   ];
+
+  // Menu bar: View lists the panes, like System Settings.
+  useEffect(() => {
+    menusRef.current = () => ({
+      View: [
+        { label: 'Back', disabled: nav.index === 0, onSelect: () => stepHistory(-1) },
+        { label: 'Forward', disabled: nav.index >= nav.stack.length - 1, onSelect: () => stepHistory(1) },
+        { type: 'separator' },
+        ...tabs.map((tab) => ({ label: tab.name, checked: activeTab === tab.id, onSelect: () => goToTab(tab.id) })),
+      ],
+    });
+  });
+
+  if (!mounted) return null;
+
 
   const filteredTabs = tabs.filter(tab => 
     tab.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -651,6 +670,28 @@ export default function SettingsModal({
                     </div>
                   </div>
                 </div>
+
+                <div className="settings-group-card-title">Menu Bar</div>
+                <div className="settings-group-card">
+                  <div className="settings-row">
+                    <label className="settings-label" htmlFor="menubar-autohide">Automatically hide and show the menu bar</label>
+                    <select
+                      id="menubar-autohide"
+                      className="settings-select"
+                      value={menubarMode}
+                      onChange={(e) => setMenubarMode(e.target.value)}
+                    >
+                      {MENUBAR_MODES.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="settings-row-hint">
+                    {menubarMode === 'never'
+                      ? 'The menu bar always stays at the top of the screen.'
+                      : 'While hidden, move the pointer to the top edge of the screen to show it.'}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -769,6 +810,8 @@ export default function SettingsModal({
             )}
 
             {/* 6. DATA CONTROLS TAB */}
+            {activeTab === 'widgets' && <WidgetsPane onClose={onClose} />}
+
             {activeTab === 'data_controls' && <DataControlsPane onImportFile={handleImportFileChange} />}
 
             {/* 7. ABOUT TAB */}

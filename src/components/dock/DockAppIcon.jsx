@@ -65,6 +65,25 @@ const ICONS = {
     </Tile>
   ),
 
+  // Markets: a green line chart on black.
+  markets: (
+    <Tile id="markets" from="#2c2c30" to="#0b0b0d">
+      <path d="M10 46l12-10 9 6 13-16 10 6" fill="none" stroke="#30d158" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 52h44" stroke="#fff" strokeOpacity="0.25" strokeWidth="2" strokeLinecap="round" />
+    </Tile>
+  ),
+
+  // News: a folded newspaper on red.
+  news: (
+    <Tile id="news" from="#ff6267" to="#e0243a">
+      <g fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 17h28v28a4 4 0 0 0 4 4H17a4 4 0 0 1-4-4z" />
+        <path d="M41 25h8v20a4 4 0 0 1-4 4" />
+        <path d="M20 26h14M20 33h14M20 40h9" />
+      </g>
+    </Tile>
+  ),
+
   // Settings: a machined gear on graphite.
   settings: (
     <Tile id="settings" from="#c3c7ce" to="#6b7079">
@@ -83,7 +102,7 @@ const ICONS = {
 
 // Each Dock item's macOS 26 icon (MacAppIcon); the drawing above shows while it loads or if it
 // can't (offline).
-const MAC_ICON = { add: 'apps', bg: 'wallpaper', notes: 'notes', music: 'music', settings: 'settings' };
+const MAC_ICON = { add: 'apps', bg: 'wallpaper', notes: 'notes', music: 'music', settings: 'settings', markets: 'stocks' };
 
 export default function DockAppIcon({ name, className }) {
   return <MacAppIcon name={MAC_ICON[name]} className={className} fallback={ICONS[name]} />;

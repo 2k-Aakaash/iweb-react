@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import { collapsedWidth } from './widgets/shared/useCardExpand';
 import GlassSurface from './glass/GlassSurface';
 
 export default function Weather({ onExpandedChange }) {
@@ -203,7 +204,7 @@ export default function Weather({ onExpandedChange }) {
     const condText = condTextRef.current;
     const hlText = hlTextRef.current;
 
-    const expandedWidth = window.innerWidth <= 480 ? '100%' : 320;
+    const expandedWidth = window.innerWidth <= 480 ? '100%' : Math.max(320, collapsedWidth(container));
     const springEase = 'cubic-bezier(0.32, 0.72, 0, 1)';
 
     // Kill existing animations on these elements before starting new ones
@@ -236,7 +237,14 @@ export default function Weather({ onExpandedChange }) {
             gsap.set([search, divider, forecast], { display: 'none' });
           }
         }, 0)
-        .to(container, { width: 150, height: 150, padding: 12, duration: 0.28 }, 0)
+        .to(container, {
+          width: collapsedWidth(container),
+          height: 150,
+          padding: 12,
+          duration: 0.28,
+          // Hand the size back to CSS, so a later widget size change (Edit Widgets) applies.
+          onComplete: () => gsap.set(container, { clearProps: 'width,height,padding' }),
+        }, 0)
         .to(locText, { fontSize: 13, duration: 0.22 }, 0)
         .to(tempText, { fontSize: 32, duration: 0.22 }, 0)
         .to(iconImg, { width: 24, height: 24, marginRight: 0, duration: 0.22 }, 0)
@@ -249,6 +257,23 @@ export default function Weather({ onExpandedChange }) {
   useEffect(() => {
     onExpandedChange?.(isExpanded);
   }, [isExpanded, onExpandedChange]);
+
+  // Like the other cards (useCardExpand): a click anywhere outside, or Esc, collapses it.
+  useEffect(() => {
+    if (!isExpanded) return undefined;
+    const onPointerDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setIsExpanded(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) setIsExpanded(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isExpanded]);
 
   // Translate vertical wheel movements into horizontal scrolling in forecast items
   useEffect(() => {
@@ -345,7 +370,7 @@ export default function Weather({ onExpandedChange }) {
 
   return (
     <div 
-      className="weather-container glass-host" 
+      className={`weather-container glass-host${isExpanded ? ' is-expanded' : ''}`}
       ref={containerRef}
       style={{ '--glass-tint': backgroundGradient }}
       onClick={toggleExpand}

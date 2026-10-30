@@ -103,7 +103,8 @@ export default function Notes() {
   const windowRef = useRef(null);
   // macOS window: genies out of the Dock's Notes icon; red closes, yellow minimizes into the
   // icon, green zooms to full size.
-  const win = useMacWindow({ app: 'notes', open: showModal, setOpen: setShowModal, windowRef, overlayRef });
+  const menusRef = useRef(null); // menu-bar menus, set below once the handlers exist
+  const win = useMacWindow({ app: 'notes', open: showModal, setOpen: setShowModal, windowRef, overlayRef, menus: menusRef });
   const mounted = win.mounted;
   const [searchQuery, setSearchQuery] = useState('');
   // Markdown: write the source, or preview it rendered. Remembered between sessions.
@@ -421,6 +422,20 @@ export default function Notes() {
   };
 
   // Ticking a checklist box in the Preview updates the Markdown source.
+  // Menu bar: File → New / Delete Note, View → Write / Preview.
+  useEffect(() => {
+    menusRef.current = () => ({
+      File: [
+        { label: 'New Note', disabled: !db, onSelect: handleAddNewNote },
+        { label: 'Delete Note…', disabled: activeNoteId === null, onSelect: () => handleDeleteNote() },
+      ],
+      View: [
+        { label: 'Write', checked: mode === 'write', disabled: activeNoteId === null, onSelect: () => setMode('write') },
+        { label: 'Preview', shortcut: 'Ctrl Shift P', checked: mode === 'preview', disabled: activeNoteId === null, onSelect: () => setMode('preview') },
+      ],
+    });
+  });
+
   const handlePreviewClick = (e) => {
     const box = e.target.closest?.('input[data-task]');
     if (!box) return;

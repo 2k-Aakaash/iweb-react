@@ -439,14 +439,29 @@ const LOCAL_SEARCH = [
   { symbol: '^INDIAVIX', name: 'INDIA VIX', exchange: 'NSE', type: 'INDEX', keywords: keywordsOf('india vix volatility ^indiavix') },
 ];
 
+// Names Yahoo's search doesn't find: renamed companies (Zomato → Eternal), common short names
+// (HUL, RIL, BEL, HAL, Policybazaar) and names with "&" (M&M, L&T). Matched like the local
+// entries, from two typed characters on.
+const SEARCH_ALIASES = [
+  { symbol: 'ETERNAL.NS', name: 'Eternal Limited', words: 'zomato eternal blinkit' },
+  { symbol: 'M&M.NS', name: 'Mahindra & Mahindra Limited', words: 'm&m mahindra' },
+  { symbol: 'LT.NS', name: 'Larsen & Toubro Limited', words: 'l&t lnt larsen toubro' },
+  { symbol: 'HINDUNILVR.NS', name: 'Hindustan Unilever Limited', words: 'hul hindustan unilever' },
+  { symbol: 'RELIANCE.NS', name: 'Reliance Industries Limited', words: 'ril reliance' },
+  { symbol: 'POLICYBZR.NS', name: 'PB Fintech Limited (Policybazaar)', words: 'policybazaar pb fintech' },
+  { symbol: 'BEL.NS', name: 'Bharat Electronics Limited', words: 'bel bharat electronics' },
+  { symbol: 'HAL.NS', name: 'Hindustan Aeronautics Limited', words: 'hal hindustan aeronautics' },
+].map(({ words, ...item }) => ({ ...item, exchange: 'NSE', type: 'EQUITY', keywords: keywordsOf(words) }));
+
 const isIndianListing = (item) => /\.(NS|BO)$/.test(item.symbol) || item.exchange === 'NSE' || item.exchange === 'BSE';
 
-/** Symbol search: local matches (indices, metals) first, then Indian listings, then others. */
+/** Symbol search: local matches (indices, metals, name aliases) first, then NSE/BSE listings. */
 export async function searchSymbols(query, { signal, now = Date.now() } = {}) {
   const q = (query || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!q) return [];
   const queryWords = q.split(' ');
-  const local = LOCAL_SEARCH.filter((item) => matchesKeywords(item.keywords, queryWords))
+  const aliases = q.length >= 2 ? SEARCH_ALIASES : [];
+  const local = [...LOCAL_SEARCH, ...aliases].filter((item) => matchesKeywords(item.keywords, queryWords))
     .map((item) => ({ symbol: item.symbol, name: item.name, exchange: item.exchange, type: item.type }));
 
   const key = `${CACHE_PREFIX}search:${q}`;
@@ -513,6 +528,11 @@ export function removeFromWatchlist(symbol) {
 /** Opens the Markets app (App listens for this event), optionally on a symbol. */
 export function openMarkets(symbol) {
   emit(OPEN_EVENT, { symbol: symbol || null });
+}
+
+/** Brings the Markets app back as it was left (its Dock icon, after minimizing). */
+export function restoreMarkets() {
+  emit(OPEN_EVENT, { restore: true });
 }
 
 // ---------------------------------------------------------------------------

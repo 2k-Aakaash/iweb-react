@@ -4,7 +4,7 @@
 // once the database has been upgraded.
 
 export const DB_NAME = 'iWebDB';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 export const STORES = {
   LOCAL: 'background_images',   // existing: { id (autoInc), blob, + v3 optional: thumb, name, type, size, hash, createdAt }
@@ -13,6 +13,8 @@ export const STORES = {
   META: 'wallpaper_meta',       // v3: { key, ... } — e.g. key 'unsplash_quota'
   FAVICONS: 'favicons',         // v4: { domain, blob, fetchedAt } — Dock bookmark icons
   PROFILE: 'profile',           // v5: { key, ... } — key 'avatar': { blob, updatedAt }
+  NEWS_ARTICLES: 'news_articles', // v6: normalized news articles, keyed by id (src/libs/news)
+  NEWS_FEEDS: 'news_feeds',     // v6: { key, kind, edition, topic, query, fetchedAt, articleIds }
 };
 
 // Deterministic, idempotent upgrade: only creates what is missing, never deletes data.
@@ -43,6 +45,13 @@ export function upgradeIwebDB(db, tx) {
 
   if (!db.objectStoreNames.contains(STORES.PROFILE)) {
     db.createObjectStore(STORES.PROFILE, { keyPath: 'key' });
+  }
+
+  if (!db.objectStoreNames.contains(STORES.NEWS_ARTICLES)) {
+    db.createObjectStore(STORES.NEWS_ARTICLES, { keyPath: 'id' });
+  }
+  if (!db.objectStoreNames.contains(STORES.NEWS_FEEDS)) {
+    db.createObjectStore(STORES.NEWS_FEEDS, { keyPath: 'key' });
   }
 }
 

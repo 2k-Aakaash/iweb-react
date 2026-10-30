@@ -84,7 +84,12 @@ export function useGenie(open, { target, windowRef, overlayRef, closeEffectRef }
   // leave strips behind if the component unmounts mid-run.
   useEffect(() => {
     if (!reduced) warmBackdrop();
-    return () => genieRef.current?.destroy();
+    return () => {
+      // Forget it too: a destroyed controller ignores play(), and reusing it (after React's
+      // dev double-mount of a window that mounts open, e.g. Markets) left the window hidden.
+      genieRef.current?.destroy();
+      genieRef.current = null;
+    };
   }, [reduced]);
 
   return mounted;

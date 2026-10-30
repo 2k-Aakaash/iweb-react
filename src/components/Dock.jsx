@@ -4,6 +4,8 @@ import GlassSurface from "./glass/GlassSurface";
 import DockAppIcon from "./dock/DockAppIcon";
 import { WINDOW_EVENT } from "../libs/window/useMacWindow";
 import { useFavicons } from "../libs/favicons/useFavicons";
+import { restoreMarkets } from "../libs/markets/marketService";
+import { openNews } from "../libs/news/newsEvents";
 
 const defaultFavicon = "https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100";
 const maxAdditionalSize = 5;
@@ -396,6 +398,33 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               {label("settings", "Settings")}
             </button>
           </li>
+          {/* ── Markets: in the Dock only while it runs (open or minimized), like a macOS app
+               that isn't kept in the Dock. It minimizes into this icon; clicking restores it. */}
+          {runningProps("markets")["data-running"] && (
+            <li className={`${styles.app} ${styles.action} ${styles.transient}`} data-action="markets" {...runningProps("markets")} onMouseMove={handleAppHover} {...labelProps("markets")}>
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={restoreMarkets}
+              >
+                <DockAppIcon name="markets" className={styles.appIcon} />
+                {label("markets", "Markets")}
+              </button>
+            </li>
+          )}
+          {/* ── News: likewise, while it runs. ── */}
+          {runningProps("news")["data-running"] && (
+            <li className={`${styles.app} ${styles.action} ${styles.transient}`} data-action="news" {...runningProps("news")} onMouseMove={handleAppHover} {...labelProps("news")}>
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={openNews}
+              >
+                <DockAppIcon name="news" className={styles.appIcon} />
+                {label("news", "News")}
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
 

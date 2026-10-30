@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react'
 import { proxyUnsplash } from './api/_unsplashProxy.js'
 import { proxyMarket } from './api/_marketProxy.js'
 import { proxyFavicon } from './api/_faviconProxy.js'
+import { proxyNews } from './api/_newsProxy.js'
 
-// Serves /api/unsplash, /api/market and /api/favicon during `npm run dev` with the same logic as the
+// Serves /api/unsplash, /api/market, /api/favicon and /api/news during `npm run dev` with the same logic as the
 // Vercel functions, reading the server-only UNSPLASH_ACCESS_KEY from .env.
 function apiDevProxy(accessKey) {
   return {
@@ -23,6 +24,11 @@ function apiDevProxy(accessKey) {
       server.middlewares.use('/api/favicon', async (req, res) => {
         const query = new URL(req.url, 'http://localhost').searchParams
         const result = await proxyFavicon(query)
+        res.writeHead(result.status, result.headers).end(result.body)
+      })
+      server.middlewares.use('/api/news', async (req, res) => {
+        const query = new URL(req.url, 'http://localhost').searchParams
+        const result = await proxyNews(query)
         res.writeHead(result.status, result.headers).end(result.body)
       })
     },
