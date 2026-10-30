@@ -42,7 +42,7 @@ describe('clock style', () => {
     expect(getClockStyle()).toBe('vibrant');
     expect(await getStoredClockStyle()).toBe('vibrant');
     // The localStorage copy draws the right clock on the next page's first frame.
-    expect(localStorage.getItem('iweb:clockStyle')).toBe('vibrant');
+    expect(JSON.parse(localStorage.getItem('iweb:clockStyle'))).toBe('vibrant');
     await setClockStyle('neon'); // ignored
     expect(await getStoredClockStyle()).toBe('vibrant');
   });

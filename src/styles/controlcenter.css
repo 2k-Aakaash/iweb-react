@@ -1,0 +1,808 @@
+/* Control Center (src/components/controlcenter), after macOS 26's: glass tiles floating under
+   the menu bar's top-right corner on a 4-column grid, white when switched on. Also the timer
+   bubble beside the Dynamic Island and what Focus, Widgets, Display and Night Shift do. */
+
+.cc {
+  --cc-unit: 64px;
+  --cc-gap: 12px;
+  --cc-blue: #0a84ff;
+  position: fixed;
+  top: calc(var(--menubar-h, 32px) + 8px);
+  right: 12px;
+  z-index: 100600; /* over the menu bar (100500) and app windows */
+  width: calc(var(--cc-unit) * 4 + var(--cc-gap) * 3);
+  max-height: calc(100vh - var(--menubar-h, 32px) - 20px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px;
+  margin: -2px;
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  scrollbar-width: none;
+}
+
+.cc button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+  cursor: default;
+}
+
+.cc button:focus-visible,
+.cc input:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.95);
+  outline-offset: 2px;
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────────── */
+
+.cc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, var(--cc-unit));
+  grid-auto-rows: var(--cc-unit);
+  grid-auto-flow: row dense;
+  gap: var(--cc-gap);
+}
+
+.cc-cell {
+  position: relative;
+  animation: cc-in 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-delay: calc(var(--i, 0) * 14ms);
+}
+
+.cc-medium { grid-column: span 2; }
+.cc-large { grid-column: span 2; grid-row: span 2; }
+.cc-wide { grid-column: span 4; }
+
+@keyframes cc-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.94); }
+}
+
+.cc-cell-inner {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Tiles ────────────────────────────────────────────────────────────── */
+
+.cc-tile {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.cc-tile .glass-surface {
+  border-radius: inherit;
+}
+
+/* Round buttons. */
+.cc-round {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition: transform 0.18s ease, background-color 0.2s ease;
+}
+
+.cc-round:active { transform: scale(0.94); }
+.cc-round:disabled { opacity: 0.45; }
+
+.cc-round.is-on {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--cc-blue);
+  text-shadow: none;
+}
+
+.cc-round-glyph {
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+}
+
+.cc-round.is-on .cc-round-glyph { filter: none; }
+
+.cc-round-time {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.cc-round-time.is-paused { opacity: 0.55; }
+
+/* Pills: a round icon and a label. */
+.cc-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 11px;
+  border-radius: 32px;
+}
+
+.cc-pill-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.cc-pill-icon.is-on {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: var(--cc-blue);
+  text-shadow: none;
+}
+
+.cc-pill-text {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  justify-content: center;
+  text-align: left;
+}
+
+.cc-pill-label {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 13.5px;
+}
+
+.cc-pill-detail {
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.cc-pill-chevron {
+  position: absolute;
+  right: -4px;
+  opacity: 0.6;
+}
+
+/* Now Playing. */
+.cc-now-playing {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 12px;
+  border-radius: 28px;
+}
+
+.cc-np-art {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.cc-np-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cc-np-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-top: auto !important;
+  text-align: left;
+}
+
+.cc-np-title,
+.cc-np-artist {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cc-np-title {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 13.5px;
+}
+
+.cc-np-artist {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.cc-np-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+
+.cc-np-controls button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 30px;
+  border-radius: 8px !important;
+  transition: transform 0.15s ease, opacity 0.2s ease;
+}
+
+.cc-np-controls button:active { transform: scale(0.88); }
+.cc-np-controls button:disabled { opacity: 0.4; }
+
+/* Full-width sliders: Display, Sound. */
+.cc-slider-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 26px;
+}
+
+.cc-wide-title {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 13.5px;
+}
+
+.cc-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.cc-slider-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  opacity: 0.9;
+}
+
+.cc-slider {
+  --cc-fill: 50%;
+  flex: 1;
+  height: 12px;
+  margin: 0;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.95) var(--cc-fill), rgba(255, 255, 255, 0.2) var(--cc-fill));
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.15);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: default;
+}
+
+.cc-slider::-webkit-slider-thumb {
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.cc-slider::-moz-range-thumb {
+  width: 4px;
+  height: 12px;
+  border: 0;
+  background: transparent;
+}
+
+.cc-output-btn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* ── Edit Controls ────────────────────────────────────────────────────── */
+
+.cc-edit-btn {
+  display: block;
+  margin: 16px auto 4px !important;
+  padding: 6px 16px !important;
+  border-radius: 999px !important;
+  background: rgba(30, 30, 34, 0.55) !important;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22), 0 4px 14px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-size: 13px;
+  color: #6cb4ff !important;
+}
+
+.cc.is-editing .cc-cell {
+  animation: cc-wiggle 0.32s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i, 0) * -70ms);
+  cursor: grab;
+}
+
+.cc.is-editing .cc-cell.is-dragging { opacity: 0.35; }
+
+@keyframes cc-wiggle {
+  from { transform: rotate(-0.8deg); }
+  to { transform: rotate(0.8deg); }
+}
+
+.cc-remove {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50% !important;
+  background: rgba(70, 70, 76, 0.96) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 0 0 0.5px rgba(255, 255, 255, 0.3);
+}
+
+.cc-more {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(30, 30, 34, 0.6);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+
+.cc-more h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: normal;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.cc-more ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cc-more-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.cc-more-plus {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #30d158;
+}
+
+/* ── Views (Wi-Fi, Sound, Calculator, Timer) ─────────────────────────── */
+
+.cc-view {
+  position: relative;
+  padding: 12px 14px 14px;
+  border-radius: 26px;
+  animation: cc-in 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.cc-view-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cc-view-head h2 {
+  margin: 0;
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 15px;
+}
+
+.cc-view-back {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+.cc-view-subtitle {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: normal;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.cc-note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.cc-note-warn { color: #ffd60a; }
+
+.cc-text-btn {
+  padding: 6px 14px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  font-size: 13px;
+}
+
+.cc-text-btn.is-primary {
+  background: var(--cc-blue) !important;
+}
+
+.cc-view > .cc-text-btn { margin-top: 8px !important; }
+
+/* Wi-Fi. */
+.cc-net-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cc-net-hero div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-net-hero strong {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: normal;
+}
+
+.cc-net-hero span:not(.cc-net-icon) {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.cc-net-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.cc-net-icon.is-on {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--cc-blue);
+}
+
+.cc-rows {
+  margin: 14px 0 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+}
+
+.cc-row + .cc-row { border-top: 0.5px solid rgba(255, 255, 255, 0.12); }
+
+.cc-row dt { color: rgba(255, 255, 255, 0.68); }
+
+.cc-row dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* Sound output. */
+.cc-view-slider { margin-bottom: 2px; }
+
+.cc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cc-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px !important;
+  border-radius: 9px !important;
+  text-align: left;
+}
+
+.cc-list-item:hover { background: rgba(255, 255, 255, 0.1) !important; }
+
+.cc-list-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.cc-list-item.is-active .cc-list-icon {
+  background: var(--cc-blue);
+}
+
+.cc-list-label {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Calculator. */
+.cc-calc-display {
+  display: block;
+  overflow: hidden;
+  padding: 4px 6px 10px;
+  font-family: 'sf_pro_displaylight', 'sf_pro_displaymedium', -apple-system, sans-serif;
+  font-size: 44px;
+  line-height: 1.1;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-calc-display.is-small { font-size: 30px; }
+
+.cc-calc-keys {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.cc-calc-key {
+  height: 48px;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  font-size: 19px;
+  transition: filter 0.12s ease, background-color 0.15s ease;
+}
+
+.cc-calc-key:active { filter: brightness(1.35); }
+.cc-calc-key.is-fn { background: rgba(255, 255, 255, 0.36) !important; }
+.cc-calc-key.is-op { background: #ff9f0a !important; font-size: 22px; }
+
+.cc-calc-key.is-op.is-active {
+  background: #fff !important;
+  color: #ff9f0a;
+  text-shadow: none;
+}
+
+.cc-calc-key.is-zero {
+  grid-column: span 2;
+  padding-left: 22px !important;
+  text-align: left;
+}
+
+/* Timer. */
+.cc-timer-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 4px auto 12px;
+}
+
+.cc-timer-face svg { transform: rotate(-90deg); }
+
+.cc-timer-track,
+.cc-timer-ring {
+  fill: none;
+  stroke-width: 7;
+}
+
+.cc-timer-track { stroke: rgba(255, 255, 255, 0.16); }
+
+.cc-timer-ring {
+  stroke: #ff9f0a;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.cc-timer-left {
+  position: absolute;
+  font-family: 'sf_pro_displaymedium', -apple-system, sans-serif;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-timer-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.cc-timer-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.cc-chip {
+  height: 34px;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  font-size: 12.5px;
+}
+
+.cc-chip:hover { background: rgba(255, 255, 255, 0.24) !important; }
+
+.cc-timer-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cc-timer-custom label {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.cc-timer-custom input {
+  width: 64px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+}
+
+.cc-timer-custom .cc-text-btn { margin-left: auto !important; }
+
+/* ── The timer beside the Dynamic Island ─────────────────────────────── */
+
+.cc-timer-bubble {
+  position: fixed;
+  top: max(15px, calc(var(--menubar-space, 0px) + 8px));
+  left: 50%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 0;
+  padding: 0 14px 0 4px;
+  border: 0;
+  border-radius: 999px;
+  color: #ff9f0a;
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  transform: translateX(-50%);
+  animation: cc-bubble-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.cc-timer-bubble.is-beside {
+  min-width: 0;
+  padding: 0 12px 0 4px;
+  transform: none;
+}
+
+@keyframes cc-bubble-in {
+  from { opacity: 0; scale: 0.6; }
+}
+
+.cc-timer-bubble.is-paused { color: rgba(255, 159, 10, 0.6); }
+
+.cc-timer-bubble.is-done {
+  animation: cc-bubble-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both, cc-bubble-pulse 1.2s ease-in-out 0.45s infinite;
+}
+
+@keyframes cc-bubble-pulse {
+  50% { scale: 1.06; }
+}
+
+.cc-bubble-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+
+.cc-bubble-ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.cc-bubble-track,
+.cc-bubble-fill {
+  fill: none;
+  stroke-width: 3.2;
+}
+
+.cc-bubble-track { stroke: rgba(255, 159, 10, 0.25); }
+
+.cc-bubble-fill {
+  stroke: #ff9f0a;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.cc-bubble-time.is-compact { font-size: 13px; }
+
+/* ── What the switches do to the page ────────────────────────────────── */
+
+/* Focus: only the clock, the search bar and the Dock (not while arranging them). */
+html.cc-focus:not(.desktop-editing) .dt-item:not([data-desktop-item='clock'], [data-desktop-item='search']),
+html.cc-widgets-hidden:not(.desktop-editing) .dt-item-widget {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+html.cc-focus .iu-notice { display: none !important; }
+
+/* Display: a veil over the wallpaper, under every piece of content (which sits at z ≥ -1),
+   above the wallpaper and its crossfade layer. */
+.cc-wallpaper-veil {
+  position: fixed;
+  inset: 0;
+  z-index: -2147483646;
+  background: #000;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* Night Shift: warmer colours over everything, never in the way of the pointer. */
+.cc-night-shift {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  background: rgb(255, 170, 90);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.cc-night-shift.is-on { opacity: 0.32; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-cell,
+  .cc-view,
+  .cc-timer-bubble,
+  .cc.is-editing .cc-cell {
+    animation: none !important;
+  }
+}

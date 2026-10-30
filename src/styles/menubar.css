@@ -130,7 +130,8 @@
   cursor: default;
 }
 
-.mb-status-btn:hover {
+.mb-status-btn:hover,
+.mb-cc-btn.is-open {
   background: rgba(255, 255, 255, 0.2);
 }
 

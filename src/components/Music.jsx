@@ -6,6 +6,7 @@ import Fuse from 'fuse.js';
 import { Index } from 'flexsearch';
 import GlassSurface from './glass/GlassSurface';
 import { useMacWindow } from '../libs/window/useMacWindow';
+import { publishPlayer, registerPlayerController } from '../libs/music/playerStore';
 import { parseSearchIntent } from '../libs/intentParser';
 
 // Supported formats
@@ -1438,6 +1439,40 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
         { type: 'separator' },
         { label: 'Mute', checked: isMuted, onSelect: handleToggleMute },
       ],
+    });
+  });
+
+  // Control Center (Now Playing, Sound): publish the player's state and take its commands
+  // (libs/music/playerStore.js). The ref always holds this render's handlers.
+  const playerRef = useRef(null);
+  useEffect(() => registerPlayerController(playerRef), []);
+  useEffect(() => {
+    playerRef.current = {
+      playPause: handlePlayPause,
+      next: handleNext,
+      previous: handlePrev,
+      setVolume: (val) => handleUpdateSetting('volume', val),
+      toggleMute: handleToggleMute,
+      open: () => setShowModal(true),
+      // Music plays through Web Audio: the whole context moves to the chosen output.
+      setOutput: async (deviceId) => {
+        if (!Howler.ctx?.setSinkId) return false;
+        try {
+          await Howler.ctx.setSinkId(deviceId);
+          publishPlayer({ outputId: deviceId });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    };
+    const track = currentTrack || library[0] || null;
+    publishPlayer({
+      available: library.length > 0,
+      track: track ? { title: track.title, artist: track.artist, artwork: track.artwork } : null,
+      playing: isPlaying,
+      volume,
+      muted: isMuted,
     });
   });
 

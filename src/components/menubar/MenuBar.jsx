@@ -5,11 +5,14 @@ import { openNews } from '../../libs/news/newsEvents';
 import { RELEASES_REPO } from '../../libs/updater/updater';
 import { isMenubarHidden, useMenubarMode } from '../../libs/menubar/menubarPrefs';
 import { useBattery, useFullscreen, useNow, useOnline } from './status';
+import ControlCenter from '../controlcenter/ControlCenter';
+import { ControlCenterIcon } from '../controlcenter/ccIcons';
+import { OPEN_CONTROL_CENTER } from '../../libs/controlcenter/controls';
 import '../../styles/menubar.css';
 
 // The macOS 26 menu bar across the top of iWeb. Left: the iWeb menu, the front app's name and
-// its menus (File, Edit, View, the app's own, Window, Help); right: Spotlight, Wi-Fi, battery
-// and the clock. The front app comes from the window registry (useMacWindow); with no window
+// its menus (File, Edit, View, the app's own, Window, Help); right: battery, Wi-Fi, Spotlight,
+// Control Center (ControlCenter.jsx) and the clock. The front app comes from the window registry (useMacWindow); with no window
 // open it's the desktop ("iWeb"). When the front window is zoomed, its red / yellow / green
 // buttons move here and the window fills the screen below the bar.
 //
@@ -267,7 +270,7 @@ function TrafficLights({ front }) {
   );
 }
 
-function StatusIcons({ onSpotlight }) {
+function StatusIcons({ onSpotlight, ccOpen, onControlCenter }) {
   const now = useNow();
   const online = useOnline();
   const battery = useBattery();
@@ -301,6 +304,18 @@ function StatusIcons({ onSpotlight }) {
           <path d="m10.4 10.4 4 4" />
         </svg>
       </button>
+      <button
+        type="button"
+        className={`mb-status mb-status-btn mb-cc-btn${ccOpen ? ' is-open' : ''}`}
+        aria-label="Control Center"
+        aria-expanded={ccOpen}
+        aria-haspopup="dialog"
+        title="Control Center"
+        data-cc-toggle
+        onClick={onControlCenter}
+      >
+        <ControlCenterIcon size={16} />
+      </button>
       <time className="mb-clock" dateTime={now.toISOString()}>
         <span>{date}</span>
         <span>{time}</span>
@@ -316,6 +331,7 @@ export default function MenuBar({ actions }) {
   const [left, setLeft] = useState(0); // the open menu's x, under its title
   const titleRefs = useRef([]);
   const barRef = useRef(null);
+  const [cc, setCc] = useState(null); // Control Center: null (closed) or { view } it opened on
 
   // Auto-hide.
   const mode = useMenubarMode();
@@ -337,7 +353,7 @@ export default function MenuBar({ actions }) {
 
   // While revealed, hide once the pointer moves down off the bar. (It slides in under a still
   // pointer, so the bar may never get pointerenter / pointerleave: follow the pointer's y.)
-  const menuIsOpen = open !== null;
+  const menuIsOpen = open !== null || cc !== null;
   useEffect(() => {
     if (!hidden || !revealed || menuIsOpen) return undefined;
     const onMove = (e) => {
@@ -374,7 +390,27 @@ export default function MenuBar({ actions }) {
     if (!hoverRef.current && !barRef.current?.contains(document.activeElement)) reveal(false, HIDE_DELAY_MS);
   };
 
+  // Control Center: one thing open at a time (it or a menu); the bar stays while it's open.
+  const closeCc = () => {
+    setCc(null);
+    if (!hoverRef.current) reveal(false, HIDE_DELAY_MS);
+  };
+  const openCc = (view = 'grid') => {
+    setOpen(null);
+    setActive(-1);
+    clearTimeout(revealTimer.current);
+    if (hidden) setRevealed(true);
+    setCc({ view, key: Date.now() });
+  };
+  const openCcEvent = useEffectEvent((e) => openCc(e.detail?.view || 'grid'));
+  useEffect(() => {
+    const onOpen = (e) => openCcEvent(e);
+    window.addEventListener(OPEN_CONTROL_CENTER, onOpen);
+    return () => window.removeEventListener(OPEN_CONTROL_CENTER, onOpen);
+  }, []);
+
   const show = (index, highlightFirst = false) => {
+    setCc(null);
     setOpen(index);
     setLeft(titleRefs.current[index]?.offsetLeft ?? 0);
     setActive(highlightFirst ? menus[index].items.findIndex(isActionable) : -1);
@@ -447,7 +483,7 @@ export default function MenuBar({ actions }) {
     )}
     <nav
       ref={barRef}
-      className={`mb${open !== null ? ' is-menu-open' : ''}${hidden ? ' is-autohide' : ''}${revealed ? ' is-revealed' : ''}`}
+      className={`mb${menuIsOpen ? ' is-menu-open' : ''}${hidden ? ' is-autohide' : ''}${revealed ? ' is-revealed' : ''}`}
       aria-label="Menu bar"
       // Clicking the bar never moves focus out of a text field.
       onMouseDown={(e) => e.preventDefault()}
@@ -458,12 +494,12 @@ export default function MenuBar({ actions }) {
       }}
       onPointerLeave={() => {
         hoverRef.current = false;
-        if (hidden && open === null) reveal(false, HIDE_DELAY_MS);
+        if (hidden && !menuIsOpen) reveal(false, HIDE_DELAY_MS);
       }}
       // Keyboard users reach it with Tab: it shows while focus is in it.
       onFocus={() => hidden && reveal(true, 0)}
       onBlur={(e) => {
-        if (hidden && open === null && !hoverRef.current && !e.currentTarget.contains(e.relatedTarget)) reveal(false, HIDE_DELAY_MS);
+        if (hidden && !menuIsOpen && !hoverRef.current && !e.currentTarget.contains(e.relatedTarget)) reveal(false, HIDE_DELAY_MS);
       }}
     >
       {lightsFor && <TrafficLights front={front} />}
@@ -495,7 +531,7 @@ export default function MenuBar({ actions }) {
           </button>
         ))}
       </div>
-      <StatusIcons onSpotlight={actions.openSpotlight} />
+      <StatusIcons onSpotlight={actions.openSpotlight} ccOpen={cc !== null} onControlCenter={() => (cc ? closeCc() : openCc())} />
       {openMenu && (
         <MenuPanel
           menu={openMenu}
@@ -506,6 +542,7 @@ export default function MenuBar({ actions }) {
         />
       )}
     </nav>
+    {cc && <ControlCenter key={cc.key} initialView={cc.view} onClose={closeCc} />}
     </>
   );
 }

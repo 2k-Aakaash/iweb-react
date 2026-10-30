@@ -2,6 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'r
 import Background from './components/Background';
 import Clock from './components/Clock';
 import Quote from './components/Quote';
+import DesktopModes from './components/controlcenter/DesktopModes';
+import TimerBubble from './components/controlcenter/TimerBubble';
 import Dock from './components/Dock';
 import SmartStack from './components/widgets/SmartStack';
 import { STACK_WIDGETS } from './components/widgets/stackWidgets';
@@ -185,8 +187,12 @@ export default function App() {
 
   return (
     <>
-      {/* 0. The macOS menu bar: the front app's menus, status and the clock */}
+      {/* 0. The macOS menu bar: the front app's menus, status, Control Center and the clock */}
       <MenuBar actions={desktopActions} />
+      {/* Control Center's effects on the page (Focus, Widgets, Display, Night Shift) and the
+          running timer beside the Dynamic Island */}
+      <DesktopModes />
+      <TimerBubble />
 
       {/* 1. Dynamic Island & Music System */}
       <Music 

@@ -2,7 +2,10 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { db as searchDB } from '../search/db/searchDB';
 import { openIwebDB } from './wallpaper/db';
-import { getStoredClockStyle, setClockStyle } from './clock/clockStyle';
+import { allPrefs } from './prefs/storedPref';
+// The modules that define settings kept in iWebDB (they register with allPrefs).
+import './clock/clockStyle';
+import './controlcenter/ccPrefs';
 
 // Generic Promise-based IndexedDB helpers for notes DB
 function getNotesDB() {
@@ -251,12 +254,15 @@ export async function exportToIwebBackup(selectedModules) {
       settingsData.localStorage[key] = val;
     }
   });
-  // The clock style (Glass or Vibrant Colour) lives in iWebDB.
-  try {
-    const clockStyle = await getStoredClockStyle();
-    if (clockStyle) settingsData.clockStyle = clockStyle;
-  } catch (err) {
-    console.error('Error reading the clock style:', err);
+  // Settings kept in iWebDB: the clock style, Control Center's switches and controls.
+  settingsData.prefs = {};
+  for (const [key, pref] of allPrefs()) {
+    try {
+      const value = await pref.getStored();
+      if (value !== null) settingsData.prefs[key] = value;
+    } catch (err) {
+      console.error(`Error reading ${key}:`, err);
+    }
   }
 
   // 2. Export Stored Images (wallpapers, custom backgrounds, gifs)
@@ -415,7 +421,9 @@ export async function restoreFromIwebBackup(zip, metadata, selectedModules) {
           localStorage.setItem(key, settingsData.localStorage[key]);
         });
       }
-      if (settingsData.clockStyle) await setClockStyle(settingsData.clockStyle);
+      for (const [key, value] of Object.entries(settingsData.prefs || {})) {
+        await allPrefs().get(key)?.set(value);
+      }
 
       // Restore search history, suggestions, clicks, etc.
       await searchDB.transaction('rw', [searchDB.searches, searchDB.suggestions, searchDB.clicks, searchDB.history], async () => {
