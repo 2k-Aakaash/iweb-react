@@ -22,7 +22,7 @@ const PHASE_TEXT = {
 function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // About → Software Update: shows the installed/latest release and installs updates

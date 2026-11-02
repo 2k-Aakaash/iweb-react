@@ -1,14 +1,32 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMacWindow } from '../libs/window/useMacWindow';
+import { useWindows } from '../libs/window/windowRegistry';
 import GlassSurface from './glass/GlassSurface';
 import { applyFormat, markdownToText, toggleTask } from '../libs/notes/markdown';
-
-// The Preview's renderer (marked + DOMPurify) loads the first time a Preview is shown.
-const loadRenderer = () => import('../libs/notes/markdownRender');
 import { canRedo, canUndo, createHistory, record, redo, undo, typingKind } from '../libs/notes/history';
-import { groupNotes, rowDate } from '../libs/notes/groups';
+import { createNote, deleteNote, getNote, registerFlush, updateContent, updateNote, useNotes } from '../libs/notes/notesStore';
+import { progressLabel, refOf, taskProgress, toggleChecked } from '../libs/notes/tasks';
+import { DATE_VIEWS, SORTS, VIEWS, filterView, listSections, searchNotes, taskKey, validView, viewCounts, viewLabel } from '../libs/notes/views';
+import { useToday } from '../libs/notes/useToday';
+import { STICKY_COLORS, pinToDesktop, removeFromDesktop, updateSticky, useStickies } from '../libs/notes/stickyStore';
+import { findStickySpot } from '../libs/notes/stickyPlacement';
+import { NOTES_OPEN_EVENT } from '../libs/notes/notesEvents';
+import NotesSidebar from './notes/NotesSidebar';
+import NoteList from './notes/NoteList';
+import TaskChecklist, { ProgressBar } from './notes/TaskChecklist';
+import PopupMenu from './notes/PopupMenu';
+import { ComposeIcon, DesktopIcon, MoreIcon, NewTaskIcon, PinIcon, SearchIcon, SidebarIcon, SortIcon, TrashIcon } from './notes/notesIcons';
 import '../styles/notes-sidebar.css';
 import '../styles/notes-markdown.css';
+import '../styles/notes-workspace.css';
+
+// Notes: Markdown notes and Task Notes (daily to-dos) in one window, after macOS 26 Notes:
+// views on the left (All Notes, Pinned, Today, Overdue, Upcoming, All Tasks, Completed,
+// tags), the notes of the selected view in the middle, the note on the right (Write /
+// Preview; a Task Note's Checklist / Write). Notes live in notesStore (shared with the
+// desktop sticky cards); this window keeps a draft of the open note and saves it 0.8 s after
+// typing stops, at once for checklist changes, and before anything else touches the note.
+// The window loads on first open (App.jsx).
 
 // Formatting toolbar (Write mode): [format, label, title]; null is a separator.
 const TOOLBAR = [
@@ -27,353 +45,356 @@ const TOOLBAR = [
   ['link', '🔗', 'Link'],
 ];
 
+const SAVE_DELAY = 800;
+
+// Preferences: the editor mode for notes (as before) and for Task Notes, and the window's
+// view, sort, sidebar, hidden completed tasks and last note. Restored on open.
 const MODE_KEY = 'iweb:notesMode';
-const readMode = () => {
+const TASK_MODE_KEY = 'iweb:notesTaskMode';
+const UI_KEY = 'iweb:notesUi';
+
+function readStorage(key) {
   try {
-    return localStorage.getItem(MODE_KEY) === 'preview' ? 'preview' : 'write';
+    return localStorage.getItem(key);
   } catch {
-    return 'write';
+    return null;
   }
-};
-
-const DB_NAME = 'iweb-notes-db';
-const STORE_NAME = 'notes';
-
-// Promise-based IndexedDB Helpers
-function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-      }
-    };
-    request.onsuccess = (e) => {
-      resolve(e.target.result);
-    };
-    request.onerror = (e) => {
-      reject(e.target.error);
-    };
-  });
 }
 
-function getAllNotesFromDB(db) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* private mode */
+  }
 }
 
-function addNoteToDB(db, note) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.add(note);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+const readModes = () => ({
+  note: readStorage(MODE_KEY) === 'preview' ? 'preview' : 'write',
+  task: readStorage(TASK_MODE_KEY) === 'write' ? 'write' : 'checklist',
+});
+
+function readUi() {
+  let saved = {};
+  try {
+    saved = JSON.parse(readStorage(UI_KEY) || '{}') || {};
+  } catch {
+    /* damaged: defaults */
+  }
+  return {
+    view: typeof saved.view === 'string' ? saved.view : 'all',
+    sort: SORTS.some((s) => s.id === saved.sort) ? saved.sort : 'edited',
+    sidebar: saved.sidebar !== false,
+    hideDone: Boolean(saved.hideDone),
+    noteId: saved.noteId ?? null,
+  };
 }
 
-function updateNoteInDB(db, note) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(note);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
+const EMPTY_DRAFT = { id: null, title: '', content: '', synced: { title: '', content: '' } };
+const draftOf = (note) => ({ id: note.id, title: note.title, content: note.content, synced: { title: note.title, content: note.content } });
+const isDirty = (d) => d.title !== d.synced.title || d.content !== d.synced.content;
+const titleOf = (note) => note?.title?.trim() || 'Untitled Note';
 
-function deleteNoteFromDB(db, id) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
+const todayTitle = () => new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
-export default function Notes() {
-  const [db, setDb] = useState(null);
-  const [notes, setNotes] = useState([]);
-  const [showModal, setShowModal] = useState(false);
+export default function Notes({ open, setOpen, initialRequest = null }) {
   const overlayRef = useRef(null);
   const windowRef = useRef(null);
+  const textareaRef = useRef(null);
+  const titleRef = useRef(null);
+  const searchRef = useRef(null);
+  const editorRef = useRef(null);
   // macOS window: genies out of the Dock's Notes icon; red closes, yellow minimizes into the
   // icon, green zooms to full size.
   const menusRef = useRef(null); // menu-bar menus, set below once the handlers exist
-  const win = useMacWindow({ app: 'notes', open: showModal, setOpen: setShowModal, windowRef, overlayRef, menus: menusRef });
+  const win = useMacWindow({ app: 'notes', open, setOpen, windowRef, overlayRef, menus: menusRef });
   const mounted = win.mounted;
-  const [searchQuery, setSearchQuery] = useState('');
-  // Markdown: write the source, or preview it rendered. Remembered between sessions.
-  const [mode, setModeState] = useState(readMode);
-  const setMode = (next) => {
-    setModeState(next);
-    try {
-      localStorage.setItem(MODE_KEY, next);
-    } catch {
-      /* private mode */
-    }
-  };
-  const textareaRef = useRef(null);
+  const { front } = useWindows();
+
+  const { status, notes } = useNotes();
+  const stickies = useStickies();
+  const { today, now } = useToday();
+  const [ui, setUi] = useState(readUi);
+  const [modes, setModes] = useState(readModes);
+  const [query, setQuery] = useState('');
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
   // Undo / redo: one history per note, kept in memory while iWeb is open.
   const historiesRef = useRef(new Map());
   const [history, setHistory] = useState(null);
-  const [activeNoteId, setActiveNoteId] = useState(null);
+  const [saveError, setSaveError] = useState(false);
+  const [menu, setMenu] = useState(null); // { anchor, items, label }
+  const [renderMarkdown, setRenderMarkdown] = useState(null);
+  const focusNextRef = useRef(null); // 'title' | 'add' | 'editor' after the next note loads
 
-  // Open modal via custom event
-  useEffect(() => {
-    const handleOpen = () => {
-      setShowModal(true);
-    };
-    window.addEventListener('notes:open', handleOpen);
-    return () => {
-      window.removeEventListener('notes:open', handleOpen);
-    };
-  }, []);
+  // ---- What's shown --------------------------------------------------------------------
+  const counts = useMemo(() => viewCounts(notes, today), [notes, today]);
+  const view = status === 'ready' ? validView(ui.view, counts) : ui.view;
+  const searching = query.trim().length > 0;
+  // Tasks ticked in Today / Overdue / Upcoming stay there, done, until the view changes.
+  const [kept, setKept] = useState({ view: null, keys: new Set(), ids: new Set() });
+  const keep = kept.view === view && !searching ? kept : null;
+  const listed = useMemo(
+    () => (searching ? searchNotes(notes, query) : filterView(notes, view, today, keep?.ids)),
+    [notes, view, today, query, searching, keep],
+  );
+  const sections = useMemo(() => listSections(listed, { sort: ui.sort, view: searching ? 'all' : view, now }), [listed, ui.sort, view, searching, now]);
+  const ordered = useMemo(() => sections.flatMap((s) => s.notes), [sections]);
+  const desktopIds = useMemo(() => new Set(Object.keys(stickies.cards)), [stickies]);
 
-  // Local state for the currently active note in the editor (to avoid laggy typing)
-  const [editorTitle, setEditorTitle] = useState('');
-  const [editorContent, setEditorContent] = useState('');
-  const [saveStatus, setSaveStatus] = useState('Saved'); // 'Saved', 'Saving...', 'Error'
+  const stored = draft.id !== null ? notes.find((n) => n.id === draft.id) || null : null;
+  const isTask = stored?.kind === 'task';
+  const dirty = isDirty(draft);
+  const mode = isTask ? modes.task : modes.note;
+  const onDesktop = stored ? desktopIds.has(String(stored.id)) : false;
 
-  const saveTimeoutRef = useRef(null);
-
-  // Initialize DB and migrate from localStorage if present
-  useEffect(() => {
-    initDB()
-      .then(async (database) => {
-        setDb(database);
-        let loadedNotes = await getAllNotesFromDB(database);
-
-        // Check for migration from localStorage
-        const stored = localStorage.getItem('notes');
-        if (stored) {
-          try {
-            const oldNotes = JSON.parse(stored);
-            if (Array.isArray(oldNotes) && oldNotes.length > 0) {
-              for (const oldNoteText of oldNotes) {
-                if (typeof oldNoteText === 'string' && oldNoteText.trim() !== '') {
-                  const title = oldNoteText.split('\n')[0].substring(0, 30) || 'Untitled Note';
-                  const newNote = {
-                    title: title.trim(),
-                    content: oldNoteText,
-                    updatedAt: Date.now(),
-                  };
-                  await addNoteToDB(database, newNote);
-                }
-              }
-              // Reload notes after migration
-              loadedNotes = await getAllNotesFromDB(database);
-            }
-          } catch (err) {
-            console.error('Error migrating localStorage notes:', err);
-          } finally {
-            localStorage.removeItem('notes');
-          }
-        }
-
-        // Sort by update date descending
-        loadedNotes.sort((a, b) => b.updatedAt - a.updatedAt);
-        setNotes(loadedNotes);
-
-        if (loadedNotes.length > 0) {
-          setActiveNoteId(loadedNotes[0].id);
-        }
-      })
-      .catch((err) => console.error('Failed to initialize notes DB:', err));
-  }, []);
-
-  // Sync editor fields when activeNoteId changes
-  useEffect(() => {
-    if (activeNoteId !== null) {
-      const activeNote = notes.find((n) => n.id === activeNoteId);
-      if (activeNote) {
-        setEditorTitle(activeNote.title);
-        setEditorContent(activeNote.content);
-        const known = historiesRef.current.get(activeNote.id);
-        const h = known && known.present.value === activeNote.content ? known : createHistory(activeNote.content);
-        historiesRef.current.set(activeNote.id, h);
-        setHistory(h);
-        setSaveStatus('Saved');
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
+  // ---- Keeping the draft and the store in step (during render, as React recommends for
+  // state derived from changing inputs) ------------------------------------------------------
+  const [seen, setSeen] = useState(null);
+  if (status === 'ready' && draft.id === null && notes.length > 0) {
+    // First load: the note open last time, else the first in the list.
+    const first = notes.find((n) => n.id === ui.noteId) || ordered[0] || notes[0];
+    setDraft(draftOf(first));
+    setHistory(createHistory(first.content));
+  } else if (status === 'ready' && draft.id !== null && !stored && !dirty) {
+    // The open note was deleted (in another tab): show the next one.
+    const next = ordered[0] || notes[0] || null;
+    setDraft(next ? draftOf(next) : EMPTY_DRAFT);
+    setHistory(next ? createHistory(next.content) : null);
+  } else if (stored !== seen) {
+    setSeen(stored);
+    // Changed elsewhere (a sticky card, another tab): take the change unless there's
+    // unsaved typing here, which wins and is saved shortly.
+    if (stored && stored.id === draft.id && !dirty && (stored.content !== draft.synced.content || stored.title !== draft.synced.title)) {
+      setDraft(draftOf(stored));
+      if (stored.content !== draft.content) {
+        const end = stored.content.length;
+        setHistory((h) => record(h ?? createHistory(draft.content), { value: stored.content, start: end, end }, { kind: 'external' }));
       }
-    } else {
-      setEditorTitle('');
-      setEditorContent('');
     }
-  }, [activeNoteId, notes]);
+  }
 
-  // Handle note selection
+  // The latest draft for saves that run outside a render (a timer, closing, another view).
+  const draftRef = useRef(draft);
+  useLayoutEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  const saveDraft = useCallback(() => {
+    const d = draftRef.current;
+    if (d.id === null || !isDirty(d)) return;
+    const sent = { title: d.title, content: d.content };
+    draftRef.current = { ...d, synced: sent };
+    setDraft((cur) => (cur.id === d.id ? { ...cur, synced: sent } : cur));
+    updateNote(d.id, sent).then(
+      () => setSaveError(false),
+      (err) => {
+        console.error('Notes: could not save the note:', err);
+        setSaveError(true);
+      },
+    );
+  }, []);
+
+  // Autosave after a pause in typing.
+  useEffect(() => {
+    if (!dirty || draft.id === null) return undefined;
+    const timer = setTimeout(saveDraft, SAVE_DELAY);
+    return () => clearTimeout(timer);
+  }, [draft, dirty, saveDraft]);
+
+  // Save before anything else changes a note (a sticky card ticking a task), and when the
+  // page is hidden or closed.
+  useEffect(() => {
+    const unregister = registerFlush(saveDraft);
+    const onHide = () => document.visibilityState === 'hidden' && saveDraft();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', saveDraft);
+    return () => {
+      unregister();
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', saveDraft);
+    };
+  }, [saveDraft]);
+
+  // Remember the view, sort, sidebar and open note; and the editor modes.
+  useEffect(() => {
+    writeStorage(UI_KEY, JSON.stringify({ view: ui.view, sort: ui.sort, sidebar: ui.sidebar, hideDone: ui.hideDone, noteId: draft.id }));
+  }, [ui, draft.id]);
+  useEffect(() => {
+    writeStorage(MODE_KEY, modes.note);
+    writeStorage(TASK_MODE_KEY, modes.task);
+  }, [modes]);
+
+  // Focus where a new note starts: its title, or a Task Note's "Add a task" field. While the
+  // window genies in it can't take focus yet, so this tries again for up to a second.
+  useEffect(() => {
+    const target = focusNextRef.current;
+    if (!target || !mounted) return undefined;
+    focusNextRef.current = null;
+    let frame = 0;
+    let tries = 0;
+    const attempt = () => {
+      const el = target === 'title' ? titleRef.current
+        : target === 'add' ? editorRef.current?.querySelector('.ntc-add input')
+          : textareaRef.current;
+      if (el) {
+        el.focus({ preventScroll: true });
+        if (target === 'title') el.select();
+        if (document.activeElement === el) return;
+      }
+      if (++tries < 60) frame = requestAnimationFrame(attempt);
+    };
+    frame = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(frame);
+  }, [draft.id, mounted, mode]);
+
+  // The Preview renderer (marked + DOMPurify) loads the first time it's needed.
+  const needsRenderer = (mode === 'preview' || mode === 'checklist') && draft.id !== null;
+  useEffect(() => {
+    if (!needsRenderer || renderMarkdown) return;
+    import('../libs/notes/markdownRender').then((m) => setRenderMarkdown(() => m.renderMarkdown)).catch(() => {});
+  }, [needsRenderer, renderMarkdown]);
+  const previewHtml = useMemo(
+    () => (mode === 'preview' && renderMarkdown ? renderMarkdown(draft.content) : ''),
+    [mode, draft.content, renderMarkdown],
+  );
+
+  // ---- Actions -----------------------------------------------------------------------------
+  const setMode = (next) => {
+    setModes((m) => ({ ...m, [isTask ? 'task' : 'note']: next }));
+  };
+
+  const openNote = (note) => {
+    if (!note) return;
+    saveDraft();
+    if (draft.id !== null && history) historiesRef.current.set(draft.id, history);
+    const known = historiesRef.current.get(note.id);
+    setDraft(draftOf(note));
+    setHistory(known && known.present.value === note.content ? known : createHistory(note.content));
+  };
+
   const selectNote = (id) => {
-    // If there is a pending save, execute it immediately
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      performSave();
-    }
-    setActiveNoteId(id);
+    if (id !== draft.id) openNote(getNote(id));
   };
 
-  // Trigger auto-save on title or content change
-  const handleEditorChange = (field, value) => {
-    if (field === 'title') {
-      setEditorTitle(value);
-    } else {
-      setEditorContent(value);
+  const newNote = async (kind = 'note') => {
+    saveDraft();
+    try {
+      const note = kind === 'task'
+        ? await createNote({ title: todayTitle(), kind: 'task' })
+        : await createNote({ title: 'New Note' });
+      setQuery('');
+      // Show it: switch to a view it's in.
+      setUi((u) => {
+        if (kind === 'task') return u.view === 'all' || u.view === 'tasks' ? u : { ...u, view: 'tasks' };
+        return u.view === 'all' ? u : { ...u, view: 'all' };
+      });
+      if (kind === 'task') setModes((m) => ({ ...m, task: 'checklist' }));
+      else setModes((m) => ({ ...m, note: 'write' }));
+      focusNextRef.current = kind === 'task' ? 'add' : 'title';
+      openNote(note);
+    } catch (err) {
+      console.error('Notes: could not create a note:', err);
+      window.alert('The note couldn’t be created. Your browser may be out of storage space.');
     }
-    setSaveStatus('Saving...');
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Debounce save
-    saveTimeoutRef.current = setTimeout(() => {
-      performSave(field === 'title' ? value : editorTitle, field === 'content' ? value : editorContent);
-    }, 800);
   };
 
-  const performSave = (titleToSave = editorTitle, contentToSave = editorContent) => {
-    if (!db || activeNoteId === null) return;
-
-    const activeNote = notes.find((n) => n.id === activeNoteId);
-    if (!activeNote) return;
-
-    // Avoid saving if no changes made
-    if (activeNote.title === titleToSave && activeNote.content === contentToSave) {
-      setSaveStatus('Saved');
+  const removeNote = async (note) => {
+    const pinnedToDesktop = desktopIds.has(String(note.id));
+    const message = `Delete “${titleOf(note)}”? This can’t be undone.${pinnedToDesktop ? '\n\nIt will also be removed from your desktop.' : ''}`;
+    if (!window.confirm(message)) return;
+    const wasOpen = note.id === draft.id;
+    const i = ordered.findIndex((n) => n.id === note.id);
+    const next = ordered[i + 1] || ordered[i - 1] || null;
+    if (wasOpen) {
+      // Don't save what's being deleted.
+      draftRef.current = { ...draftRef.current, synced: { title: draftRef.current.title, content: draftRef.current.content } };
+    }
+    try {
+      await deleteNote(note.id);
+    } catch (err) {
+      console.error('Notes: could not delete the note:', err);
+      window.alert('The note couldn’t be deleted.');
       return;
     }
-
-    const updatedNote = {
-      ...activeNote,
-      title: titleToSave || 'Untitled Note',
-      content: contentToSave,
-      updatedAt: Date.now(),
-    };
-
-    updateNoteInDB(db, updatedNote)
-      .then(() => {
-        setSaveStatus('Saved');
-        // Update notes state and re-sort
-        setNotes((prevNotes) => {
-          const updatedList = prevNotes.map((n) => (n.id === activeNoteId ? updatedNote : n));
-          return updatedList.sort((a, b) => b.updatedAt - a.updatedAt);
-        });
-      })
-      .catch((err) => {
-        console.error('Error autosaving note:', err);
-        setSaveStatus('Error');
-      });
+    removeFromDesktop(note.id);
+    historiesRef.current.delete(note.id);
+    if (wasOpen) {
+      const fallback = next || null;
+      setDraft(fallback ? draftOf(fallback) : EMPTY_DRAFT);
+      setHistory(fallback ? createHistory(fallback.content) : null);
+    }
   };
 
-  // Add a new note
-  const handleAddNewNote = async () => {
-    if (!db) return;
+  const togglePin = (note) => updateNote(note.id, { pinned: !note.pinned }, { touch: false }).catch(() => setSaveError(true));
 
-    const newNote = {
-      title: 'New Note',
-      content: '',
-      updatedAt: Date.now(),
-    };
+  const toggleDesktop = (note) => {
+    if (desktopIds.has(String(note.id))) removeFromDesktop(note.id);
+    else pinToDesktop(note.id, findStickySpot());
+  };
 
+  const convert = (note) => {
+    const toTask = note.kind !== 'task';
+    if (!toTask) removeFromDesktop(note.id);
+    updateNote(note.id, { kind: toTask ? 'task' : null }, { touch: false }).catch(() => setSaveError(true));
+  };
+
+  const duplicate = async (note) => {
+    saveDraft();
+    const source = getNote(note.id) || note;
     try {
-      const newId = await addNoteToDB(db, newNote);
-      const createdNote = { ...newNote, id: newId };
-      setNotes((prevNotes) => [createdNote, ...prevNotes]);
-      setActiveNoteId(newId);
-      setSaveStatus('Saved');
+      const copy = await createNote({ title: `${titleOf(source)} copy`, content: source.content, kind: source.kind === 'task' ? 'task' : null });
+      openNote(copy);
     } catch (err) {
-      console.error('Error creating note:', err);
+      console.error('Notes: could not duplicate the note:', err);
     }
   };
 
-  // Delete current or specific note
-  const handleDeleteNote = async (idToDelete) => {
-    if (!db) return;
-    const targetId = idToDelete || activeNoteId;
-    if (targetId === null) return;
-
-    const confirmDelete = window.confirm(
-      'Are you sure you want to delete this note? This action cannot be undone.'
-    );
-
-    if (confirmDelete) {
-      try {
-        await deleteNoteFromDB(db, targetId);
-        const updatedNotes = notes.filter((n) => n.id !== targetId);
-        setNotes(updatedNotes);
-
-        if (targetId === activeNoteId) {
-          if (updatedNotes.length > 0) {
-            setActiveNoteId(updatedNotes[0].id);
-          } else {
-            setActiveNoteId(null);
-          }
-        }
-      } catch (err) {
-        console.error('Error deleting note:', err);
-      }
-    }
+  const noteMenu = (note) => {
+    const task = note.kind === 'task';
+    const desk = desktopIds.has(String(note.id));
+    return [
+      { label: note.pinned ? 'Unpin Note' : 'Pin Note', onSelect: () => togglePin(note) },
+      task && { label: desk ? 'Remove from Desktop' : 'Show on Desktop', onSelect: () => toggleDesktop(note) },
+      ...(desk ? [
+        { type: 'header', label: 'Card Color' },
+        { label: 'None (Glass)', checked: !stickies.cards[String(note.id)]?.color, onSelect: () => updateSticky(note.id, { color: null }) },
+        ...STICKY_COLORS.map((c) => ({ label: c.label, swatch: c.swatch, checked: stickies.cards[String(note.id)]?.color === c.id, onSelect: () => updateSticky(note.id, { color: c.id }) })),
+      ] : []),
+      { type: 'separator' },
+      { label: 'Rename', onSelect: () => {
+        selectNote(note.id);
+        focusNextRef.current = 'title';
+        requestAnimationFrame(() => titleRef.current?.select());
+      } },
+      { label: 'Duplicate', onSelect: () => duplicate(note) },
+      { label: task ? 'Convert to Regular Note' : 'Convert to Task Note', onSelect: () => convert(note) },
+      { type: 'separator' },
+      { label: 'Delete Note…', danger: true, onSelect: () => removeNote(note) },
+    ];
   };
-
-  // Save a pending edit right away (before the window closes or minimizes).
-  const flushSave = () => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      performSave();
-    }
-  };
-
-  // Global escape and key bindings
-  useEffect(() => {
-    const handleGlobalKeys = (e) => {
-      if (e.key === 'Escape' && showModal) {
-        // Save immediately before closing
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-          performSave();
-        }
-        setShowModal(false);
-      }
-      // Ctrl/Cmd + Shift + P: switch between Write and Preview
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p' && showModal && activeNoteId !== null) {
-        e.preventDefault();
-        setMode(mode === 'preview' ? 'write' : 'preview');
-        return;
-      }
-      // Ctrl + S (manual save trigger)
-      if ((e.ctrlKey || e.metaKey) && e.key === 's' && showModal) {
-        e.preventDefault();
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        performSave();
-      }
-      // Ctrl + N (new note)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n' && showModal) {
-        e.preventDefault();
-        handleAddNewNote();
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeys);
-    return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, [showModal, db, activeNoteId, editorTitle, editorContent, notes, mode]);
 
   // Every content change goes through here so it lands in the note's undo history.
   const changeContent = (value, { kind, start = value.length, end = start, before }) => {
-    const base = history ?? createHistory(editorContent);
-    const h = record(base, { value, start, end }, { kind, before });
-    historiesRef.current.set(activeNoteId, h);
-    setHistory(h);
-    handleEditorChange('content', value);
+    const base = history ?? createHistory(draft.content);
+    setHistory(record(base, { value, start, end }, { kind, before }));
+    setDraft((d) => ({ ...d, content: value }));
+  };
+
+  // A checklist change (a tick, a new task, a reorder) is saved at once, so a sticky card
+  // and the list show it straight away.
+  const changeTasks = (value, kind = 'task') => {
+    if (value === draft.content || draft.id === null) return;
+    changeContent(value, { kind });
+    const sent = { title: draft.title, content: value };
+    draftRef.current = { ...draftRef.current, content: value, synced: sent };
+    setDraft((d) => ({ ...d, content: value, synced: sent }));
+    updateNote(draft.id, sent).then(
+      () => setSaveError(false),
+      (err) => {
+        console.error('Notes: could not save the note:', err);
+        setSaveError(true);
+      },
+    );
   };
 
   // Put the textarea's caret / selection back after a programmatic change.
@@ -391,15 +412,15 @@ export default function Notes() {
     const can = direction === 'undo' ? canUndo(history) : canRedo(history);
     if (!can) return;
     const h = direction === 'undo' ? undo(history) : redo(history);
-    historiesRef.current.set(activeNoteId, h);
     setHistory(h);
-    handleEditorChange('content', h.present.value);
+    setDraft((d) => ({ ...d, content: h.present.value }));
     if (mode === 'write') restoreSelection(h.present.start, h.present.end);
   };
 
   // Ctrl/Cmd+Z undo; Ctrl/Cmd+Shift+Z or Ctrl+Y redo. Returns true when handled.
   const handleUndoKeys = (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
+    if (e.target instanceof HTMLInputElement && e.target.type === 'text') return false; // the field's own undo
     const key = e.key.toLowerCase();
     if (key === 'z' && !e.shiftKey) {
       e.preventDefault();
@@ -419,58 +440,171 @@ export default function Notes() {
     const el = textareaRef.current;
     if (!el) return;
     const before = { start: el.selectionStart, end: el.selectionEnd };
-    const next = applyFormat(editorContent, before.start, before.end, name);
+    const next = applyFormat(draft.content, before.start, before.end, name);
     changeContent(next.value, { kind: 'format', start: next.start, end: next.end, before });
     restoreSelection(next.start, next.end);
   };
 
   // Ticking a checklist box in the Preview updates the Markdown source.
-  // Menu bar: File → New / Delete Note, View → Write / Preview.
-  useEffect(() => {
-    menusRef.current = () => ({
-      File: [
-        { label: 'New Note', disabled: !db, onSelect: handleAddNewNote },
-        { label: 'Delete Note…', disabled: activeNoteId === null, onSelect: () => handleDeleteNote() },
-      ],
-      View: [
-        { label: 'Write', checked: mode === 'write', disabled: activeNoteId === null, onSelect: () => setMode('write') },
-        { label: 'Preview', shortcut: 'Ctrl Shift P', checked: mode === 'preview', disabled: activeNoteId === null, onSelect: () => setMode('preview') },
-      ],
-    });
-  });
-
   const handlePreviewClick = (e) => {
     const box = e.target.closest?.('input[data-task]');
     if (!box) return;
     e.preventDefault();
-    changeContent(toggleTask(editorContent, Number(box.dataset.task)), { kind: 'task' });
+    changeTasks(toggleTask(draft.content, Number(box.dataset.task)));
   };
 
-  const [renderMarkdown, setRenderMarkdown] = useState(null);
+  const closeWindow = () => {
+    saveDraft();
+    setMenu(null);
+    win.close();
+  };
+
+  // List rows: select, ⋯ / right-click menu, tick a task (Today, Overdue, Upcoming). The
+  // list is memoized, so it gets one stable function that calls the latest handlers.
+  const rowActionsRef = useRef(null);
+  useLayoutEffect(() => {
+    rowActionsRef.current = {
+      select: (note) => selectNote(note.id),
+      menu: (note, anchor) => setMenu({ anchor, items: noteMenu(note), label: titleOf(note) }),
+      toggle: (note, task) => {
+        if (DATE_VIEWS.includes(view)) {
+          setKept((k) => {
+            const base = k.view === view ? k : { keys: new Set(), ids: new Set() };
+            return { view, keys: new Set(base.keys).add(taskKey(note, task)), ids: new Set(base.ids).add(note.id) };
+          });
+        }
+        updateContent(note.id, (c) => toggleChecked(c, refOf(task))).catch(() => setSaveError(true));
+      },
+    };
+  });
+  const onRowAction = useCallback((action, note, extra) => rowActionsRef.current?.[action]?.(note, extra), []);
+
+  // Opening on a note or a new note (a sticky card's Open in Notes; File → New in the menu
+  // bar). The first request arrives with the window (App.jsx); later ones as events.
+  const handleRequest = (detail) => {
+    if (!detail) return;
+    if (detail.create) {
+      newNote(detail.create === 'task' ? 'task' : 'note');
+      return;
+    }
+    const note = detail.noteId !== undefined && detail.noteId !== null ? getNote(detail.noteId) : null;
+    if (!note) return;
+    setQuery('');
+    if (!filterView(notes, view, today).some((n) => n.id === note.id)) setUi((u) => ({ ...u, view: note.kind === 'task' ? 'tasks' : 'all' }));
+    selectNote(note.id);
+  };
+  const requestRef = useRef(null);
+  useLayoutEffect(() => {
+    requestRef.current = handleRequest;
+  });
   useEffect(() => {
-    if (mode !== 'preview' || renderMarkdown) return;
-    loadRenderer().then((m) => setRenderMarkdown(() => m.renderMarkdown)).catch(() => {});
-  }, [mode, renderMarkdown]);
-  const previewHtml = useMemo(
-    () => (mode === 'preview' && renderMarkdown ? renderMarkdown(editorContent) : ''),
-    [mode, editorContent, renderMarkdown],
-  );
+    const onOpen = (e) => requestRef.current?.(e.detail);
+    window.addEventListener(NOTES_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(NOTES_OPEN_EVENT, onOpen);
+  }, []);
+  const handledInitial = useRef(false);
+  useEffect(() => {
+    if (handledInitial.current || status !== 'ready') return;
+    handledInitial.current = true;
+    requestRef.current?.(initialRequest);
+  }, [status, initialRequest]);
 
-  const getWordCount = () => {
-    const text = markdownToText(editorContent);
+  // ---- Keyboard ----------------------------------------------------------------------------
+  const keysRef = useRef(null);
+  useLayoutEffect(() => {
+    keysRef.current = (e) => {
+      if (!open || (front && front.app !== 'notes')) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (e.key === 'Escape') {
+        if (menu || document.querySelector('.nt-menu')) return; // the menu closes itself
+        if (e.target === searchRef.current && query) {
+          setQuery('');
+          return;
+        }
+        closeWindow();
+        return;
+      }
+      // Ctrl/Cmd + Shift + P: switch between Write and Preview (Checklist for Task Notes)
+      if (mod && e.shiftKey && key === 'p' && draft.id !== null) {
+        e.preventDefault();
+        if (isTask) setMode(mode === 'checklist' ? 'write' : 'checklist');
+        else setMode(mode === 'preview' ? 'write' : 'preview');
+        return;
+      }
+      if (mod && !e.shiftKey && !e.altKey && key === 's') {
+        e.preventDefault();
+        saveDraft();
+        return;
+      }
+      // Ctrl + Alt + N: new Task Note (not AltGr + N, which types a letter on some keyboards)
+      if (mod && e.altKey && key === 'n' && !e.getModifierState?.('AltGraph')) {
+        e.preventDefault();
+        newNote('task');
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey && key === 'n') {
+        e.preventDefault();
+        newNote('note');
+      }
+    };
+  });
+  useEffect(() => {
+    const onKey = (e) => keysRef.current?.(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Menu bar: File and View for Notes.
+  useEffect(() => {
+    menusRef.current = () => ({
+      File: [
+        { label: 'New Note', shortcut: 'Ctrl N', disabled: status !== 'ready', onSelect: () => newNote('note') },
+        { label: 'New Task Note', shortcut: 'Ctrl Alt N', disabled: status !== 'ready', onSelect: () => newNote('task') },
+        { type: 'separator' },
+        { label: stored?.pinned ? 'Unpin Note' : 'Pin Note', disabled: !stored, onSelect: () => togglePin(stored) },
+        { label: onDesktop ? 'Remove from Desktop' : 'Show on Desktop', disabled: !isTask, onSelect: () => toggleDesktop(stored) },
+        { label: 'Duplicate Note', disabled: !stored, onSelect: () => duplicate(stored) },
+        { label: isTask ? 'Convert to Regular Note' : 'Convert to Task Note', disabled: !stored, onSelect: () => convert(stored) },
+        { type: 'separator' },
+        { label: 'Delete Note…', disabled: !stored, onSelect: () => removeNote(stored) },
+      ],
+      View: [
+        ...(isTask
+          ? [
+            { label: 'Checklist', checked: mode === 'checklist', disabled: !stored, onSelect: () => setMode('checklist') },
+            { label: 'Write', shortcut: 'Ctrl Shift P', checked: mode === 'write', disabled: !stored, onSelect: () => setMode('write') },
+          ]
+          : [
+            { label: 'Write', checked: mode === 'write', disabled: !stored, onSelect: () => setMode('write') },
+            { label: 'Preview', shortcut: 'Ctrl Shift P', checked: mode === 'preview', disabled: !stored, onSelect: () => setMode('preview') },
+          ]),
+        { type: 'separator' },
+        { label: ui.sidebar ? 'Hide Sidebar' : 'Show Sidebar', onSelect: () => setUi((u) => ({ ...u, sidebar: !u.sidebar })) },
+        { label: 'Hide Completed Tasks', checked: ui.hideDone, onSelect: () => setUi((u) => ({ ...u, hideDone: !u.hideDone })) },
+        { type: 'separator' },
+        ...SORTS.map((s) => ({ label: `Sort by ${s.label}`, checked: ui.sort === s.id, onSelect: () => setUi((u) => ({ ...u, sort: s.id })) })),
+      ],
+    });
+  });
+
+  // ---- Render ------------------------------------------------------------------------------
+  const words = useMemo(() => {
+    const text = markdownToText(draft.content);
     return text ? text.split(/\s+/).length : 0;
-  };
+  }, [draft.content]);
+  const progress = useMemo(() => (isTask ? taskProgress(draft.content) : null), [isTask, draft.content]);
 
-  const getCharCount = () => {
-    return editorContent.length;
-  };
+  const listTitle = searching ? 'Results' : viewLabel(view);
+  const composeKind = DATE_VIEWS.includes(view) || view === 'tasks' || view === 'completed' ? 'task' : 'note';
+  const modeTabs = isTask ? [['checklist', 'Checklist'], ['write', 'Write']] : [['write', 'Write'], ['preview', 'Preview']];
+  let saveLabel = 'Saved';
+  if (saveError) saveLabel = 'Save Failed';
+  else if (dirty) saveLabel = 'Saving';
 
-  // Filter notes based on search query
-  const filteredNotes = notes.filter(
-    (n) =>
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  let emptyList = searching ? `No results for “${query.trim()}”` : VIEWS[view]?.empty || 'No Notes';
+  if (status === 'loading' || status === 'idle') emptyList = null; // a few ms: nothing, not a flash
+  if (status === 'error') emptyList = 'Notes couldn’t be opened.';
 
   return (
     <>
@@ -480,170 +614,168 @@ export default function Notes() {
             <GlassSurface preset="window" />
             {/* macOS window dots */}
             <div className="window-controls">
-              <span
-                className="window-dot dot-close"
-                role="button"
-                aria-label="Close"
-                onClick={() => {
-                  flushSave();
-                  win.close();
-                }}
-              ></span>
+              <span className="window-dot dot-close" role="button" aria-label="Close" onClick={closeWindow}></span>
               <span
                 className="window-dot dot-minimize"
                 role="button"
                 aria-label="Minimize"
                 onClick={() => {
-                  flushSave();
+                  saveDraft();
                   win.minimize();
                 }}
               ></span>
-              <span
-                className="window-dot dot-maximize"
-                role="button"
-                aria-label={win.maximized ? 'Exit full size' : 'Zoom'}
-                onClick={win.toggleMaximize}
-              ></span>
+              <span className="window-dot dot-maximize" role="button" aria-label={win.maximized ? 'Exit full size' : 'Zoom'} onClick={win.toggleMaximize}></span>
             </div>
 
+            <div className={`notes-app-layout ntw${ui.sidebar ? '' : ' is-sidebar-hidden'}`}>
+              {ui.sidebar && (
+                <NotesSidebar
+                  counts={counts}
+                  view={searching ? null : view}
+                  onView={(id) => {
+                    setQuery('');
+                    setUi((u) => ({ ...u, view: id }));
+                    // Open the view's first note if the open one isn't in it.
+                    const inView = filterView(notes, id, today);
+                    if (!inView.some((n) => n.id === draft.id)) {
+                      const first = listSections(inView, { sort: ui.sort, view: id, now }).flatMap((s) => s.notes)[0];
+                      if (first) openNote(first);
+                    }
+                  }}
+                  onNewNote={() => newNote('note')}
+                  onNewTask={() => newNote('task')}
+                  disabled={status !== 'ready'}
+                />
+              )}
 
-            {/* Split Pane macOS Layout */}
-            <div className="notes-app-layout">
-              {/* Left Sidebar */}
-              <aside className="notes-sidebar nsb">
-                {/* macOS 26 Notes: large title + count, compose button, search, dated sections. */}
-                <div className="nsb-header">
-                  <div className="nsb-heading">
-                    <h2>Notes</h2>
+              {/* The notes of the view */}
+              <section className="notes-sidebar nsb ntl" aria-label={listTitle}>
+                <div className="ntl-head">
+                  <button
+                    type="button"
+                    className="nt-icon-btn"
+                    title={ui.sidebar ? 'Hide Sidebar' : 'Show Sidebar'}
+                    aria-label={ui.sidebar ? 'Hide sidebar' : 'Show sidebar'}
+                    aria-pressed={ui.sidebar}
+                    onClick={() => setUi((u) => ({ ...u, sidebar: !u.sidebar }))}
+                  >
+                    <SidebarIcon size={17} />
+                  </button>
+                  <div className="nsb-heading ntl-heading">
+                    <h2>{listTitle}</h2>
                     <span className="nsb-count">
-                      {notes.length} {notes.length === 1 ? 'note' : 'notes'}
+                      {listed.length} {listed.length === 1 ? 'note' : 'notes'}
                     </span>
                   </div>
                   <button
                     type="button"
-                    className="nsb-compose"
-                    title="New Note (Ctrl+N)"
-                    aria-label="New note"
-                    onClick={handleAddNewNote}
+                    className="nt-icon-btn"
+                    title="Sort"
+                    aria-label="Sort notes"
+                    aria-haspopup="menu"
+                    onClick={(e) => setMenu({
+                      anchor: e.currentTarget,
+                      label: 'Sort',
+                      items: [{ type: 'header', label: 'Sort By' }, ...SORTS.map((s) => ({ label: s.label, checked: ui.sort === s.id, onSelect: () => setUi((u) => ({ ...u, sort: s.id })) }))],
+                    })}
                   >
-                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" />
-                      <path d="M17.6 3.4a2 2 0 0 1 2.9 2.9L12 14.8l-3.6.8.8-3.6z" />
-                    </svg>
+                    <SortIcon size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="nsb-compose"
+                    title={composeKind === 'task' ? 'New Task Note (Ctrl+Alt+N)' : 'New Note (Ctrl+N)'}
+                    aria-label={composeKind === 'task' ? 'New task note' : 'New note'}
+                    disabled={status !== 'ready'}
+                    onClick={() => newNote(composeKind)}
+                  >
+                    {composeKind === 'task' ? <NewTaskIcon size={17} /> : <ComposeIcon size={17} />}
                   </button>
                 </div>
 
                 <label className="nsb-search">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7" />
-                    <line x1="20.5" y1="20.5" x2="16" y2="16" />
-                  </svg>
+                  <SearchIcon size={14} />
                   <input
+                    ref={searchRef}
                     type="text"
-                    placeholder="Search"
-                    aria-label="Search notes"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search all notes"
+                    aria-label="Search all notes"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
                   />
-                  {searchQuery && (
-                    <button type="button" className="nsb-search-clear" aria-label="Clear search" onClick={() => setSearchQuery('')}>
+                  {query && (
+                    <button type="button" className="nsb-search-clear" aria-label="Clear search" onClick={() => setQuery('')}>
                       <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor" /><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#1c1c1e" strokeWidth="1.6" strokeLinecap="round" /></svg>
                     </button>
                   )}
                 </label>
 
                 <div className="nsb-list custom-scrollbar">
-                  {filteredNotes.length === 0 ? (
-                    <div className="nsb-empty">
-                      {searchQuery ? `No results for “${searchQuery}”` : 'No Notes'}
-                    </div>
-                  ) : (
-                    groupNotes(filteredNotes).map((group) => (
-                      <section key={group.label} className="nsb-group" aria-label={group.label}>
-                        <h3 className="nsb-group-title">{group.label}</h3>
-                        <ul className="nsb-rows">
-                          {group.notes.map((note) => {
-                            const isActive = note.id === activeNoteId;
-                            const snippet = markdownToText(note.content) || 'No additional text';
-                            return (
-                              <li key={note.id} className={`nsb-row${isActive ? ' is-active' : ''}`}>
-                                <button
-                                  type="button"
-                                  className="nsb-row-main"
-                                  aria-current={isActive ? 'true' : undefined}
-                                  onClick={() => selectNote(note.id)}
-                                >
-                                  <span className="nsb-row-title">{note.title || 'Untitled Note'}</span>
-                                  <span className="nsb-row-sub">
-                                    <span className="nsb-row-date">{rowDate(note.updatedAt)}</span>
-                                    <span className="nsb-row-snippet">{snippet}</span>
-                                  </span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="nsb-row-delete"
-                                  title="Delete note"
-                                  aria-label={`Delete ${note.title || 'note'}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteNote(note.id);
-                                  }}
-                                >
-                                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
-                                  </svg>
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </section>
-                    ))
-                  )}
+                  <NoteList
+                    key={searching ? 'search' : view /* a new list starts at its first rows */}
+                    sections={status === 'ready' ? sections : []}
+                    activeId={draft.id}
+                    view={searching ? 'all' : view}
+                    today={today}
+                    now={now}
+                    desktopIds={desktopIds}
+                    keep={keep?.keys}
+                    onAction={onRowAction}
+                    emptyText={emptyList}
+                  />
                 </div>
-              </aside>
+              </section>
 
-              {/* Right Editor Pane */}
-              <main className="notes-editor-pane">
-                {activeNoteId === null ? (
+              {/* The open note */}
+              <main className="notes-editor-pane" ref={editorRef}>
+                {draft.id === null || !stored ? (
                   <div className="notes-editor-empty">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
-                      <polyline points="10 9 9 9 8 9" />
-                    </svg>
-                    <p>Select a note or create a new one to start writing.</p>
-                    <button className="notes-new-btn-large" onClick={handleAddNewNote}>
-                      Create New Note
-                    </button>
+                    {status === 'error' ? (
+                      <p>Notes couldn’t open its storage. Your notes haven’t been changed; try reloading the page.</p>
+                    ) : status !== 'ready' ? null : (
+                      <>
+                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden="true">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <p>Write notes in Markdown, or plan your day with a Task Note.</p>
+                        <div className="nt-empty-actions">
+                          <button className="notes-new-btn-large" onClick={() => newNote('note')}>New Note</button>
+                          <button className="notes-new-btn-large" onClick={() => newNote('task')}>New Task Note</button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
-                  <div className="notes-editor-container">
+                  <div className={`notes-editor-container${isTask ? ' is-task-note' : ''}`}>
                     <div className="notes-editor-header">
                       <div className="notes-editor-meta">
-                        <span className="notes-save-indicator">
-                          {saveStatus === 'Saving...' && (
-                            <span className="saving-dots">Saving</span>
-                          )}
-                          {saveStatus === 'Saved' && 'Saved'}
-                          {saveStatus === 'Error' && 'Save Failed'}
+                        <span className={`notes-save-indicator${saveError ? ' is-error' : ''}`} role="status">
+                          {saveLabel === 'Saving' ? <span className="saving-dots">Saving</span> : saveLabel}
                         </span>
-                        <span className="notes-word-count">
-                          {getWordCount()} words • {getCharCount()} chars
-                        </span>
+                        {isTask && mode === 'checklist' ? null : isTask ? (
+                          <span className="notes-word-count ntw-progress">
+                            <ProgressBar done={progress.done} total={progress.total} className="is-small" />
+                            {progressLabel(progress)}
+                          </span>
+                        ) : (
+                          <span className="notes-word-count">
+                            {words} words • {draft.content.length} chars
+                          </span>
+                        )}
                       </div>
                       <div className="notes-editor-actions">
                         <div className="notes-mode-switch" role="tablist" aria-label="Editor mode">
-                          {[['write', 'Write'], ['preview', 'Preview']].map(([id, label]) => (
+                          {modeTabs.map(([id, label]) => (
                             <button
                               key={id}
                               type="button"
                               role="tab"
                               aria-selected={mode === id}
                               className={mode === id ? 'is-active' : ''}
-                              title={id === 'preview' ? 'Preview Markdown (Ctrl+Shift+P)' : 'Edit Markdown (Ctrl+Shift+P)'}
+                              title={id === 'write' ? 'Edit Markdown (Ctrl+Shift+P)' : `${label} (Ctrl+Shift+P)`}
                               onClick={() => setMode(id)}
                             >
                               {label}
@@ -651,24 +783,70 @@ export default function Notes() {
                           ))}
                         </div>
                         <button
-                          className="notes-action-btn notes-delete-btn"
-                          title="Delete Note"
-                          onClick={() => handleDeleteNote(activeNoteId)}
+                          type="button"
+                          className={`nt-icon-btn${stored.pinned ? ' is-on' : ''}`}
+                          title={stored.pinned ? 'Unpin Note' : 'Pin Note'}
+                          aria-label={stored.pinned ? 'Unpin note' : 'Pin note'}
+                          aria-pressed={Boolean(stored.pinned)}
+                          onClick={() => togglePin(stored)}
                         >
-                          Delete Note
+                          <PinIcon size={16} filled={stored.pinned} />
+                        </button>
+                        {isTask && (
+                          <button
+                            type="button"
+                            className={`nt-icon-btn${onDesktop ? ' is-on' : ''}`}
+                            title={onDesktop ? 'Remove from Desktop' : 'Show on Desktop'}
+                            aria-label={onDesktop ? 'Remove from desktop' : 'Show on desktop'}
+                            aria-pressed={onDesktop}
+                            onClick={() => toggleDesktop(stored)}
+                          >
+                            <DesktopIcon size={17} filled={onDesktop} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="nt-icon-btn"
+                          title="More"
+                          aria-label="More actions"
+                          aria-haspopup="menu"
+                          onClick={(e) => setMenu({ anchor: e.currentTarget, items: noteMenu(stored), label: titleOf(stored) })}
+                        >
+                          <MoreIcon size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="nt-icon-btn is-danger"
+                          title="Delete Note"
+                          aria-label="Delete note"
+                          onClick={() => removeNote(stored)}
+                        >
+                          <TrashIcon size={16} />
                         </button>
                       </div>
                     </div>
 
                     <input
+                      ref={titleRef}
                       type="text"
                       className="notes-editor-title-input"
                       placeholder="Title"
-                      value={editorTitle}
-                      onChange={(e) => handleEditorChange('title', e.target.value)}
+                      aria-label="Title"
+                      value={draft.title}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setDraft((d) => ({ ...d, title: value }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (mode === 'write') textareaRef.current?.focus();
+                          else editorRef.current?.querySelector('.ntc-add input, .notes-md-preview')?.focus();
+                        }
+                      }}
                     />
 
-                    {mode === 'write' ? (
+                    {mode === 'write' && (
                       <>
                         <div className="notes-md-toolbar" role="toolbar" aria-label="Markdown formatting">
                           <button
@@ -712,10 +890,13 @@ export default function Notes() {
                         <textarea
                           ref={textareaRef}
                           className="notes-editor-textarea custom-scrollbar"
-                          placeholder={'Start writing in Markdown…\n\n# Heading   **bold**   _italic_   - [ ] task   `code`'}
-                          value={editorContent}
+                          aria-label="Note text (Markdown)"
+                          placeholder={isTask
+                            ? 'One task per line:\n\n- [ ] Review pull request !! 📅 2026-11-03\n- [x] Fix login issue'
+                            : 'Start writing in Markdown…\n\n# Heading   **bold**   _italic_   - [ ] task   `code`'}
+                          value={draft.content}
                           onChange={(e) => changeContent(e.target.value, {
-                            kind: typingKind(editorContent, e.target.value),
+                            kind: typingKind(draft.content, e.target.value),
                             start: e.target.selectionStart,
                             end: e.target.selectionEnd,
                           })}
@@ -730,7 +911,8 @@ export default function Notes() {
                           }}
                         />
                       </>
-                    ) : (
+                    )}
+                    {mode === 'preview' && (
                       <div
                         className="notes-md-preview custom-scrollbar"
                         tabIndex={0}
@@ -743,6 +925,17 @@ export default function Notes() {
                         dangerouslySetInnerHTML={{ __html: previewHtml || '<p class="notes-md-empty">Nothing to preview yet.</p>' }}
                       />
                     )}
+                    {mode === 'checklist' && (
+                      <TaskChecklist
+                        content={draft.content}
+                        today={today}
+                        onChange={changeTasks}
+                        renderMarkdown={renderMarkdown}
+                        hideDone={ui.hideDone}
+                        onHideDoneChange={(hideDone) => setUi((u) => ({ ...u, hideDone }))}
+                        onUndoKeys={handleUndoKeys}
+                      />
+                    )}
                   </div>
                 )}
               </main>
@@ -750,6 +943,7 @@ export default function Notes() {
           </div>
         </div>
       )}
+      {menu && <PopupMenu anchor={menu.anchor} items={menu.items} label={menu.label} onClose={() => setMenu(null)} />}
     </>
   );
 }

@@ -2,15 +2,15 @@
 // and the formatting toolbar's text edits. Rendering the Preview is in markdownRender.js,
 // which Notes loads the first time it shows one (marked and DOMPurify stay out of startup).
 
-const TASK_RE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)( |x|X)(\])/gm;
+import { toggleChecked } from './tasks';
 
-/** Flips the n-th checklist item ("- [ ]" <-> "- [x]") in the Markdown source. */
+/**
+ * Flips the n-th checklist item ("- [ ]" <-> "- [x]") in the Markdown source. Items are
+ * counted as the Preview renders them (tasks.js), so code blocks and "- [ ]" with no text
+ * don't shift the count.
+ */
 export function toggleTask(source, n) {
-  let i = 0;
-  return source.replace(TASK_RE, (match, open, mark, close) => {
-    if (i++ !== n) return match;
-    return `${open}${mark === ' ' ? 'x' : ' '}${close}`;
-  });
+  return toggleChecked(source, { index: n });
 }
 
 /** Plain text of a Markdown note (for list snippets and word counts). */

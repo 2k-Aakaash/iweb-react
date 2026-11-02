@@ -7,6 +7,7 @@ import { allPrefs } from './prefs/storedPref';
 import './clock/clockStyle';
 import './controlcenter/ccPrefs';
 import './creator/creatorPrefs';
+import { announceReload } from './notes/notesStore';
 
 // Generic Promise-based IndexedDB helpers for notes DB
 function getNotesDB() {
@@ -543,6 +544,7 @@ export async function restoreFromIwebBackup(zip, metadata, selectedModules) {
       try {
         const notes = JSON.parse(await notesFile.async('string'));
         await restoreNotes(notes);
+        announceReload(); // other open tabs re-read their notes
       } catch (err) {
         console.error('Failed to restore notes:', err);
       }

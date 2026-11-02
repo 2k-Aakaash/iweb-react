@@ -1,0 +1,307 @@
+/* Task Notes on the desktop (src/components/notes/StickyLayer.jsx). By default a card is
+   clear frosted glass with white text, like iWeb's widgets; a chosen colour (card ⋯ menu →
+   Color) turns it into a sticky note in one of the macOS 26 Stickies colours, opaque like
+   paper, with dark ink. Everything colour-dependent is a variable set below. Above the
+   widgets (z 1000), under app windows (1100) and menus. */
+
+.stk-card {
+  /* Glass (no colour chosen) */
+  --stk-bg: rgba(28, 28, 32, 0.42);
+  --stk-border: rgba(255, 255, 255, 0.22);
+  --stk-ink: #fff;
+  --stk-ink-2: rgba(235, 235, 245, 0.7);
+  --stk-ink-3: rgba(235, 235, 245, 0.48);
+  --stk-wash: rgba(255, 255, 255, 0.1);
+  --stk-hover: rgba(255, 255, 255, 0.06);
+  --stk-box: rgba(255, 255, 255, 0.55);
+  --stk-track: rgba(255, 255, 255, 0.18);
+  --stk-fill: #ffd60a;
+  --stk-tick: #1c1c1e;
+  --stk-overdue: #ff8a80;
+  --stk-overdue-bg: rgba(255, 69, 58, 0.2);
+  --stk-priority: #ff9f0a;
+  --stk-shine: rgba(255, 255, 255, 0.22);
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 260px;
+  padding-bottom: 10px;
+  border: 1px solid var(--stk-border);
+  border-radius: 14px;
+  background: var(--stk-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.16), inset 0 1px 0 var(--stk-shine);
+  color: var(--stk-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  text-align: left;
+  transition: box-shadow 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+}
+
+/* Paper colours: opaque, so there's nothing to blur. */
+.stk-card[data-color] {
+  --stk-ink: #2b2b2b;
+  --stk-ink-2: rgba(0, 0, 0, 0.58);
+  --stk-ink-3: rgba(0, 0, 0, 0.4);
+  --stk-wash: rgba(0, 0, 0, 0.07);
+  --stk-hover: rgba(0, 0, 0, 0.045);
+  --stk-box: rgba(0, 0, 0, 0.42);
+  --stk-track: rgba(0, 0, 0, 0.12);
+  --stk-tick: #fff;
+  --stk-overdue: #a3241b;
+  --stk-overdue-bg: rgba(179, 38, 30, 0.12);
+  --stk-priority: #b85400;
+  --stk-shine: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.stk-card[data-color='yellow'] { --stk-bg: linear-gradient(180deg, #fff4ad, #fde88a); --stk-border: rgba(120, 95, 0, 0.2); --stk-ink: #3b3000; --stk-fill: #8a6a00; }
+.stk-card[data-color='blue'] { --stk-bg: linear-gradient(180deg, #d9eefd, #a9d4f5); --stk-border: rgba(0, 70, 130, 0.18); --stk-ink: #062c4d; --stk-fill: #1f6fb2; }
+.stk-card[data-color='green'] { --stk-bg: linear-gradient(180deg, #e2f8d2, #b9eb9c); --stk-border: rgba(30, 100, 20, 0.18); --stk-ink: #173d0c; --stk-fill: #3d8a25; }
+.stk-card[data-color='pink'] { --stk-bg: linear-gradient(180deg, #ffe0ed, #fbb6d2); --stk-border: rgba(140, 20, 70, 0.16); --stk-ink: #4d0a27; --stk-fill: #c2316e; }
+.stk-card[data-color='purple'] { --stk-bg: linear-gradient(180deg, #efe4fd, #d3baf5); --stk-border: rgba(80, 30, 140, 0.16); --stk-ink: #2e1052; --stk-fill: #7a45c4; }
+.stk-card[data-color='gray'] { --stk-bg: linear-gradient(180deg, #f2f2f2, #d8d8d8); --stk-border: rgba(0, 0, 0, 0.14); --stk-ink: #262626; --stk-fill: #5b5b5b; }
+
+.stk-card button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font-family: inherit;
+}
+
+.stk-card.is-dragging {
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.38), 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 var(--stk-shine);
+  transition: none;
+  will-change: transform;
+}
+
+/* ── Title bar: the drag handle ──────────────────────────────────────────── */
+
+.stk-head {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 6px 3px 12px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.stk-card.is-dragging .stk-head {
+  cursor: grabbing;
+}
+
+.stk-title {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px 2px 0;
+  border-radius: 6px;
+  outline: none;
+}
+
+.stk-title:focus-visible {
+  box-shadow: 0 0 0 2px #0a84ff;
+}
+
+.stk-title-text {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stk-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--stk-ink-2);
+}
+
+.stk-btn {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--stk-ink-2);
+  cursor: pointer;
+}
+
+.stk-btn:hover {
+  background: var(--stk-wash);
+  color: var(--stk-ink);
+}
+
+.stk-btn:focus-visible,
+.stk-task .nt-check:focus-visible,
+.stk-add input:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 1px;
+}
+
+/* ── Progress ────────────────────────────────────────────────────────────── */
+
+.stk-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 14px;
+  padding: 0 12px 6px;
+  font-size: 11px;
+  color: var(--stk-ink-2);
+}
+
+.stk-card .nt-progress {
+  width: 56px;
+  background: var(--stk-track);
+}
+
+.stk-card .nt-progress > span {
+  background: var(--stk-fill);
+}
+
+/* ── Tasks ───────────────────────────────────────────────────────────────── */
+
+.stk-list {
+  max-height: 172px;
+  margin: 0;
+  padding: 0 6px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stk-track) transparent;
+}
+
+.stk-card.is-expanded .stk-list {
+  max-height: min(60vh, 460px);
+}
+
+.stk-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 4px 4px 4px calc(4px + var(--depth, 0) * 18px);
+  border-radius: 7px;
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+
+.stk-task:hover {
+  background: var(--stk-hover);
+}
+
+.stk-task label {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.stk-task .nt-check {
+  margin-top: 1px;
+  border-color: var(--stk-box);
+}
+
+.stk-task .nt-check:hover {
+  border-color: var(--stk-ink);
+}
+
+.stk-task .nt-check:checked {
+  border-color: var(--stk-fill);
+  background-color: var(--stk-fill);
+}
+
+/* On paper the tick is white (the glass card keeps the Notes window's dark tick on yellow). */
+.stk-card[data-color] .stk-task .nt-check:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.4 2.6 2.6L12 5.4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.stk-task-text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.stk-task.is-done .stk-task-text {
+  color: var(--stk-ink-3);
+  text-decoration: line-through;
+}
+
+.stk-card .ntc-due {
+  background: var(--stk-wash);
+  color: var(--stk-ink-2);
+  font-size: 11px;
+}
+
+.stk-card .ntc-due.is-today {
+  color: var(--stk-ink);
+  font-weight: 700;
+}
+
+.stk-card .ntc-due.is-overdue {
+  background: var(--stk-overdue-bg);
+  color: var(--stk-overdue);
+}
+
+.stk-card .ntc-priority {
+  color: var(--stk-priority);
+}
+
+.stk-empty {
+  padding: 6px 6px 2px;
+  font-size: 12.5px;
+  color: var(--stk-ink-2);
+}
+
+/* ── Add a task ──────────────────────────────────────────────────────────── */
+
+.stk-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 10px 0;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--stk-wash);
+  color: var(--stk-ink-3);
+}
+
+.stk-add input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--stk-ink);
+  font-size: 13px;
+}
+
+.stk-add input::placeholder {
+  color: var(--stk-ink-3);
+}
+
+/* Edit Widgets: cards step back so widgets can be arranged under them. Focus: only the clock,
+   the search bar and the Dock stay (controlcenter.css). */
+html.desktop-editing .stk-card {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+html.cc-focus:not(.desktop-editing) .stk-card {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stk-card {
+    transition: none;
+  }
+}

@@ -7,12 +7,13 @@ import '../../styles/desktop.css';
 
 // iWeb's right-click menu, in place of the browser's, styled after macOS 26 menus (plain
 // frosted CSS, no Liquid Glass). The browser's own menu stays where it is useful: text fields,
-// selected text, and inside app windows (Notes, Settings…), whose content has its own uses.
+// selected text, and inside app windows (Notes, Settings…) and the desktop's Task Note cards,
+// whose content has its own uses.
 
 const NATIVE_INSIDE = [
   'input', 'textarea', 'select', '[contenteditable="true"]', '[role="dialog"]', '[aria-modal="true"]',
   '.settings-overlay', '.search-modal-overlay', '.notes-overhaul-modal', '.music-overhaul-modal',
-  '.news-overlay', '.mk-overlay', 'iframe',
+  '.news-overlay', '.mk-overlay', '.stk-card', 'iframe',
 ].join(',');
 
 function wantsNativeMenu(target) {

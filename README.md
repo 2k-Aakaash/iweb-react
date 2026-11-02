@@ -36,7 +36,7 @@ One click from the menu bar: Now Playing, volume and sound output, wallpaper bri
 
 ### Built-in apps
 
-- **Notes:** write in Markdown with a live preview.
+- **Notes and daily tasks:** write in Markdown with a live preview, or plan your day in Task Notes: checklists with due dates and priorities, and Today, Overdue and Upcoming views. Pin a Task Note to the desktop as a sticky card you can tick off and drag anywhere. ([details](docs/NOTES.md))
 - **Music:** play your local music library, with playlists, shuffle and repeat.
 - **Markets and News:** follow your stocks and read top stories without leaving the tab.
 - **Spotlight (Ctrl K):** search your bookmarks, history and the web, convert currencies and check stock prices as you type.

@@ -21,12 +21,15 @@ export function groupLabel(t, now = Date.now()) {
   return date.toLocaleDateString(undefined, sameYear ? { month: 'long' } : { month: 'long', year: 'numeric' });
 }
 
-/** Notes newest first, split into [{ label, notes }] sections. */
-export function groupNotes(notes, now = Date.now()) {
-  const sorted = [...notes].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+/**
+ * Notes newest first, split into [{ label, notes }] sections. `time(note)` picks the date
+ * (default: last edited).
+ */
+export function groupNotes(notes, now = Date.now(), time = (note) => note.updatedAt ?? 0) {
+  const sorted = [...notes].sort((a, b) => time(b) - time(a));
   const groups = [];
   for (const note of sorted) {
-    const label = groupLabel(note.updatedAt ?? 0, now);
+    const label = groupLabel(time(note), now);
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.notes.push(note);
     else groups.push({ label, notes: [note] });

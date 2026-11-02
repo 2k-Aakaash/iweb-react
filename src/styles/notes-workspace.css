@@ -1,0 +1,664 @@
+/* Notes as a three-column workspace, after macOS 26 Notes: views (ntn), the view's notes
+   (ntl, built on the sidebar rows in notes-sidebar.css) and the editor, whose Task Notes
+   have a Checklist view (ntc). The window keeps its Liquid Glass; the columns are quiet
+   tinted panels inside it, so text stays crisp. Narrow windows fold the views to icons. */
+
+.notes-overhaul-modal {
+  container: notes / inline-size;
+}
+
+.notes-overhaul-modal:not(.window-maximized) {
+  width: 1200px !important;
+}
+
+.ntw button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font-family: inherit;
+}
+
+.notes-app-layout.ntw {
+  display: grid;
+  grid-template-columns: 196px 300px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr); /* the columns scroll inside the window */
+  gap: 12px;
+}
+
+.ntw > * {
+  min-height: 0;
+}
+
+.notes-app-layout.ntw.is-sidebar-hidden {
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+.ntw > .notes-sidebar.nsb {
+  width: auto;
+  min-width: 0;
+}
+
+.ntw .notes-editor-pane {
+  min-width: 0;
+}
+
+/* ── Views ───────────────────────────────────────────────────────────────── */
+
+.ntn {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 8px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.18);
+  text-align: left;
+}
+
+.ntn-new {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 2px 8px;
+}
+
+.ntn-new-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ntn-new-btn svg {
+  color: #ffd60a;
+}
+
+.ntn-new-btn:hover {
+  background: rgba(255, 255, 255, 0.17);
+}
+
+.ntn-new-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ntn-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ntn-heading {
+  margin: 0;
+  padding: 10px 10px 4px;
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.ntn-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ntn-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.ntn-item svg {
+  flex-shrink: 0;
+  color: #ffd60a;
+}
+
+.ntn-item.is-alert svg {
+  color: #ff6961;
+}
+
+.ntn-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ntn-item.is-selected {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ntn-item:focus-visible,
+.ntn-new-btn:focus-visible,
+.nt-icon-btn:focus-visible,
+.nt-text-btn:focus-visible,
+.ntc-text:focus-visible,
+.ntc-more:focus-visible,
+.ntc-due:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: -1px;
+}
+
+.ntn-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ntn-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+/* ── Note list ───────────────────────────────────────────────────────────── */
+
+.ntl-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 10px 2px;
+}
+
+.ntl-heading {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.ntl-heading h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ntl-head .nsb-compose:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.nt-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.nt-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.nt-icon-btn.is-on {
+  color: #ffd60a;
+}
+
+.nt-icon-btn.is-danger:hover {
+  background: rgba(255, 69, 58, 0.2);
+  color: #ff6961;
+}
+
+.ntl-title-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ntl-title-line .nsb-row-title {
+  min-width: 0;
+}
+
+.ntl-kind {
+  flex-shrink: 0;
+  color: #ffd60a;
+}
+
+.ntl-flag {
+  flex-shrink: 0;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.ntl-row.is-active .ntl-flag {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.ntl-task-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: rgba(235, 235, 245, 0.62);
+}
+
+.ntl-task-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ⋯ button sits by the title (rows with tasks under them are taller). */
+.ntl-more.nsb-row-delete {
+  top: 8px;
+  transform: none;
+}
+
+.nsb-row-delete.ntl-more:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.ntl-more-rows {
+  height: 1px;
+}
+
+.ntl-tasks {
+  margin: -2px 0 0;
+  padding: 0 12px 9px 12px;
+  list-style: none;
+}
+
+.ntl-task {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.ntl-task.is-done .ntl-task-text {
+  color: rgba(235, 235, 245, 0.45);
+  text-decoration: line-through;
+}
+
+.ntl-task-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── Editor ──────────────────────────────────────────────────────────────── */
+
+.ntw .notes-editor-actions {
+  gap: 2px;
+}
+
+.ntw .notes-mode-switch {
+  margin-right: 6px;
+}
+
+.ntw .notes-editor-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.notes-save-indicator.is-error {
+  color: #ff6961;
+  font-style: normal;
+}
+
+.ntw-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nt-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* ── Checklist (Task Notes) ──────────────────────────────────────────────── */
+
+.ntc {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.ntc-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: -6px 0 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ntc-summary-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(235, 235, 245, 0.75);
+}
+
+.ntc-summary-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.nt-text-btn {
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: #ffd60a;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.nt-text-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.nt-text-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ntc-body {
+  flex: 1 0 auto;
+}
+
+.ntc-md.notes-md-preview {
+  flex: none;
+  overflow: visible;
+  margin: 8px 0;
+  cursor: default;
+}
+
+.ntc-list {
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ntc-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 3px 4px 3px calc(var(--depth, 0) * 26px);
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.ntc-row:hover,
+.ntc-row:focus-within {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ntc-row.is-dragging {
+  z-index: 2;
+  background: rgba(60, 60, 66, 0.92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.ntc-grip {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.12s ease;
+}
+
+.ntc-row:hover .ntc-grip,
+.ntc-row.is-dragging .ntc-grip {
+  opacity: 1;
+}
+
+.ntc-row.is-dragging .ntc-grip {
+  cursor: grabbing;
+}
+
+.ntc-text {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: left;
+  word-break: break-word;
+  cursor: text;
+}
+
+.ntc-row.is-done .ntc-text {
+  color: rgba(235, 235, 245, 0.45);
+  text-decoration: line-through;
+  text-decoration-color: rgba(235, 235, 245, 0.35);
+}
+
+.ntc-edit {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  outline: 2px solid rgba(10, 132, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.ntc-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ntc-date {
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  color-scheme: dark;
+  font-size: 12px;
+}
+
+.ntc-more {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ntc-row:hover .ntc-more,
+.ntc-row:focus-within .ntc-more,
+.ntc-more[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.ntc-more:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.ntc-drop {
+  height: 2px;
+  margin: -1px 0 -1px calc(var(--depth, 0) * 26px + 24px);
+  border-radius: 1px;
+  background: #0a84ff;
+  list-style: none;
+}
+
+.ntc-drop.is-end {
+  margin-left: 24px;
+}
+
+.ntc-empty,
+.ntc-hidden-note {
+  margin: 0;
+  padding: 10px 4px;
+  font-size: 13px;
+  color: rgba(235, 235, 245, 0.45);
+}
+
+.ntc-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.ntc-add:focus-within {
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.6);
+}
+
+.ntc-add input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-size: 14.5px;
+}
+
+.ntc-add input::placeholder {
+  color: rgba(235, 235, 245, 0.45);
+}
+
+/* ── Menus ───────────────────────────────────────────────────────────────── */
+
+.nt-menu {
+  min-width: 210px;
+}
+
+.dt-menu-item.is-danger {
+  color: #ff6961;
+}
+
+.dt-menu-item.is-danger:hover,
+.dt-menu-item.is-danger:focus {
+  color: #fff;
+}
+
+.dt-menu-item[aria-disabled='true'] {
+  opacity: 0.4;
+}
+
+/* ── Narrow windows: the views fold to icons; then the list narrows ──────── */
+
+@container notes (max-width: 1040px) {
+  .notes-app-layout.ntw {
+    grid-template-columns: 50px 280px minmax(0, 1fr);
+  }
+
+  .ntn {
+    padding: 10px 5px 6px;
+  }
+
+  .ntn-new {
+    grid-template-columns: 1fr;
+    padding: 0 0 6px;
+  }
+
+  .ntn-new-btn {
+    padding: 0;
+  }
+
+  .ntn-new-btn span,
+  .ntn-label,
+  .ntn-count,
+  .ntn-heading {
+    display: none;
+  }
+
+  .ntn-list + .ntn-heading,
+  .ntn-heading + .ntn-list {
+    margin-top: 8px;
+  }
+
+  .ntn-item {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+@container notes (max-width: 820px) {
+  .notes-app-layout.ntw {
+    grid-template-columns: 50px 240px minmax(0, 1fr);
+  }
+
+  .notes-app-layout.ntw.is-sidebar-hidden {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .ntw .notes-editor-container {
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ntc-row,
+  .ntc-grip,
+  .ntn-item {
+    transition: none;
+  }
+}

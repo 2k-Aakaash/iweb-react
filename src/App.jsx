@@ -9,7 +9,6 @@ import Dock from './components/Dock';
 import SmartStack from './components/widgets/SmartStack';
 import { STACK_WIDGETS } from './components/widgets/stackWidgets';
 import Music from './components/Music';
-import Notes from './components/Notes';
 import { SearchBar } from './search/components/SearchBar';
 import UpdateNotice from './components/update/UpdateNotice';
 import { openIwebDB } from './libs/wallpaper/db';
@@ -24,6 +23,8 @@ import { snapToSlots, useDesktop } from './libs/desktop/layoutStore';
 import { setDesktopTopInset } from './libs/desktop/layout';
 import { desktopInsetFor, useMenubarMode } from './libs/menubar/menubarPrefs';
 import { useFullscreen } from './components/menubar/status';
+import { NOTES_OPEN_EVENT } from './libs/notes/notesEvents';
+import { useStickies } from './libs/notes/stickyStore';
 
 // The Markets and News apps are loaded on first open, so they add nothing to the new-tab
 // bundle. If a chunk can't be fetched (offline, or a page left open across a deploy) it logs
@@ -35,6 +36,29 @@ const MarketsModal = React.lazy(() => import('./components/markets/MarketsModal'
 const NewsModal = React.lazy(() => import('./components/news/NewsModal').catch((err) => {
   console.error('Failed to load the News app:', err);
   return { default: AppUnavailable };
+}));
+
+// Notes (the window, its Markdown and task tools) mounts on first open. Its code and the
+// notes themselves are loaded once the desktop is idle, so the Dock opens it at once: a
+// window whose code is already here is rendered directly (React.lazy would still hold a
+// freshly resolved boundary back for ~300 ms), and it genies out with its notes in place.
+// Task Notes pinned to the desktop (sticky cards) load their own small chunk, only while
+// there is at least one.
+let NotesLoaded = null;
+const loadNotes = () => import('./components/Notes').then((m) => {
+  NotesLoaded = m.default;
+  return m;
+});
+const preloadNotes = () => loadNotes()
+  .then(() => import('./libs/notes/notesStore'))
+  .then((m) => m.ensureLoaded());
+const NotesLazy = React.lazy(() => loadNotes().catch((err) => {
+  console.error('Failed to load Notes:', err);
+  return { default: AppUnavailable };
+}));
+const StickyLayer = React.lazy(() => import('./components/notes/StickyLayer').catch((err) => {
+  console.error('Failed to load the desktop notes:', err);
+  return { default: () => null };
 }));
 
 // Spotlight (with Framer Motion, Radix, the search database, engines and worker) mounts the
@@ -88,6 +112,11 @@ export default function App() {
   const [newsOpen, setNewsOpen] = useState(false);
   const [newsLoaded, setNewsLoaded] = useState(false);
   const [marketsSymbol, setMarketsSymbol] = useState(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesRequest, setNotesRequest] = useState(undefined); // set on first open: then mounted
+  const [NotesWindow, setNotesWindow] = useState(null); // chosen once, so it never remounts
+  const stickies = useStickies();
+  const hasStickies = Object.keys(stickies.cards).length > 0;
 
   const changeBgRef = useRef(null);
   const desktop = useDesktop();
@@ -169,6 +198,7 @@ export default function App() {
     whenIdle(() => {
       loadSpotlight().catch(() => {});
       loadSettings().catch(() => {});
+      preloadNotes().catch(() => {});
     });
   }, []);
 
@@ -214,6 +244,18 @@ export default function App() {
     };
     window.addEventListener(MARKETS_OPEN_EVENT, handleOpenMarkets);
     return () => window.removeEventListener(MARKETS_OPEN_EVENT, handleOpenMarkets);
+  }, []);
+
+  // The Dock, the menu bar and the desktop sticky cards open Notes (on a note, or a new one).
+  // The first request is handed to Notes as it mounts; later ones it hears itself.
+  useEffect(() => {
+    const handleOpenNotes = (e) => {
+      setNotesRequest((first) => (first === undefined ? e.detail || null : first));
+      setNotesWindow((current) => current || NotesLoaded || NotesLazy); // the updater's result is stored as is
+      setNotesOpen(true);
+    };
+    window.addEventListener(NOTES_OPEN_EVENT, handleOpenNotes);
+    return () => window.removeEventListener(NOTES_OPEN_EVENT, handleOpenNotes);
   }, []);
 
   // The News widget and the News Dock icon open the News app.
@@ -269,6 +311,13 @@ export default function App() {
       </DesktopItem>
       {/* Instagram Analytics is in development (ITEMS.instagram.inDevelopment): never placed. */}
 
+      {/* Task Notes on the desktop: above the widgets, under app windows. */}
+      {hasStickies && (
+        <Suspense fallback={null}>
+          <StickyLayer />
+        </Suspense>
+      )}
+
       {/* 3. The clock, the quote under it, and the Spotlight search bar */}
       <DesktopItem id="clock">
         <Clock clockFont={clockFont} />
@@ -287,13 +336,17 @@ export default function App() {
         bookmarks={bookmarks}
         setBookmarks={setBookmarks}
         onChangeBg={() => changeBgRef.current?.()}
-        onOpenNotes={() => window.dispatchEvent(new CustomEvent('notes:open'))}
+        onOpenNotes={() => window.dispatchEvent(new CustomEvent(NOTES_OPEN_EVENT))}
         onOpenSettings={() => window.dispatchEvent(new CustomEvent('settings:open'))}
         onOpenMusicLibrary={() => setShowMusicLibrary(true)}
       />
 
-      {/* 5. Notes Section */}
-      <Notes />
+      {/* 5. Notes: loaded on first open, then kept (genie, minimized state, drafts) */}
+      {NotesWindow && (
+        <Suspense fallback={null}>
+          <NotesWindow open={notesOpen} setOpen={setNotesOpen} initialRequest={notesRequest} />
+        </Suspense>
+      )}
 
       {/* 6. Background and Customization Controllers */}
       <Background 
