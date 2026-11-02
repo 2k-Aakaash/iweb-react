@@ -53,6 +53,17 @@ const SettingsModal = React.lazy(() => loadSettings().catch((err) => {
   return { default: ({ onClose }) => <AppUnavailable setOpen={() => onClose?.()} /> };
 }));
 
+// The Creator widgets (YouTube and Instagram analytics) load only when on the desktop: until
+// someone adds one, none of their code is fetched. DesktopItem renders nothing for a hidden
+// item, so the lazy import never starts for them.
+const YouTubeWidget = React.lazy(() => import('./components/creator/YouTubeWidget').catch((err) => {
+  console.error('Failed to load the YouTube widget:', err);
+  return { default: () => null };
+}));
+
+// Holds the widget's slot while its code loads, so nothing else is placed on top of it.
+const widgetSlot = <div aria-hidden="true" style={{ width: 'var(--widget-w)', height: 'var(--widget-h)' }} />;
+
 const whenIdle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 1500));
 
 function AppUnavailable({ setOpen }) {
@@ -251,6 +262,12 @@ export default function App() {
       <DesktopItem id="news">
         <NewsWidget size={desktop.layout.news.size} />
       </DesktopItem>
+      <DesktopItem id="youtube">
+        <Suspense fallback={widgetSlot}>
+          <YouTubeWidget size={desktop.layout.youtube.size} />
+        </Suspense>
+      </DesktopItem>
+      {/* Instagram Analytics is in development (ITEMS.instagram.inDevelopment): never placed. */}
 
       {/* 3. The clock, the quote under it, and the Spotlight search bar */}
       <DesktopItem id="clock">

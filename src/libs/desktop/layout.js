@@ -39,6 +39,9 @@ export const PITCH = WIDGET_SIZES.small.w + GUTTER; // 166
 // Movable items. Widgets have fixed sizes from WIDGET_SIZES; the clock, quote and search bar
 // scale. `stackable` widgets can live in the Smart Stack (stack.pages) or on the desktop on
 // their own, never both. The search bar can be removed: Ctrl K still opens Spotlight.
+// `category` groups widgets in the gallery (Creator Widgets); `findSpot` widgets take the
+// first free slot when added, since they have no place of their own yet. `inDevelopment`
+// widgets are listed in the gallery as coming soon but can't be placed (always hidden).
 export const ITEMS = Object.freeze({
   clock: { label: 'Clock', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: false },
   quote: { label: 'Quote', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: true },
@@ -49,6 +52,8 @@ export const ITEMS = Object.freeze({
   currency: { label: 'Currency Converter', kind: 'widget', sizes: ['small', 'medium'], removable: true, stackable: true },
   metals: { label: 'Gold & Silver', kind: 'widget', sizes: ['small', 'medium'], removable: true, stackable: true },
   markets: { label: 'Markets', kind: 'widget', sizes: ['small', 'medium'], removable: true, stackable: true },
+  youtube: { label: 'YouTube Analytics', kind: 'widget', sizes: ['small', 'medium', 'large'], removable: true, category: 'creator', findSpot: true },
+  instagram: { label: 'Instagram Analytics', kind: 'widget', sizes: ['small', 'medium', 'large'], removable: true, category: 'creator', findSpot: true, inDevelopment: true },
 });
 
 export const STACKABLE = Object.freeze(Object.keys(ITEMS).filter((id) => ITEMS[id].stackable));
@@ -78,6 +83,9 @@ export const DEFAULT_LAYOUT = Object.freeze({
   currency: { ax: 'left', x: 182, ay: 'top', y: 182, size: 'small', hidden: true },
   metals: { ax: 'left', x: 16, ay: 'top', y: 348, size: 'small', hidden: true },
   markets: { ax: 'left', x: 182, ay: 'top', y: 348, size: 'small', hidden: true },
+  // Creator widgets start off the desktop; added, they take the first free slot.
+  youtube: { ax: 'left', x: 16, ay: 'top', y: 182, size: 'medium', hidden: true },
+  instagram: { ax: 'left', x: 16, ay: 'top', y: 348, size: 'medium', hidden: true },
 });
 
 const AX = ['left', 'center', 'right'];
@@ -115,7 +123,7 @@ export function normalizeLayout(input) {
     out[id] = {
       ...(validPos(item) ? { ax: item.ax, x: item.x, ay: item.ay, y: item.y } : { ax: def.ax, x: def.x, ay: def.ay, y: def.y }),
       size: ITEMS[id].sizes.includes(item?.size) ? item.size : def.size,
-      hidden: ITEMS[id].removable ? Boolean(item?.hidden ?? def.hidden) : false,
+      hidden: ITEMS[id].inDevelopment ? true : ITEMS[id].removable ? Boolean(item?.hidden ?? def.hidden) : false,
     };
   }
   // Stack pages: known stackable widgets, each once, in order; a widget shown on the desktop
@@ -150,9 +158,13 @@ export function placementOf(layout, id) {
   return layout.stack.pages.includes(id) ? 'stack' : 'hidden';
 }
 
-/** Items that can be added back to the desktop: removed ones (not on it, not in the stack). */
+/**
+ * Items that can be added back to the desktop: removed ones (not on it, not in the stack).
+ * Widgets of a category (Creator Widgets) are added from the widget gallery, not offered here.
+ */
 export function addableItems(layout) {
-  return Object.keys(ITEMS).filter((id) => placementOf(layout, id) === 'hidden' && (id !== 'stack' || layout.stack.pages.length > 0));
+  return Object.keys(ITEMS).filter((id) => !ITEMS[id].category && placementOf(layout, id) === 'hidden'
+    && (id !== 'stack' || layout.stack.pages.length > 0));
 }
 
 /** Top-left of an item of size w×h for its anchors, kept on screen. */

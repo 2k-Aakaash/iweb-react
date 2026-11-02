@@ -96,9 +96,10 @@ describe('v2 -> v3 migration', () => {
     });
 
     const db = await openIwebDB();
-    expect(db.version).toBe(6);
+    expect(db.version).toBe(7);
     expect(Array.from(db.objectStoreNames).sort()).toEqual(
-      [STORES.LOCAL, STORES.FONTS, STORES.UNSPLASH, STORES.META, STORES.FAVICONS, STORES.PROFILE, STORES.NEWS_ARTICLES, STORES.NEWS_FEEDS].sort(),
+      [STORES.LOCAL, STORES.FONTS, STORES.UNSPLASH, STORES.META, STORES.FAVICONS, STORES.PROFILE, STORES.NEWS_ARTICLES, STORES.NEWS_FEEDS,
+        STORES.CREATOR_ACCOUNTS, STORES.CREATOR_SNAPSHOTS].sort(),
     );
 
     const local = await listLocal();

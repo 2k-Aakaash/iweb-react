@@ -599,3 +599,312 @@ html.wg-dragging * {
     animation: none;
   }
 }
+
+/* ---- Categories (Creator Widgets) ---- */
+.wg-list-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wg-list-category {
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+}
+
+.wg-list-sub {
+  padding-left: 18px;
+}
+
+.wg-category {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wg-category-head h3 {
+  margin: 6px 0 0;
+  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-size: 15px;
+  color: #fff;
+}
+
+.wg-category-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wg-btn-danger {
+  background: #ff453a;
+  border-color: transparent;
+}
+
+.wg-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- Creator accounts (CreatorAccounts.jsx) ---- */
+.wg-cr {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.wg-cr-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wg-cr-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+}
+
+.wg-cr-account.is-selected {
+  border-color: rgba(10, 132, 255, 0.45);
+}
+
+.wg-cr-account-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.wg-cr-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.wg-cr-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wg-cr-name {
+  overflow: hidden;
+  color: #fff;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wg-cr-meta,
+.wg-cr-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.wg-cr-error {
+  font-size: 11px;
+  color: #ff9f97;
+}
+
+.wg-cr-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.wg-cr-confirm {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.wg-cr-add,
+.wg-cr-connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wg-cr-add input {
+  flex: 1 1 220px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  outline: none;
+}
+
+.wg-cr-add input:focus {
+  border-color: rgba(10, 132, 255, 0.8);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25);
+}
+
+.wg-cr-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.wg-cr-inline select {
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(40, 40, 44, 0.9);
+  color: #fff;
+  font: inherit;
+}
+
+.wg-cr-waiting {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.wg-cr-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.wg-cr-message {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wg-cr-message.is-error {
+  background: rgba(255, 69, 58, 0.14);
+  color: #ffb3ad;
+}
+
+.wg-cr-message.is-info {
+  background: rgba(10, 132, 255, 0.14);
+  color: #a9d1ff;
+}
+
+.wg-cr-add button,
+.wg-cr-connect button,
+.wg-cr-account-actions button {
+  margin: 0;
+}
+
+/* ---- Creator previews ---- */
+.wgp-creator {
+  gap: 12px;
+  background: linear-gradient(160deg, #3b1d22, #1d1a20);
+  color: #fff;
+}
+
+.wgp-creator-instagram {
+  background: linear-gradient(160deg, #47224f, #4a2a22);
+}
+
+.wgp-creator-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wgp-creator-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.wgp-creator-who {
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+}
+
+.wgp-creator-who i {
+  font-style: normal;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.wgp-creator-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.wgp-creator-grid.is-small {
+  grid-template-columns: 1fr;
+}
+
+.wgp-creator-grid span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.wgp-creator-grid i {
+  font-style: normal;
+  opacity: 0.6;
+}
+
+.wgp-creator .wgp-line {
+  width: 70%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.wgp-creator-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.wgp-creator-rows .wgp-line {
+  width: 100%;
+  height: 9px;
+}
+
+/* ---- In development (Instagram Analytics): previewed, not usable ---- */
+.wg-section.is-development .wg-sizes {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  pointer-events: none;
+}
+
+.wg-section.is-development .wg-tile {
+  cursor: default;
+}
+
+.wg-status.is-development {
+  background: rgba(255, 159, 10, 0.18);
+  color: #ffc46b;
+}

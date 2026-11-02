@@ -1,0 +1,498 @@
+/* Creator Widgets: YouTube Analytics and Instagram Analytics (src/components/creator).
+   Same card language as News and the Smart Stack: Liquid Glass with a dark tint so white
+   text reads on any wallpaper, a hint of each platform's colour, 18px corners. Sizes come
+   from the desktop item (--widget-w × --widget-h: 150², 316×150, 316²). */
+
+.crw-card {
+  --crw-muted: rgba(255, 255, 255, 0.62);
+  --crw-faint: rgba(255, 255, 255, 0.45);
+  --crw-hair: rgba(255, 255, 255, 0.12);
+  --glass-tint-opacity: 0.6;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: var(--widget-w, 316px);
+  height: var(--widget-h, 150px);
+  padding: 11px 13px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 18px;
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-align: left;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.38), 0 2px 8px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.crw-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(16, 16, 22, 0.42);
+}
+
+.crw-youtube {
+  --glass-tint: linear-gradient(160deg, rgba(120, 22, 26, 0.55), rgba(28, 18, 22, 0.75));
+  --crw-accent: #ff4d4d;
+  --crw-glyph-bg: linear-gradient(160deg, #ff4b4b, #d61f1f);
+  --crw-glyph-cut: #d92323;
+}
+
+.crw-instagram {
+  --glass-tint: linear-gradient(160deg, rgba(118, 38, 128, 0.5), rgba(170, 60, 40, 0.42));
+  --crw-accent: #ff6fae;
+  --crw-glyph-bg: linear-gradient(45deg, #f9b234 0%, #e8333f 45%, #c0309a 75%, #6a4ce0 100%);
+}
+
+.crw-card button {
+  margin: 0; /* legacy global `button { margin-top }` */
+  font: inherit;
+}
+
+/* ── Header: who ─────────────────────────────────────────────────────────── */
+
+.crw-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.crw-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.crw-avatar-glyph {
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--crw-glyph-bg);
+  color: #fff;
+}
+
+.crw-small .crw-avatar {
+  width: 22px;
+  height: 22px;
+}
+
+.crw-small .crw-avatar-glyph {
+  border-radius: 6px;
+}
+
+.crw-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.crw-name {
+  overflow: hidden;
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crw-small .crw-name {
+  font-size: 12px;
+}
+
+.crw-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--crw-muted);
+}
+
+.crw-handle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crw-badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 10px;
+  line-height: 15px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.crw-tools {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.crw-tool {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.crw-tool:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.crw-tool:disabled {
+  cursor: default;
+}
+
+.crw-tool:focus-visible,
+.crw-link:focus-visible,
+.crw-action:focus-visible,
+.crw-post:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 2px;
+}
+
+.crw-tool.is-spinning svg {
+  animation: crw-spin 0.9s linear infinite;
+}
+
+@keyframes crw-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Small: the options button appears on hover or focus, like a widget's corner controls. */
+.crw-small .crw-tools {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.crw-small:hover .crw-tools,
+.crw-small:focus-within .crw-tools {
+  opacity: 1;
+}
+
+/* ── Metrics ─────────────────────────────────────────────────────────────── */
+
+.crw-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.crw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.crw-metric {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.crw-metric-label {
+  overflow: hidden;
+  font-size: 10.5px;
+  color: var(--crw-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crw-metric-value {
+  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.crw-metric-value.is-missing {
+  color: var(--crw-faint);
+}
+
+.crw-metric-change,
+.crw-metric-note {
+  overflow: hidden;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--crw-faint);
+}
+
+/* Value and its note share a line in the 2 × 2 grid to keep the card compact. */
+.crw-grid .crw-metric {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: baseline;
+}
+
+.crw-grid .crw-metric-label {
+  grid-column: 1 / -1;
+}
+
+.crw-metric-change.is-up {
+  color: #5fe08a;
+}
+
+.crw-metric-change.is-down {
+  color: #ff8a80;
+}
+
+.crw-metric.is-big {
+  gap: 2px;
+  margin-top: auto;
+}
+
+.crw-metric.is-big .crw-metric-value {
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.crw-metric.is-big .crw-metric-label {
+  font-size: 11px;
+}
+
+.crw-metric.is-big .crw-metric-change,
+.crw-metric.is-big .crw-metric-note {
+  font-size: 11px;
+}
+
+/* ── Large: details, chart, recent posts ─────────────────────────────────── */
+
+.crw-details {
+  display: flex;
+  flex-direction: column;
+  padding-top: 7px;
+  border-top: 1px solid var(--crw-hair);
+}
+
+.crw-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+.crw-row-label {
+  overflow: hidden;
+  color: var(--crw-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crw-row-value {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.crw-row-value.is-missing {
+  color: var(--crw-faint);
+  font-size: 10.5px;
+}
+
+.crw-growth {
+  padding-top: 5px;
+}
+
+.crw-chart,
+.crw-posts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: auto;
+  min-width: 0;
+}
+
+.crw-chart-label {
+  font-size: 10.5px;
+  color: var(--crw-muted);
+}
+
+.crw-spark {
+  display: block;
+  width: 100%;
+  height: 34px;
+  color: var(--crw-accent);
+}
+
+.crw-post {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 17px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+a.crw-post:hover .crw-post-type {
+  text-decoration: underline;
+}
+
+.crw-post-type {
+  min-width: 52px;
+}
+
+.crw-post-when {
+  flex: 1;
+  color: var(--crw-faint);
+}
+
+.crw-post-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+  color: var(--crw-muted);
+}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+
+.crw-loading {
+  justify-content: center;
+  gap: 7px;
+}
+
+.crw-shimmer-line {
+  width: 70%;
+  height: 10px;
+}
+
+.crw-shimmer-line.is-short {
+  width: 40%;
+}
+
+.crw-shimmer-value {
+  width: 50%;
+  height: 20px;
+}
+
+.crw-empty {
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.crw-empty p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.crw-small .crw-empty p {
+  font-size: 11px;
+}
+
+.crw-action {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.crw-action:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Footer: freshness ───────────────────────────────────────────────────── */
+
+.crw-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+  height: 14px;
+  font-size: 10.5px;
+  color: var(--crw-faint);
+}
+
+.crw-foot-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34c759;
+}
+
+.crw-foot.is-busy .crw-foot-dot {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.crw-foot.is-stale .crw-foot-dot {
+  background: #ffcc00;
+}
+
+.crw-foot.is-action .crw-foot-dot {
+  background: #ff453a;
+}
+
+.crw-foot.is-stale .crw-foot-text,
+.crw-foot.is-action .crw-foot-text {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.crw-foot-text {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crw-link {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.crw-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.crw-menu {
+  min-width: 200px;
+  max-width: 300px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crw-tool.is-spinning svg {
+    animation: none;
+  }
+}

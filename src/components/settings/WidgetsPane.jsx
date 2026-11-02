@@ -11,15 +11,21 @@ import {
   useDesktop,
 } from '../../libs/desktop/layoutStore';
 import { landingFor } from '../../libs/desktop/placement';
+import { GALLERY_FOCUS_EVENT, takeGalleryFocus } from '../../libs/desktop/galleryFocus';
 import SettingsTabIcon from './SettingsTabIcon';
 import WidgetPreview from './WidgetPreview';
+import CreatorAccounts from './CreatorAccounts';
 import '../../styles/settings-widgets.css';
 
 // Settings → Widgets, after macOS 26's widget gallery: search, a list of widgets on the left,
 // and every size as a preview. Click a size to put it on the desktop (or resize it there), or
-// drag it out: Settings fades away so it can be dropped where it should go.
+// drag it out: Settings fades away so it can be dropped where it should go. Widgets of a
+// category (Creator Widgets) are listed under its own heading, with their accounts.
 
 const ORDER = ['clock', 'quote', 'search', 'news', 'stack', 'weather', 'currency', 'metals', 'markets'];
+const CATEGORIES = [
+  { id: 'creator', label: 'Creator Widgets', description: 'Stats for your YouTube channel. Instagram Analytics is in development.', items: ['youtube', 'instagram'] },
+];
 const DESCRIPTIONS = {
   clock: 'The time. Always on the desktop.',
   quote: 'A line to start the day, with your name.',
@@ -30,8 +36,10 @@ const DESCRIPTIONS = {
   currency: 'Live exchange rates and a converter.',
   metals: 'Gold and silver prices.',
   markets: 'Indices and the stocks you follow.',
+  youtube: 'Subscribers and views of any channel; analytics and revenue for your own.',
+  instagram: 'In development: followers, reach and views of your Business or Creator account. Not available yet.',
 };
-const STATUS = { desktop: 'On Desktop', stack: 'In Smart Stack', hidden: 'Not on Desktop' };
+const STATUS = { desktop: 'On Desktop', stack: 'In Smart Stack', hidden: 'Not on Desktop', development: 'In Development' };
 
 // Full-size dimensions, as on the desktop; the clock, quote and search bar scale with their size.
 const SCALE_SIZES = {
@@ -85,6 +93,33 @@ function WidgetSection({ id, layout, onPick, onDragStart }) {
   const where = placementOf(layout, id);
   const item = layout[id];
   const stackPages = id === 'stack' ? layout.stack.pages : null;
+  // In development: shown as coming soon, with a preview, but it can't be added or set up.
+  if (def.inDevelopment) {
+    return (
+      <section className="wg-section is-development" aria-labelledby={`wg-${id}`} aria-disabled="true">
+        <header className="wg-section-head">
+          <SettingsTabIcon id={id} className="wg-section-icon" />
+          <div className="wg-section-text">
+            <h3 id={`wg-${id}`}>{def.label}</h3>
+            <p>{DESCRIPTIONS[id]}</p>
+          </div>
+          <span className="wg-status is-development">{STATUS.development}</span>
+        </header>
+        <div className="wg-sizes" aria-hidden="true">
+          {def.sizes.map((size) => (
+            <div key={size} className="wg-size">
+              <span className="wg-tile" style={{ width: dimsOf(id, size).w * PREVIEW_SCALE, height: dimsOf(id, size).h * PREVIEW_SCALE }}>
+                <span className="wg-tile-inner" style={{ width: dimsOf(id, size).w, height: dimsOf(id, size).h, transform: `scale(${PREVIEW_SCALE})` }}>
+                  <WidgetPreview id={id} size={size} />
+                </span>
+              </span>
+              <span className="wg-size-label">{sizeLabel(id, size)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="wg-section" aria-labelledby={`wg-${id}`}>
       <header className="wg-section-head">
@@ -113,6 +148,7 @@ function WidgetSection({ id, layout, onPick, onDragStart }) {
           />
         ))}
       </div>
+      {def.category === 'creator' && <CreatorAccounts platform={id} />}
       <div className="wg-actions">
         {where !== 'desktop' && (id !== 'stack' || stackPages.length > 0) && (
           <button type="button" className="wg-btn" onClick={() => showOnDesktop(id)}>
@@ -135,7 +171,18 @@ function WidgetSection({ id, layout, onPick, onDragStart }) {
 export default function WidgetsPane({ onClose }) {
   const { layout } = useDesktop();
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState('all');
+  // 'all', a category id or a widget id; a widget's "Manage Accounts…" opens on that widget.
+  const [selected, setSelected] = useState(() => takeGalleryFocus() || 'all');
+  useEffect(() => {
+    const onOpen = (e) => {
+      if (!e.detail?.widget || !ITEMS[e.detail.widget]) return;
+      takeGalleryFocus();
+      setQuery('');
+      setSelected(e.detail.widget);
+    };
+    window.addEventListener(GALLERY_FOCUS_EVENT, onOpen);
+    return () => window.removeEventListener(GALLERY_FOCUS_EVENT, onOpen);
+  }, []);
   const [drag, setDrag] = useState(null); // { id, size, x, y, w, h, target }
   const dragRef = useRef(null);
   useEffect(() => {
@@ -144,8 +191,14 @@ export default function WidgetsPane({ onClose }) {
   const dragTarget = drag?.target ?? null;
 
   const q = query.trim().toLowerCase();
-  const matches = ORDER.filter((id) => !q || ITEMS[id].label.toLowerCase().includes(q) || DESCRIPTIONS[id].toLowerCase().includes(q));
-  const shown = selected === 'all' ? matches : matches.filter((id) => id === selected);
+  const matchesQuery = (id) => !q || ITEMS[id].label.toLowerCase().includes(q) || DESCRIPTIONS[id].toLowerCase().includes(q);
+  const matches = ORDER.filter(matchesQuery);
+  const categories = CATEGORIES.map((c) => ({ ...c, matches: c.items.filter(matchesQuery) })).filter((c) => c.matches.length);
+  const shownCore = selected === 'all' ? matches : matches.filter((id) => id === selected);
+  const shownCategories = categories
+    .map((c) => ({ ...c, shown: selected === 'all' || selected === c.id ? c.matches : c.matches.filter((id) => id === selected) }))
+    .filter((c) => c.shown.length);
+  const nothing = !shownCore.length && !shownCategories.length;
 
   const pick = (id, size) => showOnDesktop(id, size);
 
@@ -240,12 +293,45 @@ export default function WidgetsPane({ onClose }) {
               {ITEMS[id].label}
             </button>
           ))}
+          {categories.map((c) => (
+            <div key={c.id} className="wg-list-group" role="group" aria-label={c.label}>
+              <button
+                type="button"
+                className={`wg-list-item wg-list-category${selected === c.id ? ' is-active' : ''}`}
+                aria-current={selected === c.id ? 'true' : undefined}
+                onClick={() => setSelected(c.id)}
+              >
+                <SettingsTabIcon id={c.id} className="wg-list-icon" />
+                {c.label}
+              </button>
+              {c.matches.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`wg-list-item wg-list-sub${selected === id ? ' is-active' : ''}`}
+                  aria-current={selected === id ? 'true' : undefined}
+                  onClick={() => setSelected(id)}
+                >
+                  <SettingsTabIcon id={id} className="wg-list-icon" />
+                  {ITEMS[id].label}
+                </button>
+              ))}
+            </div>
+          ))}
         </nav>
 
         <div className="wg-gallery custom-scrollbar">
-          {shown.length
-            ? shown.map((id) => <WidgetSection key={id} id={id} layout={layout} onPick={pick} onDragStart={startDrag} />)
-            : <p className="wg-empty">No widgets match “{query}”.</p>}
+          {shownCore.map((id) => <WidgetSection key={id} id={id} layout={layout} onPick={pick} onDragStart={startDrag} />)}
+          {shownCategories.map((c) => (
+            <div key={c.id} className="wg-category" role="group" aria-labelledby={`wg-cat-${c.id}`}>
+              <header className="wg-category-head">
+                <h3 id={`wg-cat-${c.id}`}>{c.label}</h3>
+                <p>{c.description}</p>
+              </header>
+              {c.shown.map((id) => <WidgetSection key={id} id={id} layout={layout} onPick={pick} onDragStart={startDrag} />)}
+            </div>
+          ))}
+          {nothing && <p className="wg-empty">No widgets match “{query}”.</p>}
         </div>
       </div>
 

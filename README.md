@@ -28,6 +28,7 @@ Most new tab pages are a search box and a grid of shortcuts. iWeb gives you a wh
 - **Weather, currency, gold & silver, stocks and news**, with automatic updates.
 - **Smart Stack:** several widgets in one space; swipe or scroll to flip between them.
 - **Edit Widgets:** drag, resize and snap widgets into place, or add new ones from the widget gallery.
+- **Creator Widgets:** keep an eye on a YouTube channel's subscribers and views, or connect your own channel for 28-day analytics and estimated revenue. Instagram Business and Creator accounts get followers, reach and views. Official YouTube and Instagram APIs only.
 
 ### Control Center
 

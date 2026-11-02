@@ -4,10 +4,12 @@ import { proxyUnsplash } from './api/_unsplashProxy.js'
 import { proxyMarket } from './api/_marketProxy.js'
 import { proxyFavicon } from './api/_faviconProxy.js'
 import { proxyNews } from './api/_newsProxy.js'
+import { clientIp, handleCallback, handleCreator, readJsonBody } from './api/_creatorProxy.js'
 
-// Serves /api/unsplash, /api/market, /api/favicon and /api/news during `npm run dev` with the same logic as the
-// Vercel functions, reading the server-only UNSPLASH_ACCESS_KEY from .env.
-function apiDevProxy(accessKey) {
+// Serves /api/unsplash, /api/market, /api/favicon, /api/news and /api/creator during `npm run dev` with the
+// same logic as the Vercel functions, reading the server-only keys (UNSPLASH_ACCESS_KEY, the
+// Creator widgets' OAuth settings) from .env.
+function apiDevProxy(accessKey, env) {
   return {
     name: 'api-dev-proxy',
     configureServer(server) {
@@ -31,6 +33,20 @@ function apiDevProxy(accessKey) {
         const result = await proxyNews(query)
         res.writeHead(result.status, result.headers).end(result.body)
       })
+      server.middlewares.use('/api/creator-callback', (req, res) => {
+        const result = handleCallback(new URL(req.url, 'http://localhost').searchParams)
+        res.writeHead(result.status, result.headers).end(result.body)
+      })
+      server.middlewares.use('/api/creator', async (req, res) => {
+        const result = await handleCreator({
+          method: req.method,
+          query: new URL(req.url, 'http://localhost').searchParams,
+          body: await readJsonBody(req),
+          origin: req.headers.origin || '',
+          ip: clientIp(req),
+        }, env)
+        res.writeHead(result.status, result.headers).end(result.body)
+      })
     },
   }
 }
@@ -41,7 +57,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), apiDevProxy(env.UNSPLASH_ACCESS_KEY)],
+    plugins: [react(), apiDevProxy(env.UNSPLASH_ACCESS_KEY, env)],
     // UNSPLASH_APP_NAME is non-secret (attribution utm_source), so expose it to the client too.
     envPrefix: ['VITE_', 'UNSPLASH_APP_NAME'],
     server: {

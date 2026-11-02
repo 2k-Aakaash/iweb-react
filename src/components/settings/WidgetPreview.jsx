@@ -128,7 +128,35 @@ function Search() {
   );
 }
 
-const PREVIEWS = { weather: Weather, currency: Currency, metals: Metals, markets: Markets, news: News, stack: Stack, clock: Clock, quote: Quote, search: Search };
+// Creator widgets: their layout only, with placeholder bars instead of numbers (a preview
+// must never look like someone's real statistics).
+function Creator({ size, platform }) {
+  const labels = platform === 'youtube'
+    ? ['Subscribers', 'Total views', 'Views · 28d', 'Revenue · 28d']
+    : ['Followers', 'Reach · 28d', 'Views · 28d', 'Posts'];
+  return (
+    <div className={`wgp wgp-creator wgp-creator-${platform}`}>
+      <div className="wgp-creator-head">
+        <span className="wgp-creator-avatar" />
+        <span className="wgp-creator-who">
+          <b>{platform === 'youtube' ? 'Your Channel' : 'Your Account'}</b>
+          {size !== 'small' && <i>{platform === 'youtube' ? '@handle' : '@username'}</i>}
+        </span>
+      </div>
+      <div className={`wgp-creator-grid${size === 'small' ? ' is-small' : ''}`}>
+        {(size === 'small' ? labels.slice(0, 1) : labels).map((label) => (
+          <span key={label}><i>{label}</i><b className="wgp-line" /></span>
+        ))}
+      </div>
+      {size === 'large' && <div className="wgp-creator-rows">{[0, 1, 2, 3].map((i) => <span key={i} className="wgp-line" />)}</div>}
+    </div>
+  );
+}
+
+const PREVIEWS = {
+  youtube: (props) => <Creator {...props} platform="youtube" />,
+  instagram: (props) => <Creator {...props} platform="instagram" />,
+  weather: Weather, currency: Currency, metals: Metals, markets: Markets, news: News, stack: Stack, clock: Clock, quote: Quote, search: Search };
 
 export default function WidgetPreview({ id, size }) {
   const Preview = PREVIEWS[id];

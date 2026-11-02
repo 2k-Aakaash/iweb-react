@@ -104,6 +104,26 @@ const TILES = {
   markets: { from: '#3a3a3e', to: '#0d0d0f', glyph: (
     <path d="m5 16 4.5-4.5 3 3L19 8" />
   ) },
+  // Creator Widgets: the category, YouTube Analytics and Instagram Analytics.
+  creator: { from: '#ff8a5c', to: '#e8457a', glyph: (
+    <>
+      <path d="M5 18.5h14" />
+      <path d="M7.5 15v-3.5M12 15V7.5M16.5 15v-5.5" />
+    </>
+  ) },
+  youtube: { from: '#ff5050', to: '#d41c1c', glyph: (
+    <>
+      <rect x="4" y="6.5" width="16" height="11" rx="3.2" fill="#fff" stroke="none" />
+      <path d="M10.4 9.6v4.8L14.6 12z" fill="#d91f1f" stroke="none" />
+    </>
+  ) },
+  instagram: { from: '#f77737', to: '#c13584', glyph: (
+    <>
+      <rect x="5" y="5" width="14" height="14" rx="4" />
+      <circle cx="12" cy="12" r="3.2" />
+      <circle cx="16.1" cy="7.9" r="0.9" fill="#fff" stroke="none" />
+    </>
+  ) },
   about: { from: '#a3a6ad', to: '#6c6f77', glyph: (
     <>
       <circle cx="12" cy="7.3" r="1.3" fill="#fff" stroke="none" />

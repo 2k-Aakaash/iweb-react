@@ -62,6 +62,7 @@ export function updateItem(id, patch) {
 
 /** Shows an item on the desktop (out of the Smart Stack if it was there), at `size`. */
 export function showOnDesktop(id, size = null) {
+  if (ITEMS[id].inDevelopment) return;
   const current = state.layout[id];
   const nextSize = size && ITEMS[id].sizes.includes(size) ? size : current.size;
   if (!current.hidden) {
@@ -69,17 +70,18 @@ export function showOnDesktop(id, size = null) {
     return;
   }
   // News, the search bar, the stack: back where they were.
-  if (!ITEMS[id].stackable) {
+  if (!ITEMS[id].stackable && !ITEMS[id].findSpot) {
     updateItem(id, { hidden: false, size: nextSize });
     return;
   }
-  // A widget leaving the stack: the first free spot.
+  // A widget leaving the stack, or a creator widget: the first free spot.
   const spot = findFreeSpot(id, nextSize);
   save(detachFromStack(state.layout, id, { ...(spot || {}), size: nextSize }));
 }
 
 /** Places an item at `position` (anchors), e.g. dropped from the widget gallery. */
 export function placeOnDesktop(id, size, position) {
+  if (ITEMS[id].inDevelopment) return;
   const nextSize = ITEMS[id].sizes.includes(size) ? size : state.layout[id].size;
   save(detachFromStack(state.layout, id, { ...position, size: nextSize }));
 }

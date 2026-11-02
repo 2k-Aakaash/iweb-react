@@ -6,6 +6,7 @@ import { allPrefs } from './prefs/storedPref';
 // The modules that define settings kept in iWebDB (they register with allPrefs).
 import './clock/clockStyle';
 import './controlcenter/ccPrefs';
+import './creator/creatorPrefs';
 
 // Generic Promise-based IndexedDB helpers for notes DB
 function getNotesDB() {
