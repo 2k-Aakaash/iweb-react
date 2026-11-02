@@ -143,7 +143,7 @@ If no task has that text any more, the change is **skipped**. It is never applie
 
 ## Desktop sticky cards
 
-**Show on Desktop** (editor toolbar, ⋯ menu, File menu, or a row's right-click menu) puts a Task Note on the desktop as a card. A new card is clear frosted glass with white text. From its ⋯ menu → **Color** (or the note's ⋯ menu → **Card Color** in Notes) it can become a paper sticky in one of the macOS 26 Stickies colours (Yellow, Blue, Green, Pink, Purple, Gray), and **None (Glass)** turns it back.
+**Show on Desktop** (editor toolbar, ⋯ menu, File menu, or a row's right-click menu) puts a Task Note on the desktop as a card. A new card is clear frosted glass with white text. From its ⋯ menu → **Color** (or the note's ⋯ menu → **Card Color** in Notes) the glass can be tinted in one of the macOS 26 Stickies colours (Yellow, Blue, Green, Pink, Purple, Gray), and **None (Glass)** turns it back.
 
 **What a card shows and does:**
 
@@ -231,7 +231,7 @@ Notes only handles these keys while it is the front window.
 | Typing | no long tasks |
 | Opening the window | rows are in its first frame |
 
-**Sticky cards** use one backdrop blur each while they're glass; paper colours are opaque and have none.
+**Sticky cards** use one backdrop blur each, tinted or clear.
 
 ## Known limitations
 

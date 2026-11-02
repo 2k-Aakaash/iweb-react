@@ -1,7 +1,7 @@
 /* Task Notes on the desktop (src/components/notes/StickyLayer.jsx). By default a card is
    clear frosted glass with white text, like iWeb's widgets; a chosen colour (card ⋯ menu →
-   Color) turns it into a sticky note in one of the macOS 26 Stickies colours, opaque like
-   paper, with dark ink. Everything colour-dependent is a variable set below. Above the
+   Color) tints that glass in one of the macOS 26 Stickies colours. Everything
+   colour-dependent is a variable set below. Above the
    widgets (z 1000), under app windows (1100) and menus. */
 
 .stk-card {
@@ -39,30 +39,14 @@
   transition: box-shadow 0.2s ease, opacity 0.2s ease, background 0.2s ease;
 }
 
-/* Paper colours: opaque, so there's nothing to blur. */
-.stk-card[data-color] {
-  --stk-ink: #2b2b2b;
-  --stk-ink-2: rgba(0, 0, 0, 0.58);
-  --stk-ink-3: rgba(0, 0, 0, 0.4);
-  --stk-wash: rgba(0, 0, 0, 0.07);
-  --stk-hover: rgba(0, 0, 0, 0.045);
-  --stk-box: rgba(0, 0, 0, 0.42);
-  --stk-track: rgba(0, 0, 0, 0.12);
-  --stk-tick: #fff;
-  --stk-overdue: #a3241b;
-  --stk-overdue-bg: rgba(179, 38, 30, 0.12);
-  --stk-priority: #b85400;
-  --stk-shine: rgba(255, 255, 255, 0.6);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.stk-card[data-color='yellow'] { --stk-bg: linear-gradient(180deg, #fff4ad, #fde88a); --stk-border: rgba(120, 95, 0, 0.2); --stk-ink: #3b3000; --stk-fill: #8a6a00; }
-.stk-card[data-color='blue'] { --stk-bg: linear-gradient(180deg, #d9eefd, #a9d4f5); --stk-border: rgba(0, 70, 130, 0.18); --stk-ink: #062c4d; --stk-fill: #1f6fb2; }
-.stk-card[data-color='green'] { --stk-bg: linear-gradient(180deg, #e2f8d2, #b9eb9c); --stk-border: rgba(30, 100, 20, 0.18); --stk-ink: #173d0c; --stk-fill: #3d8a25; }
-.stk-card[data-color='pink'] { --stk-bg: linear-gradient(180deg, #ffe0ed, #fbb6d2); --stk-border: rgba(140, 20, 70, 0.16); --stk-ink: #4d0a27; --stk-fill: #c2316e; }
-.stk-card[data-color='purple'] { --stk-bg: linear-gradient(180deg, #efe4fd, #d3baf5); --stk-border: rgba(80, 30, 140, 0.16); --stk-ink: #2e1052; --stk-fill: #7a45c4; }
-.stk-card[data-color='gray'] { --stk-bg: linear-gradient(180deg, #f2f2f2, #d8d8d8); --stk-border: rgba(0, 0, 0, 0.14); --stk-ink: #262626; --stk-fill: #5b5b5b; }
+/* Colours: the same frosted glass, tinted (like the Weather and News widgets), white text.
+   The macOS 26 Stickies colours, deepened so white text reads on any wallpaper. */
+.stk-card[data-color='yellow'] { --stk-bg: linear-gradient(160deg, rgba(196, 150, 10, 0.55), rgba(120, 88, 0, 0.55)); --stk-fill: #ffd60a; }
+.stk-card[data-color='blue'] { --stk-bg: linear-gradient(160deg, rgba(40, 120, 210, 0.55), rgba(16, 60, 130, 0.58)); --stk-fill: #64d2ff; }
+.stk-card[data-color='green'] { --stk-bg: linear-gradient(160deg, rgba(52, 150, 72, 0.55), rgba(20, 88, 40, 0.58)); --stk-fill: #30d158; }
+.stk-card[data-color='pink'] { --stk-bg: linear-gradient(160deg, rgba(214, 70, 130, 0.55), rgba(130, 28, 76, 0.58)); --stk-fill: #ff6fae; }
+.stk-card[data-color='purple'] { --stk-bg: linear-gradient(160deg, rgba(140, 80, 210, 0.55), rgba(76, 36, 130, 0.58)); --stk-fill: #bf5af2; }
+.stk-card[data-color='gray'] { --stk-bg: linear-gradient(160deg, rgba(130, 130, 138, 0.5), rgba(64, 64, 70, 0.55)); --stk-fill: #d1d1d6; }
 
 .stk-card button {
   margin: 0; /* legacy global `button { margin-top }` */
@@ -219,11 +203,6 @@
 .stk-task .nt-check:checked {
   border-color: var(--stk-fill);
   background-color: var(--stk-fill);
-}
-
-/* On paper the tick is white (the glass card keeps the Notes window's dark tick on yellow). */
-.stk-card[data-color] .stk-task .nt-check:checked {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.4 2.6 2.6L12 5.4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .stk-task-text {
