@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { parseIwebBackup, restoreFromIwebBackup } from '../libs/backupService';
+// Backups (jszip, the search database…) load when one is restored, not with Settings.
+const loadBackupService = () => import('../libs/backupService');
 import { openIwebDB } from '../libs/wallpaper/db';
 import WallpaperSettings from './WallpaperSettings';
 import { useMacWindow } from '../libs/window/useMacWindow';
@@ -23,10 +24,11 @@ export default function SettingsModal({
   clockFont,
   setClockFont,
   bookmarks,
-  setBookmarks
+  setBookmarks,
+  initialTab = 'general', // the pane it first opens on (it's mounted on first open)
 }) {
   // Visited panes, for the toolbar's back / forward buttons (like System Settings).
-  const [nav, setNav] = useState({ stack: ['general'], index: 0 });
+  const [nav, setNav] = useState({ stack: [initialTab], index: 0 });
   const activeTab = nav.stack[nav.index];
   const goToTab = useCallback((id) => {
     setNav((prev) => {
@@ -293,6 +295,7 @@ export default function SettingsModal({
     if (!file) return;
 
     try {
+      const { parseIwebBackup } = await loadBackupService();
       const { metadata, zip } = await parseIwebBackup(file);
       setImportMetadata(metadata);
       setImportingZip(zip);
@@ -314,6 +317,7 @@ export default function SettingsModal({
   // Finalize import restore
   const handleConfirmImport = async () => {
     try {
+      const { restoreFromIwebBackup } = await loadBackupService();
       await restoreFromIwebBackup(importingZip, importMetadata, importModules);
       alert('Backup imported successfully. The page will reload to apply changes.');
       window.location.reload();

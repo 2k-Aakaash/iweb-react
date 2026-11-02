@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useMacWindow } from '../libs/window/useMacWindow';
 import GlassSurface from './glass/GlassSurface';
-import { applyFormat, markdownToText, renderMarkdown, toggleTask } from '../libs/notes/markdown';
+import { applyFormat, markdownToText, toggleTask } from '../libs/notes/markdown';
+
+// The Preview's renderer (marked + DOMPurify) loads the first time a Preview is shown.
+const loadRenderer = () => import('../libs/notes/markdownRender');
 import { canRedo, canUndo, createHistory, record, redo, undo, typingKind } from '../libs/notes/history';
 import { groupNotes, rowDate } from '../libs/notes/groups';
 import '../styles/notes-sidebar.css';
@@ -443,9 +446,14 @@ export default function Notes() {
     changeContent(toggleTask(editorContent, Number(box.dataset.task)), { kind: 'task' });
   };
 
+  const [renderMarkdown, setRenderMarkdown] = useState(null);
+  useEffect(() => {
+    if (mode !== 'preview' || renderMarkdown) return;
+    loadRenderer().then((m) => setRenderMarkdown(() => m.renderMarkdown)).catch(() => {});
+  }, [mode, renderMarkdown]);
   const previewHtml = useMemo(
-    () => (mode === 'preview' ? renderMarkdown(editorContent) : ''),
-    [mode, editorContent],
+    () => (mode === 'preview' && renderMarkdown ? renderMarkdown(editorContent) : ''),
+    [mode, editorContent, renderMarkdown],
   );
 
   const getWordCount = () => {

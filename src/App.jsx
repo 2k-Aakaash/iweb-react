@@ -4,14 +4,13 @@ import Clock from './components/Clock';
 import Quote from './components/Quote';
 import DesktopModes from './components/controlcenter/DesktopModes';
 import TimerBubble from './components/controlcenter/TimerBubble';
+import { markBootReady } from './libs/boot/bootReveal';
 import Dock from './components/Dock';
 import SmartStack from './components/widgets/SmartStack';
 import { STACK_WIDGETS } from './components/widgets/stackWidgets';
 import Music from './components/Music';
 import Notes from './components/Notes';
 import { SearchBar } from './search/components/SearchBar';
-import { SearchResult } from './search/components/SearchResult';
-import SettingsModal from './components/SettingsModal';
 import UpdateNotice from './components/update/UpdateNotice';
 import { openIwebDB } from './libs/wallpaper/db';
 import { OPEN_EVENT as MARKETS_OPEN_EVENT } from './libs/markets/marketService';
@@ -38,6 +37,24 @@ const NewsModal = React.lazy(() => import('./components/news/NewsModal').catch((
   return { default: AppUnavailable };
 }));
 
+// Spotlight (with Framer Motion, Radix, the search database, engines and worker) mounts the
+// first time it opens; its code is fetched when the browser is idle, so Ctrl K stays instant.
+const loadSpotlight = () => import('./search/components/SearchResult');
+const SearchResult = React.lazy(() => loadSpotlight().then((m) => ({ default: m.SearchResult })).catch((err) => {
+  console.error('Failed to load Spotlight:', err);
+  return { default: ({ onClose }) => <AppUnavailable setOpen={() => onClose?.()} /> };
+}));
+
+// Settings (its panes, the wallpaper library, Framer Motion…) mounts on first open, on the pane
+// that was asked for; its code is also fetched once the desktop is idle.
+const loadSettings = () => import('./components/SettingsModal');
+const SettingsModal = React.lazy(() => loadSettings().catch((err) => {
+  console.error('Failed to load Settings:', err);
+  return { default: ({ onClose }) => <AppUnavailable setOpen={() => onClose?.()} /> };
+}));
+
+const whenIdle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 1500));
+
 function AppUnavailable({ setOpen }) {
   useEffect(() => {
     setOpen?.(false);
@@ -51,7 +68,10 @@ export default function App() {
   const [clockColor, setClockColor] = useState('');
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchLoaded, setSearchLoaded] = useState(false);
+  if (isSearchOpen && !searchLoaded) setSearchLoaded(true); // mounted from its first open on
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState(null); // set on first open: then it's mounted
   const [marketsOpen, setMarketsOpen] = useState(false);
   const [marketsLoaded, setMarketsLoaded] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
@@ -128,6 +148,19 @@ export default function App() {
     return () => cancelAnimationFrame(frame);
   }, [desktopInset]);
 
+  // Rendered: one of the two things the start-up veil waits for (the other is the wallpaper).
+  useEffect(() => {
+    markBootReady('app');
+  }, []);
+
+  // Spotlight's code, fetched once the desktop is idle.
+  useEffect(() => {
+    whenIdle(() => {
+      loadSpotlight().catch(() => {});
+      loadSettings().catch(() => {});
+    });
+  }, []);
+
   // Global hotkey Ctrl+K / Cmd+K listener
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
@@ -145,7 +178,9 @@ export default function App() {
     const handleOpenMusic = () => {
       setShowMusicLibrary(true);
     };
-    const handleOpenSettings = () => {
+    const handleOpenSettings = (e) => {
+      // The first open mounts Settings on this pane; later ones it handles itself.
+      setSettingsTab((tab) => tab ?? (e.detail?.tab || 'general'));
       setShowSettings(true);
     };
     window.addEventListener('music:open', handleOpenMusic);
@@ -236,7 +271,7 @@ export default function App() {
         setBookmarks={setBookmarks}
         onChangeBg={() => changeBgRef.current?.()}
         onOpenNotes={() => window.dispatchEvent(new CustomEvent('notes:open'))}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={() => window.dispatchEvent(new CustomEvent('settings:open'))}
         onOpenMusicLibrary={() => setShowMusicLibrary(true)}
       />
 
@@ -255,20 +290,29 @@ export default function App() {
         onOpenMusicLibrary={() => setShowMusicLibrary(true)}
       />
 
-      <SearchResult isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      {searchLoaded && (
+        <Suspense fallback={null}>
+          <SearchResult isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+        </Suspense>
+      )}
 
       <UpdateNotice />
 
-      <SettingsModal 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)}
-        customName={customName}
-        setCustomName={setCustomName}
-        clockFont={clockFont}
-        setClockFont={setClockFont}
-        bookmarks={bookmarks}
-        setBookmarks={setBookmarks}
-      />
+      {settingsTab && (
+        <Suspense fallback={null}>
+          <SettingsModal
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            customName={customName}
+            setCustomName={setCustomName}
+            clockFont={clockFont}
+            setClockFont={setClockFont}
+            bookmarks={bookmarks}
+            setBookmarks={setBookmarks}
+            initialTab={settingsTab}
+          />
+        </Suspense>
+      )}
 
       {/* Loaded on first open, then kept: it animates in and out (genie) and keeps its
           state while minimized to the Dock, like the other app windows. */}

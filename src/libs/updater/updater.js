@@ -10,7 +10,6 @@
 //      published .sha256 asset, writes the files into that folder and reloads the
 //      extension (chrome.runtime.reload re-reads unpacked files from disk).
 
-import JSZip from 'jszip';
 import { openIwebDB, reqToPromise, STORES } from '../wallpaper/db';
 
 export const RELEASES_REPO = import.meta.env.VITE_IWEB_RELEASES_REPO || '2k-Aakaash/iWeb';
@@ -333,6 +332,7 @@ export async function applyUpdate(latest, { onProgress = () => {}, signal } = {}
     throw new UpdateError('CHECKSUM', 'The download didn’t match its checksum. Nothing was changed.');
   }
 
+  const { default: JSZip } = await import('jszip'); // only when installing an update
   const zip = await JSZip.loadAsync(zipBuffer);
   const entries = Object.values(zip.files)
     .filter((entry) => !entry.dir)

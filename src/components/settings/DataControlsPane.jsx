@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { exportToIwebBackup } from '../../libs/backupService';
 import SettingsTabIcon from './SettingsTabIcon';
 import '../../styles/settings-data.css';
 
@@ -49,6 +48,8 @@ export default function DataControlsPane({ onImportFile }) {
     if (busy || selectedCount === 0) return;
     setStatus({ tone: 'busy', text: 'Backing up…' });
     try {
+      // Backups (jszip, the search database…) load when one is made.
+      const { exportToIwebBackup } = await import('../../libs/backupService');
       await exportToIwebBackup(modules);
       const now = Date.now();
       try {

@@ -8,6 +8,7 @@
 
 import { getWallpaperRecord, touchWallpaper } from './repository';
 import { pickUnsplashUrl, decodeImage } from './imageLoader';
+import { markBootReady } from '../boot/bootReveal';
 
 // With no wallpaper chosen (first launch) the page shows the body's solid dark colour
 // (style.css) and white text; no remote image is loaded.
@@ -113,6 +114,7 @@ function paintBody(url) {
     document.documentElement.style.removeProperty('--page-bg-url');
   }
   activeUrl = url || null;
+  markBootReady('wallpaper'); // the first paint lifts the start-up veil (with the app)
 }
 
 // Paints `nextUrl` on the body and fades the previous image out on top of it.

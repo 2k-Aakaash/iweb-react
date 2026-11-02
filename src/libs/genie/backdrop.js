@@ -11,8 +11,24 @@ function wallpaperUrl() {
   return value.match(/url\(\s*["']?(.*?)["']?\s*\)/)?.[1] || null;
 }
 
-/** Starts decoding the current wallpaper so the first genie run already has it. */
+/**
+ * Starts decoding the current wallpaper so the first genie run already has it. Called by each
+ * window as it mounts, so it waits for an idle moment (and runs once for all of them) rather
+ * than reading styles during startup.
+ */
+let warmQueued = false;
 export function warmBackdrop() {
+  if (warmQueued) return;
+  warmQueued = true;
+  const run = () => {
+    warmQueued = false;
+    warmNow();
+  };
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 3000 });
+  else setTimeout(run, 1000);
+}
+
+function warmNow() {
   const url = wallpaperUrl();
   if (!url || images.has(url)) return;
   const img = new Image();
@@ -28,7 +44,7 @@ export function warmBackdrop() {
  * background), or after `timeout` ms so a slow image never holds up the animation.
  */
 export function backdropReady(timeout = 150) {
-  warmBackdrop();
+  warmNow();
   const img = images.get(wallpaperUrl());
   if (!img || (img.complete && img.naturalWidth)) return Promise.resolve();
   return Promise.race([

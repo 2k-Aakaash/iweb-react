@@ -32,6 +32,11 @@
   width: 100%;
   height: 100%;
   border-radius: inherit;
+  transition: opacity 0.18s ease; /* the frost hands over to the glass once it's painted */
+}
+
+.glass-surface.is-pending .glass-surface-canvas {
+  opacity: 0;
 }
 
 /* Until the static glass has rendered (the wallpaper is still decoding), a plain CSS frost

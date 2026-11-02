@@ -1,19 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { getSearchPhrase } from '../../libs/search-bar-text';
 import GlassSurface from '../../components/glass/GlassSurface';
 
+// The day's phrase comes from a long list (search-bar-text.js) that loads after the desktop
+// is up; the last one shown is kept, so the bar has its phrase on the first frame.
+const FALLBACK = 'Search or type command...';
+const PHRASE_KEY = 'iweb:searchPhrase';
+
+function cachedPhrase() {
+  try {
+    return localStorage.getItem(PHRASE_KEY) || FALLBACK;
+  } catch {
+    return FALLBACK;
+  }
+}
+
 export const SearchBar = ({ onOpenSearch }) => {
-  const [placeholder, setPlaceholder] = useState('Search or type command...');
+  const [placeholder, setPlaceholder] = useState(cachedPhrase);
 
   useEffect(() => {
-    // Initial placeholder
-    setPlaceholder(getSearchPhrase() || 'Search or type command...');
+    let interval = 0;
+    let cancelled = false;
+    import('../../libs/search-bar-text').then(({ getSearchPhrase }) => {
+      if (cancelled) return;
+      const update = () => {
+        const phrase = getSearchPhrase() || FALLBACK;
+        setPlaceholder(phrase);
+        try {
+          localStorage.setItem(PHRASE_KEY, phrase);
+        } catch {
+          // Not kept: the next tab shows the fallback until the list loads.
+        }
+      };
+      update();
+      interval = setInterval(update, 60000); // Updates every minute
+    }).catch(() => {});
 
-    const interval = setInterval(() => {
-      setPlaceholder(getSearchPhrase() || 'Search or type command...');
-    }, 60000); // Updates every minute
-
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const isMac = typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);

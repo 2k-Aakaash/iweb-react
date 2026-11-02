@@ -1,4 +1,5 @@
-import { Client } from 'typesense';
+// The Typesense client (and its axios) loads only when a server is configured: it's optional
+// and off by default, so it stays out of the startup bundle.
 
 export class TypesenseService {
   constructor() {
@@ -10,8 +11,9 @@ export class TypesenseService {
   /**
    * Initializes Typesense client from potential local configuration.
    */
-  initialize(config) {
+  async initialize(config) {
     if (config) {
+      const { Client } = await import('typesense');
       this.client = new Client({
         nodes: [{
           host: config.host,

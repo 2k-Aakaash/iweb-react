@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Howl, Howler } from 'howler';
-import * as musicMetadata from 'music-metadata-browser';
 import { directoryOpen } from 'browser-fs-access';
-import Fuse from 'fuse.js';
-import { Index } from 'flexsearch';
 import GlassSurface from './glass/GlassSurface';
 import { useMacWindow } from '../libs/window/useMacWindow';
 import { publishPlayer, registerPlayerController } from '../libs/music/playerStore';
@@ -19,6 +16,19 @@ const TRACKS_KEY = 'tracks-list';
 const FAVORITES_KEY = 'favorites-list';
 const PLAYLISTS_KEY = 'playlists-data';
 const LAST_PLAYED_KEY = 'last-played-state';
+
+// Reading tags and artwork (music-metadata and its stream polyfills, ~280 KiB) loads the first
+// time a folder is scanned, not with the desktop.
+let metadataModule = null;
+const loadMetadata = () => (metadataModule ??= import('music-metadata-browser'));
+
+// Howler's master volume. Setting it creates the AudioContext, which is slow to start and
+// belongs to the first play: until then the value waits here.
+let masterVolume = null;
+function setMasterVolume(value) {
+  masterVolume = value;
+  if (Howler.ctx) Howler.volume(value);
+}
 
 function isSupportedAudio(filename) {
   const ext = filename.split('.').pop().toLowerCase();
@@ -111,15 +121,18 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     playlistRef.current = getPlaylistTracks(currentPlaylistId);
   }, [currentPlaylistId, library, favorites, playlists]);
 
-  // Build search indexes when library updates
+  // Build search indexes when library updates (FlexSearch and Fuse load with the first library)
   useEffect(() => {
     if (library.length === 0) {
       flexSearchRef.current = null;
       fuseSearchRef.current = null;
-      return;
+      return undefined;
     }
 
-    try {
+    let cancelled = false;
+    Promise.all([import('flexsearch'), import('fuse.js')]).then(([{ Index }, { default: Fuse }]) => {
+     if (cancelled) return;
+     try {
       // 1. Build FlexSearch Index
       const flexIndex = new Index({
         tokenize: 'forward',
@@ -139,9 +152,13 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
         minMatchCharLength: 2
       });
       fuseSearchRef.current = fuseIndex;
-    } catch (e) {
+     } catch (e) {
       console.error("Failed to build search indexes:", e);
-    }
+     }
+    }).catch((e) => console.error('Failed to load the search engines:', e));
+    return () => {
+      cancelled = true;
+    };
   }, [library]);
 
   // Alternating page title between song name and "iWeb <Time>" every 5 seconds when playing, otherwise showing time
@@ -213,8 +230,8 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     initDatabase();
     checkAudioOutputDevice();
     
-    // Set Howler global volume
-    Howler.volume(volume / 100);
+    // Howler's master volume (applied once something plays: see setMasterVolume)
+    setMasterVolume(volume / 100);
 
     return () => {
       stopProgressTimer();
@@ -314,7 +331,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       if (settings) {
         if (settings.volume !== undefined) {
           setVolume(settings.volume);
-          Howler.volume(settings.volume / 100);
+          setMasterVolume(settings.volume / 100);
         }
         if (settings.outputDevice !== undefined) setOutputDevice(settings.outputDevice);
         if (settings.rememberPlayback !== undefined) setRememberPlayback(settings.rememberPlayback);
@@ -453,7 +470,8 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     let artworkBlob = null;
 
     try {
-      const metadata = await musicMetadata.parseBlob(file);
+      const { parseBlob } = await loadMetadata();
+      const metadata = await parseBlob(file);
       if (metadata.common) {
         if (metadata.common.title) title = metadata.common.title;
         if (metadata.common.artist) artist = metadata.common.artist;
@@ -674,6 +692,8 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     const objectURL = URL.createObjectURL(track.file);
     const ext = track.file.name.split('.').pop().toLowerCase();
 
+    // The first sound starts Howler's AudioContext: give it the master volume set so far.
+    if (!Howler.ctx && masterVolume !== null) Howler.volume(masterVolume);
     const newSound = new Howl({
       src: [objectURL],
       format: [ext],
@@ -816,7 +836,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       if (soundRef.current) {
         soundRef.current.volume(isMuted ? 0 : val / 100);
       }
-      Howler.volume(isMuted ? 0 : val / 100);
+      setMasterVolume(isMuted ? 0 : val / 100);
     } else if (key === 'outputDevice') {
       setOutputDevice(val);
     } else if (key === 'rememberPlayback') {
@@ -895,7 +915,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     if (soundRef.current) {
       soundRef.current.volume(targetVol);
     }
-    Howler.volume(targetVol);
+    setMasterVolume(targetVol);
   };
 
   const checkAudioOutputDevice = async () => {

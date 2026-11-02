@@ -28,3 +28,4 @@ dist-ssr
 .env.*
 !.env.example
 SESSION_HANDOFF.md
+docs/PROJECT_SUMMARY.md

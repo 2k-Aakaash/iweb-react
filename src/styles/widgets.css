@@ -472,17 +472,22 @@
   transform: scale(0.95);
 }
 
-/* Loading shimmer (first load only; cached rates render immediately). */
+/* Loading shimmer (first load only; cached rates render immediately). The band of light is
+   a layer that slides with transform, so the compositor moves it without repainting. */
 .cw-shimmer {
+  position: relative;
   display: block;
+  overflow: hidden;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.22) 50%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  background-size: 200% 100%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cw-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.14) 50%, transparent 100%);
+  transform: translateX(-100%);
   animation: cw-shimmer 1.3s ease-in-out infinite;
 }
 
@@ -503,8 +508,8 @@
 }
 
 @keyframes cw-shimmer {
-  from { background-position: 150% 0; }
-  to { background-position: -50% 0; }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 /* ── Expanded converter (revealed like .weather-search / .weather-forecast-container) ── */
@@ -832,7 +837,7 @@
     transition: none !important;
   }
 
-  .cw-shimmer {
+  .cw-shimmer::after {
     animation: none;
   }
 }
