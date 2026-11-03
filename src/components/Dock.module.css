@@ -87,14 +87,24 @@
 }
 
 /* ── macOS-style vertical separator ── */
+/* The line is drawn inside a full-height strip, so the pointer crossing it is still "in" the
+   Dock's wave (see the magnification rules) rather than in a gap that drops it. */
 .separator {
-  width: 1px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.22);
-  margin: 0 8px;
-  align-self: center;
+  position: relative;
+  width: 17px;
+  height: 60px;
   flex-shrink: 0;
+}
+
+.separator::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 8px;
+  width: 1px;
   border-radius: 1px;
+  background: rgba(255, 255, 255, 0.22);
   box-shadow: 0 0 4px rgba(255, 255, 255, 0.08);
 }
 
@@ -173,44 +183,60 @@
   transform: translateX(-50%) translateY(0);
 }
 
-/* Main hover magnification */
-.dock:not([data-hover-off]) .app:not(.action):hover {
+/* Hover magnification, macOS-style: the hovered icon and two neighbours on each side, across
+   every icon in the Dock (bookmarks and the built-in apps alike). The wave carries on over the
+   separator, which takes no part in it. */
+.dock:not([data-hover-off]) .app:hover {
   width: 90px;
   height: 90px;
   margin-top: -30px;
 }
 
-/* Right side scaling */
-.dock:not([data-hover-off]) .app:not(.action):hover + .app:not(.action) {
+/* Right side */
+.dock:not([data-hover-off]) .app:hover + .app,
+.dock:not([data-hover-off]) .app:hover + .separator + .app {
   width: calc(80px + var(--dock-offset-right, 0px));
   height: calc(80px + var(--dock-offset-right, 0px));
   margin-top: calc(-20px + var(--dock-offset-right, 0px) * -1);
 }
 
-.dock:not([data-hover-off]) .app:not(.action):hover + .app + .app:not(.action) {
+.dock:not([data-hover-off]) .app:hover + .app + .app,
+.dock:not([data-hover-off]) .app:hover + .separator + .app + .app,
+.dock:not([data-hover-off]) .app:hover + .app + .separator + .app {
   width: calc(70px + var(--dock-offset-right, 0px));
   height: calc(70px + var(--dock-offset-right, 0px));
   margin-top: calc(-10px + var(--dock-offset-right, 0px) * -1);
 }
 
-/* Left side scaling (requires :has support) */
-.dock:not([data-hover-off]) .app:not(.action):has(+ .app:not(.action):hover) {
+/* Left side (:has) */
+.dock:not([data-hover-off]) .app:has(+ .app:hover),
+.dock:not([data-hover-off]) .app:has(+ .separator + .app:hover) {
   width: calc(80px + var(--dock-offset-left, 0px));
   height: calc(80px + var(--dock-offset-left, 0px));
   margin-top: calc(-20px + var(--dock-offset-left, 0px) * -1);
 }
 
-.dock:not([data-hover-off]) .app:not(.action):has(+ .app + .app:not(.action):hover) {
+.dock:not([data-hover-off]) .app:has(+ .app + .app:hover),
+.dock:not([data-hover-off]) .app:has(+ .separator + .app + .app:hover),
+.dock:not([data-hover-off]) .app:has(+ .app + .separator + .app:hover) {
   width: calc(70px + var(--dock-offset-left, 0px));
   height: calc(70px + var(--dock-offset-left, 0px));
   margin-top: calc(-10px + var(--dock-offset-left, 0px) * -1);
 }
 
-/* action buttons don't magnify */
-.dock:not([data-hover-off]) .action:hover {
-  width: 60px;
-  height: 60px;
-  margin-top: 0;
+/* Over the separator: the wave stays, centred on the line (both neighbours raised). */
+.dock:not([data-hover-off]) .separator:hover + .app,
+.dock:not([data-hover-off]) .app:has(+ .separator:hover) {
+  width: 84px;
+  height: 84px;
+  margin-top: -24px;
+}
+
+.dock:not([data-hover-off]) .separator:hover + .app + .app,
+.dock:not([data-hover-off]) .app:has(+ .app + .separator:hover) {
+  width: 72px;
+  height: 72px;
+  margin-top: -12px;
 }
 
 /* iOS Jiggle / Wobble Edit State */
