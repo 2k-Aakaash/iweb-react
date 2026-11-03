@@ -1,4 +1,4 @@
-import { ATTRIBUTION, formatMoney, formatRate, getCurrency, getCurrencySymbol } from '../../libs/currency/currencyService';
+import { attributionFor, formatMoney, formatRate, getCurrency, getCurrencySymbol } from '../../libs/currency/currencyService';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 const MOD_KEY = isMac ? '⌘' : 'Ctrl';
@@ -125,12 +125,12 @@ export const CurrencyAnswer = ({ ref, answer, isSelected, onHover }) => {
       <div className="sp-cc-footer">
         <a
           className="sp-cc-attribution"
-          href={ATTRIBUTION.url}
+          href={attributionFor(data?.source).url}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
         >
-          {ATTRIBUTION.label}
+          {attributionFor(data?.source).label}
         </a>
         <button
           type="button"

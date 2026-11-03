@@ -152,3 +152,43 @@ describe('stale reasons', () => {
     expect(offline).toMatchObject({ stale: true, staleReason: 'offline' });
   });
 });
+
+describe('backup rates', () => {
+  const ecb = (date, rates) => jsonResponse({ amount: 1, base: 'USD', date, rates });
+
+  it('uses today’s ECB rates when the main service is unreachable', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(latest('USD', { INR: 95.07 })));
+    await getLatestRates('USD', { now: NOW });
+    const later = NOW + 3 * 24 * 3600 * 1000;
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock.mockResolvedValueOnce(ecb('2026-10-17', { INR: 94.91, EUR: 0.86 }));
+    const rates = await getLatestRates('USD', { now: later });
+    expect(rates).toMatchObject({ stale: false, source: 'ecb' });
+    expect(rates.rates.INR).toBe(94.91);
+    expect(fetchMock.mock.calls[2][0]).toContain('frankfurter.dev/v1/latest?base=USD');
+    const result = await convert(2, 'USD', 'INR', { now: later }); // cached backup, no request
+    expect(result).toMatchObject({ result: 189.82, source: 'ecb', stale: false });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('also covers a failing (HTTP 503) main service, and goes stale only when both fail', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503));
+    fetchMock.mockResolvedValueOnce(ecb('2026-10-14', { INR: 94.5 }));
+    expect((await getLatestRates('USD', { now: NOW })).rates.INR).toBe(94.5);
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const stale = await getLatestRates('USD', { now: NOW + 2 * 3600 * 1000 });
+    expect(stale).toMatchObject({ stale: true, staleReason: 'offline' });
+    expect(stale.rates.INR).toBe(94.5);
+  });
+
+  it('keeps a newer rate from the main service over an older ECB fixing', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(latest('USD', { INR: 95.07 })));
+    await getLatestRates('USD', { now: NOW });
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock.mockResolvedValueOnce(ecb('2026-10-10', { INR: 93 }));
+    const rates = await getLatestRates('USD', { now: NOW + 21 * 3600 * 1000 });
+    expect(rates.rates.INR).toBe(95.07);
+    expect(rates.stale).toBe(true);
+  });
+});

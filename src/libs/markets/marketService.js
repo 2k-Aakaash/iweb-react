@@ -217,11 +217,25 @@ export function combineSeries(a, b, scale = 1) {
 // USD per troy ounce → INR per gram.
 const PER_GRAM = 1 / TROY_OUNCE_GRAMS;
 
-// The quote batch endpoint has no currency: NSE/BSE listings, Indian indices and our
-// metals are INR; anything else is left unknown (charts carry the real currency).
+// The quote batch endpoint has no currency, so it's read from the symbol: NSE/BSE listings,
+// Indian indices and our metals are INR; other exchanges by their Yahoo suffix (NVDA, with
+// none, is a US listing); FX pairs, futures and anything unknown are left without one
+// (charts carry the real currency).
+const SUFFIX_CURRENCY = {
+  L: 'GBP', T: 'JPY', HK: 'HKD', SS: 'CNY', SZ: 'CNY', KS: 'KRW', KQ: 'KRW', TW: 'TWD', SI: 'SGD',
+  AX: 'AUD', NZ: 'NZD', TO: 'CAD', V: 'CAD', DE: 'EUR', F: 'EUR', PA: 'EUR', AS: 'EUR', MI: 'EUR',
+  MC: 'EUR', BR: 'EUR', LS: 'EUR', VI: 'EUR', HE: 'EUR', IR: 'EUR', SW: 'CHF', ST: 'SEK', OL: 'NOK',
+  CO: 'DKK', SA: 'BRL', MX: 'MXN', JO: 'ZAR', TA: 'ILS', SR: 'SAR', QA: 'QAR', AE: 'AED',
+};
+
 export function guessCurrency(symbol) {
   if (isMetal(symbol) || symbol.startsWith('^') || /\.(NS|BO)$/.test(symbol)) return 'INR';
-  return null;
+  if (/=[XF]$/.test(symbol)) return null;
+  const crypto = /-(USD|EUR|INR|GBP)$/.exec(symbol);
+  if (crypto) return crypto[1];
+  const suffix = /\.([A-Z]{1,3})$/.exec(symbol);
+  if (suffix) return SUFFIX_CURRENCY[suffix[1]] || null;
+  return /^[A-Z][A-Z0-9-]{0,5}$/.test(symbol) ? 'USD' : null;
 }
 
 function buildQuote(symbol, raw, name, extra = {}) {
@@ -455,7 +469,7 @@ const SEARCH_ALIASES = [
 
 const isIndianListing = (item) => /\.(NS|BO)$/.test(item.symbol) || item.exchange === 'NSE' || item.exchange === 'BSE';
 
-/** Symbol search: local matches (indices, metals, name aliases) first, then NSE/BSE listings. */
+/** Symbol search: local matches (indices, metals, name aliases) first, then NSE/BSE listings, then the rest of the world (NVIDIA, Apple…). */
 export async function searchSymbols(query, { signal, now = Date.now() } = {}) {
   const q = (query || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!q) return [];
@@ -480,10 +494,10 @@ export async function searchSymbols(query, { signal, now = Date.now() } = {}) {
     }
   }
   const seen = new Set(local.map((item) => item.symbol));
-  const rank = (item) => (isIndianListing(item) ? 0 : 1);
-  // Indian listings only (NSE .NS / BSE .BO); local indices and metals are already included.
+  // Indian listings, then shares, funds and indices elsewhere, then futures (SNVDA=F…).
+  const rank = (item) => (isIndianListing(item) ? 0 : item.type === 'FUTURE' || /=F$/.test(item.symbol) ? 2 : 1);
   const merged = remote
-    .filter((item) => item && typeof item.symbol === 'string' && !seen.has(item.symbol) && isIndianListing(item))
+    .filter((item) => item && typeof item.symbol === 'string' && !seen.has(item.symbol))
     .sort((a, b) => rank(a) - rank(b));
   return [...local, ...merged].slice(0, 12);
 }

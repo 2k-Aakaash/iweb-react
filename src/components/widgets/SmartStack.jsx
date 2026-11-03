@@ -20,14 +20,21 @@ const SWIPE_MAX_MS = 800;
 const TRANSITION_MS = 280;
 const HINT_MS = 1200;
 
-// Gestures that start inside these belong to the widget itself (scrollers, form fields).
-const NO_FLIP_SELECTOR = '.forecast-scroll-wrapper, input, select, textarea, [contenteditable="true"], [data-stack-no-flip]';
+// Gestures that start inside these belong to the widget itself (form fields, menus). The
+// hourly forecast is a sideways scroller: it only keeps sideways gestures, and only while it
+// can scroll (at medium size it is clipped), so scrolling up or down over it still flips.
+const NO_FLIP_SELECTOR = 'input, select, textarea, [contenteditable="true"], [data-stack-no-flip]';
+const SIDEWAYS_SCROLLER = '.forecast-scroll-wrapper';
 
-function isNoFlipTarget(target, root) {
+function isNoFlipTarget(target, root, { horizontal = true } = {}) {
   if (!(target instanceof Element)) return false;
   const match = target.closest(NO_FLIP_SELECTOR);
-  return Boolean(match && root.contains(match));
+  if (match && root.contains(match)) return true;
+  const scroller = target.closest(SIDEWAYS_SCROLLER);
+  return Boolean(horizontal && scroller && root.contains(scroller) && scroller.scrollWidth > scroller.clientWidth + 1);
 }
+
+const isHorizontalWheel = (e) => Math.abs(e.deltaX) > Math.abs(e.deltaY);
 
 function prefersReducedMotion() {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -114,7 +121,7 @@ export default function SmartStack({ size = 'small', pages: pageIds = Object.key
 
   const handleWheel = useEffectEvent((e) => {
     const stack = stackRef.current;
-    if (!stack || e.ctrlKey || locked || isNoFlipTarget(e.target, stack)) return;
+    if (!stack || e.ctrlKey || locked || isNoFlipTarget(e.target, stack, { horizontal: isHorizontalWheel(e) })) return;
     const delta = wheelDelta(e);
     if (!delta) return;
 

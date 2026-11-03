@@ -299,11 +299,20 @@ describe('formatting', () => {
     expect(formatChange(-12.4)).toBe('−12.40');
   });
 
-  it('only labels INR for Indian listings, indices excluded', () => {
+  it('reads the currency from the listing, indices excluded', () => {
     expect(displayCurrency('^NSEI')).toBeNull();
     expect(displayCurrency('RELIANCE.NS')).toBe('INR');
     expect(displayCurrency('GOLD')).toBe('INR');
-    expect(displayCurrency('AAPL')).toBeNull();
+    expect(displayCurrency('AAPL')).toBe('USD');
+    expect(displayCurrency('NVDA')).toBe('USD');
+    expect(displayCurrency('BRK-B')).toBe('USD');
+    expect(displayCurrency('VOD.L')).toBe('GBP');
+    expect(displayCurrency('7203.T')).toBe('JPY');
+    expect(displayCurrency('SAP.DE')).toBe('EUR');
+    expect(displayCurrency('BTC-USD')).toBe('USD');
+    expect(displayCurrency('USDINR=X')).toBeNull();
+    expect(displayCurrency('CL=F')).toBeNull();
+    expect(displayCurrency('ABC.ZZ')).toBeNull();
   });
 });
 
@@ -326,7 +335,7 @@ describe('regressions', () => {
     expect(later['^NSEI'].price).toBe(22997.35);
   });
 
-  it('keeps remote search results to NSE/BSE listings', async () => {
+  it('lists NSE/BSE results first, then other exchanges (NVIDIA)', async () => {
     routeFetch({
       search: () => jsonResponse({
         results: [
@@ -336,7 +345,19 @@ describe('regressions', () => {
         ],
       }),
     });
-    expect((await searchSymbols('infosys', { now: NOW })).map((r) => r.symbol)).toEqual(['INFY.NS', 'INFY.BO']);
+    expect((await searchSymbols('infosys', { now: NOW })).map((r) => r.symbol)).toEqual(['INFY.NS', 'INFY.BO', 'INFY']);
+  });
+
+  it('finds companies listed only abroad', async () => {
+    routeFetch({
+      search: () => jsonResponse({
+        results: [
+          { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NasdaqGS', type: 'EQUITY' },
+          { symbol: 'NVD.DE', name: 'NVIDIA Corporation', exchange: 'XETRA', type: 'EQUITY' },
+        ],
+      }),
+    });
+    expect((await searchSymbols('nvidia', { now: NOW })).map((r) => r.symbol)).toEqual(['NVDA', 'NVD.DE']);
   });
 
   it('labels metal charts in IST and omits contract-specific 52-week figures', async () => {

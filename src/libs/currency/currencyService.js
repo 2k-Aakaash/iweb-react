@@ -5,6 +5,10 @@
 //     refreshed once a day. Attribution "Rates By Exchange Rate API" is required.
 //   - 7-day trend: Frankfurter (ECB reference rates, ~30 major currencies). Pairs it
 //     doesn't cover simply have no trend line.
+//   - Backup for the latest rates: when ExchangeRate-API can't be reached or fails,
+//     Frankfurter's latest ECB rates are used for the currencies it covers, so the widget
+//     shows today's rate instead of an old cached one. Only if both fail is the cache shown
+//     as stale.
 // Responses are cached in localStorage, so every tab shares them and the widget still
 // works offline with the last known rates.
 
@@ -17,6 +21,27 @@ const PREFS_KEY = 'currencyWidget';
 const MIN_REFRESH_MS = 60 * 60 * 1000;
 
 export const ATTRIBUTION = { label: 'Rates By Exchange Rate API', url: 'https://www.exchangerate-api.com' };
+export const BACKUP_ATTRIBUTION = { label: 'Rates by the European Central Bank (Frankfurter)', url: 'https://frankfurter.dev' };
+
+/** The attribution for rates from `source` ('er-api', the default, or 'ecb'). */
+export const attributionFor = (source) => (source === 'ecb' ? BACKUP_ATTRIBUTION : ATTRIBUTION);
+
+// Latest ECB rates for `base` from Frankfurter, in the same shape as the main source.
+async function getBackupRates(base, { signal, now }) {
+  const res = await fetch(`${HISTORY_API}latest?base=${encodeURIComponent(base)}`, { signal });
+  if (!res.ok) throw new CurrencyError('HTTP', `Backup rate service error (HTTP ${res.status}).`);
+  const json = await res.json();
+  const rates = { [base]: 1 };
+  for (const [code, raw] of Object.entries(json?.rates || {})) {
+    const value = Number(raw);
+    if (CODES.has(code) && Number.isFinite(value) && value > 0) rates[code] = value;
+  }
+  if (Object.keys(rates).length < 2) throw new CurrencyError('BAD_RESPONSE', 'Backup rate service returned unexpected data.');
+  // ECB reference rates are set around 16:00 CET on working days.
+  const updatedAt = Date.parse(`${json.date}T15:00:00Z`) || now;
+  // Try the main source again within the hour.
+  return { base, rates, updatedAt, nextUpdateAt: now + MIN_REFRESH_MS, fetchedAt: now, source: 'ecb' };
+}
 
 export const CURRENCIES = [
   { code: 'USD', name: 'US Dollar', flag: '🇺🇸' },
@@ -186,7 +211,18 @@ export async function getLatestRates(base, { signal, now = Date.now() } = {}) {
     return { ...entry, stale: false };
   } catch (err) {
     if (err?.name === 'AbortError') throw err;
-    // Stale because the device is offline, or because the rate service failed (e.g. 503).
+    // The main service is down or unreachable: today's ECB rates, when they cover `base`.
+    try {
+      const backup = await getBackupRates(base, { signal, now });
+      // A newer cached rate from the main source wins over an older ECB fixing.
+      if (!(cached && cached.source !== 'ecb' && cached.updatedAt > backup.updatedAt && now - cached.fetchedAt < 24 * 60 * 60 * 1000)) {
+        writeJson(cacheKey, backup);
+        return { ...backup, stale: false };
+      }
+    } catch (backupErr) {
+      if (backupErr?.name === 'AbortError') throw backupErr;
+    }
+    // Stale because the device is offline, or because the rate services failed (e.g. 503).
     const staleReason = err instanceof CurrencyError && (err.code === 'HTTP' || err.code === 'BAD_RESPONSE')
       ? 'error'
       : 'offline';
@@ -206,7 +242,7 @@ export async function convert(amount, from, to, options = {}) {
   const data = await getLatestRates(from, options);
   const rate = data.rates[to];
   if (!rate) throw new CurrencyError('UNSUPPORTED', `No rate available for ${from} → ${to}.`);
-  return { amount: value, from, to, rate, result: value * rate, updatedAt: data.updatedAt, stale: data.stale, staleReason: data.staleReason || null };
+  return { amount: value, from, to, rate, result: value * rate, updatedAt: data.updatedAt, stale: data.stale, staleReason: data.staleReason || null, source: data.source || 'er-api' };
 }
 
 function isoDate(date) {

@@ -3,7 +3,7 @@ import GlassSurface from '../glass/GlassSurface';
 import Sparkline from './shared/Sparkline';
 import { useCardExpand } from './shared/useCardExpand';
 import {
-  ATTRIBUTION,
+  attributionFor,
   CURRENCIES,
   CurrencyError,
   convert,
@@ -443,11 +443,11 @@ export default function CurrencyWidget({ active = true, onExpandedChange }) {
           <span className={stale ? 'cw-updated cw-updated-offline' : 'cw-updated'}>{updatedText}</span>
           <a
             className="cw-attribution"
-            href={ATTRIBUTION.url}
+            href={attributionFor(conversion?.source).url}
             target="_blank"
             rel="noopener noreferrer"
           >
-            {ATTRIBUTION.label}
+            {attributionFor(conversion?.source).label}
           </a>
         </div>
       </div>
