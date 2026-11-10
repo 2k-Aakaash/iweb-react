@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import gsap from 'gsap';
-import { collapsedWidth } from './widgets/shared/useCardExpand';
+import { collapsedWidth, morphCard } from './widgets/shared/useCardExpand';
 import GlassSurface from './glass/GlassSurface';
 
 export default function Weather({ onExpandedChange }) {
@@ -204,53 +203,23 @@ export default function Weather({ onExpandedChange }) {
     const condText = condTextRef.current;
     const hlText = hlTextRef.current;
 
-    const expandedWidth = window.innerWidth <= 480 ? '100%' : Math.max(320, collapsedWidth(container));
-    const springEase = 'cubic-bezier(0.32, 0.72, 0, 1)';
-
-    // Kill existing animations on these elements before starting new ones
-    gsap.killTweensOf([container, search, divider, forecast, locText, tempText, iconImg, condText, hlText]);
-
-    if (isExpanded) {
-      gsap.set(search, { display: 'flex' });
-      gsap.set(divider, { display: 'block' });
-      gsap.set(forecast, { display: 'flex' });
-
-      const tl = gsap.timeline({ defaults: { ease: springEase } });
-      tl
-        .to(container, { width: expandedWidth, height: 'auto', padding: 16, duration: 0.38 }, 0)
-        .to(locText, { fontSize: 20, duration: 0.3 }, 0)
-        .to(tempText, { fontSize: 56, duration: 0.3 }, 0)
-        .to(iconImg, { width: 46, height: 46, marginRight: 0, duration: 0.3 }, 0)
-        .to(condText, { fontSize: 14, duration: 0.3 }, 0)
-        .to(hlText, { fontSize: 12, duration: 0.3 }, 0)
-        .to(search, { height: 'auto', opacity: 1, duration: 0.32 }, 0.03)
-        .to(divider, { height: 1, opacity: 0.5, duration: 0.25 }, 0.03)
-        .to(forecast, { height: 'auto', opacity: 1, duration: 0.35 }, 0.03);
-    } else {
-      const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' } });
-      tl
-        .to([search, divider, forecast], {
-          height: 0,
-          opacity: 0,
-          duration: 0.22,
-          onComplete: () => {
-            gsap.set([search, divider, forecast], { display: 'none' });
-          }
-        }, 0)
-        .to(container, {
-          width: collapsedWidth(container),
-          height: 150,
-          padding: 12,
-          duration: 0.28,
-          // Hand the size back to CSS, so a later widget size change (Edit Widgets) applies.
-          onComplete: () => gsap.set(container, { clearProps: 'width,height,padding' }),
-        }, 0)
-        .to(locText, { fontSize: 13, duration: 0.22 }, 0)
-        .to(tempText, { fontSize: 32, duration: 0.22 }, 0)
-        .to(iconImg, { width: 24, height: 24, marginRight: 0, duration: 0.22 }, 0)
-        .to(condText, { fontSize: 11, duration: 0.22 }, 0)
-        .to(hlText, { fontSize: 10, duration: 0.22 }, 0);
-    }
+    // The headline text grows with the card (sizes from the CSS at rest).
+    morphCard(container, isExpanded, {
+      sections: [
+        { el: search, display: 'flex' },
+        { el: divider, display: 'block', opacity: 0.5 },
+        { el: forecast, display: 'flex' },
+      ],
+      width: window.innerWidth <= 480 ? '100%' : Math.max(320, collapsedWidth(container)),
+      tweens: [
+        { el: locText, open: { fontSize: 20 }, closed: { fontSize: 13 } },
+        { el: tempText, open: { fontSize: 56 }, closed: { fontSize: 32 } },
+        { el: iconImg, open: { width: 46, height: 46, marginRight: 0 }, closed: { width: 24, height: 24, marginRight: 0 } },
+        { el: condText, open: { fontSize: 14 }, closed: { fontSize: 11 } },
+        { el: hlText, open: { fontSize: 12 }, closed: { fontSize: 10 } },
+      ],
+      instant: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    });
   }, [isExpanded]);
 
   // Lets a container (the Smart Stack) know when the card is expanded.

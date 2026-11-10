@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 
-// Expand / collapse behaviour shared by the Smart Stack cards (currency, gold & silver):
-// the same GSAP timeline values as the Weather card, plus "click outside to collapse".
+// Expand / collapse behaviour shared by the Smart Stack cards (currency, gold & silver; the
+// Weather card uses morphCard too), plus "click outside to collapse".
 //
 //   cardRef      the card element (collapsed size from CSS: --widget-w × 150)
 //   panelRefs    sections shown only when expanded (display: flex)
@@ -17,10 +17,107 @@ export function collapsedWidth(card) {
   return Number.isFinite(value) && value > 0 ? value : COLLAPSED_SIZE;
 }
 const MOBILE_QUERY = '(max-width: 480px)';
-// The weather card's timeline passes a CSS cubic-bezier() string, which GSAP core can't
-// parse and resolves to its default 'power1.out'; use that so all cards move the same.
-const EXPAND_EASE = 'power1.out';
-const COLLAPSE_EASE = 'power2.inOut';
+
+// How a card opens and closes, after macOS 26's widgets: the frame glides to its exact final
+// size on one smooth, settling curve (no jump at the end, no overshoot), the extra content
+// fades in once there's room for it, and on close fades out first while the frame shrinks
+// back around it (clipped, never squashed).
+const FRAME_EASE = 'expo.out';
+const FRAME_S = 0.5;
+const CLOSE_EASE = 'power3.inOut';
+const CLOSE_S = 0.4;
+
+/**
+ * Animates `card` open or closed. The final size is measured before anything moves (the
+ * end state is laid out once, read, and put back), so the frame lands exactly on it.
+ *
+ *   sections   elements shown only when open: { el, display } (display: 'flex', 'block', …)
+ *   width      open width (px or '100%'); open padding is 16, closed 12 and 150 tall
+ *   tweens     other elements that change with it: { el, open: {…}, closed: {…} }, GSAP vars
+ *   instant    no animation (reduced motion)
+ */
+// The card's height while it's open, kept up to date (its content can change while open), so
+// closing starts from what's on screen rather than from the re-rendered, closed-state layout.
+const openHeights = new WeakMap();
+const watchers = new WeakMap();
+function watchOpenHeight(card, on) {
+  watchers.get(card)?.disconnect();
+  watchers.delete(card);
+  if (!on || typeof ResizeObserver === 'undefined') return;
+  const ro = new ResizeObserver(() => openHeights.set(card, card.offsetHeight));
+  ro.observe(card);
+  watchers.set(card, ro);
+}
+
+// Reads the layout as it will be once the CSS transitions now starting (font sizes that
+// follow the open class) have finished, then puts them back where they were.
+function measureSettled(card, read) {
+  const running = card.getAnimations?.({ subtree: true }).filter((a) => {
+    const end = a.effect?.getComputedTiming?.().endTime;
+    return a.playState === 'running' && Number.isFinite(end);
+  }) ?? [];
+  const saved = running.map((a) => a.currentTime);
+  running.forEach((a) => { a.currentTime = a.effect.getComputedTiming().endTime - 1; });
+  const value = read();
+  running.forEach((a, i) => { a.currentTime = saved[i]; });
+  return value;
+}
+
+export function morphCard(card, open, { sections, width, tweens = [], instant = false }) {
+  const els = sections.map((s) => s.el);
+  gsap.killTweensOf([card, ...els, ...tweens.map((t) => t.el)]);
+  watchOpenHeight(card, false);
+  const done = () => {
+    card.classList.remove('is-morphing');
+    if (open) {
+      gsap.set(card, { height: 'auto', clearProps: 'overflow' }); // follows its content
+      openHeights.set(card, card.offsetHeight);
+      watchOpenHeight(card, true);
+    } else {
+      gsap.set(els, { display: 'none', clearProps: 'height,opacity,y' });
+      gsap.set(card, { clearProps: 'width,height,padding,overflow' }); // CSS size again
+    }
+  };
+
+  if (open) {
+    const from = { width: card.offsetWidth, height: card.offsetHeight };
+    const fromVars = tweens.map((t) => Object.fromEntries(Object.keys(t.open).map((k) => [k, gsap.getProperty(t.el, k)])));
+    // Lay out the open state once to measure it.
+    sections.forEach((s) => gsap.set(s.el, { display: s.display, height: 'auto', opacity: 0, y: 0 }));
+    tweens.forEach((t) => gsap.set(t.el, t.open));
+    gsap.set(card, { width, height: 'auto', padding: 16 });
+    const to = measureSettled(card, () => ({ width: card.offsetWidth, height: card.offsetHeight }));
+    if (instant) {
+      gsap.set(els, { opacity: (i) => sections[i].opacity ?? 1 });
+      done();
+      return;
+    }
+    tweens.forEach((t, i) => gsap.set(t.el, fromVars[i]));
+    card.classList.add('is-morphing'); // its rows keep their size and are clipped, not squashed
+    gsap.set(card, { ...from, padding: 12, overflow: 'hidden' });
+    const tl = gsap.timeline({ defaults: { ease: FRAME_EASE, duration: FRAME_S } });
+    tl.to(card, { ...to, padding: 16, onComplete: done }, 0);
+    tweens.forEach((t) => tl.to(t.el, t.open, 0));
+    sections.forEach((s) => {
+      tl.fromTo(s.el, { y: 8 }, { opacity: s.opacity ?? 1, y: 0, duration: 0.32, ease: 'power2.out' }, 0.1);
+    });
+    return;
+  }
+
+  if (instant) {
+    tweens.forEach((t) => gsap.set(t.el, t.closed));
+    done();
+    return;
+  }
+  // The frame shrinks around the (fading) content, which keeps its layout until it's gone.
+  const narrow = width === '100%' ? '100%' : collapsedWidth(card);
+  card.classList.add('is-morphing');
+  gsap.set(card, { height: openHeights.get(card) ?? card.offsetHeight, overflow: 'hidden' });
+  const tl = gsap.timeline({ defaults: { ease: CLOSE_EASE, duration: CLOSE_S } });
+  tl.to(els, { opacity: 0, duration: 0.14, ease: 'power1.in' }, 0)
+    .to(card, { width: narrow, height: COLLAPSED_SIZE, padding: 12, onComplete: done }, 0);
+  tweens.forEach((t) => tl.to(t.el, t.closed, 0));
+}
 
 export function useCardExpand({ isExpanded, onCollapse, cardRef, panelRefs, dividerRef, expandedWidth = EXPANDED_WIDTH }) {
   const lastExpandedRef = useRef(false);
@@ -66,51 +163,14 @@ export function useCardExpand({ isExpanded, onCollapse, cardRef, panelRefs, divi
     lastExpandedRef.current = isExpanded;
 
     const mobile = window.matchMedia(MOBILE_QUERY).matches;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const sections = divider ? [...panels, divider] : panels;
-    // Callbacks live on the tweens (not the timeline) so a quick re-toggle that kills
-    // them can never fire a stale one.
-    const hideSections = () => gsap.set(sections, { display: 'none', height: 0, opacity: 0 });
-    const restoreCollapsedSize = () => gsap.set(card, { clearProps: 'width,height,padding' });
-    gsap.killTweensOf([card, ...sections]);
-
-    if (isExpanded) {
-      gsap.set(panels, { display: 'flex' });
-      if (divider) gsap.set(divider, { display: 'block' });
-      // The card's height follows its content (min-height 150px) while the sections open,
-      // so it grows smoothly and ends at the real height without a jump.
-      gsap.set(card, { height: 'auto' });
-      const cardTo = { width: mobile ? '100%' : Math.max(optionsRef.current.expandedWidth, collapsedWidth(card)), padding: 16 };
-      if (reducedMotion) {
-        gsap.set(card, cardTo);
-        gsap.set(panels, { height: 'auto', opacity: 1 });
-        if (divider) gsap.set(divider, { height: 1, opacity: 0.5 });
-        return undefined;
-      }
-      const timeline = gsap.timeline({ defaults: { ease: EXPAND_EASE } })
-        .to(card, { ...cardTo, duration: 0.38 }, 0);
-      panels.forEach((panel, index) => {
-        timeline.to(panel, { height: 'auto', opacity: 1, duration: index === 0 ? 0.32 : 0.35 }, 0.03);
-      });
-      if (divider) timeline.to(divider, { height: 1, opacity: 0.5, duration: 0.25 }, 0.03);
-      return undefined;
-    }
-
-    // Collapsed size comes from CSS (150×150, full width on phones) once the tween ends.
-    if (reducedMotion) {
-      hideSections();
-      restoreCollapsedSize();
-      return undefined;
-    }
-    gsap.timeline({ defaults: { ease: COLLAPSE_EASE } })
-      .to(sections, { height: 0, opacity: 0, duration: 0.22, onComplete: hideSections }, 0)
-      .to(card, {
-        width: mobile ? '100%' : collapsedWidth(card),
-        height: COLLAPSED_SIZE,
-        padding: 12,
-        duration: 0.28,
-        onComplete: restoreCollapsedSize,
-      }, 0);
+    morphCard(card, isExpanded, {
+      sections: [
+        ...panels.map((el) => ({ el, display: 'flex' })),
+        ...(divider ? [{ el: divider, display: 'block', opacity: 0.5 }] : []),
+      ],
+      width: mobile ? '100%' : Math.max(optionsRef.current.expandedWidth, collapsedWidth(card)),
+      instant: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    });
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the expanded state drives the animation
   }, [isExpanded]);

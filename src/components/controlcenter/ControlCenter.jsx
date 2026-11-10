@@ -18,19 +18,23 @@ import '../../styles/controlcenter.css';
 // Leaves the menu bar's Control Center button alone (it toggles the panel itself).
 const TOGGLE_SELECTOR = '[data-cc-toggle]';
 
-export default function ControlCenter({ initialView = 'grid', onClose }) {
+// `closing`: it's animating out (MenuBar.jsx unmounts it after); it takes no more input.
+export default function ControlCenter({ initialView = 'grid', closing = false, onClose }) {
   const [view, setView] = useState(initialView);
   const [editing, setEditingControls] = useState(false);
   const [dragId, setDragId] = useState(null);
   const shown = usePref(controlsPref);
   const { windows } = useWindows();
   const panelRef = useRef(null);
+  const backdropRef = useRef(null);
 
   // Escape: back from a view, out of editing, then close. Outside presses close.
   const escapeRef = useRef(null);
   const closeRef = useRef(onClose);
+  const closingRef = useRef(closing);
   useEffect(() => {
     closeRef.current = onClose;
+    closingRef.current = closing;
     escapeRef.current = () => {
       if (view !== 'grid') setView('grid');
       else if (editing) setEditingControls(false);
@@ -39,12 +43,13 @@ export default function ControlCenter({ initialView = 'grid', onClose }) {
   });
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || closingRef.current) return;
       e.preventDefault();
       e.stopPropagation(); // not also the window or Spotlight underneath
       escapeRef.current();
     };
     const onPointerDown = (e) => {
+      if (closingRef.current) return;
       if (panelRef.current?.contains(e.target) || e.target.closest?.(TOGGLE_SELECTOR)) return;
       closeRef.current();
     };
@@ -54,6 +59,18 @@ export default function ControlCenter({ initialView = 'grid', onClose }) {
       window.removeEventListener('keydown', onKey, true);
       document.removeEventListener('pointerdown', onPointerDown, true);
     };
+  }, []);
+
+  // The blurred backdrop follows the panel's height (views and editing change it).
+  useEffect(() => {
+    const panel = panelRef.current;
+    const backdrop = backdropRef.current;
+    if (!panel || !backdrop || typeof ResizeObserver === 'undefined') return undefined;
+    const fit = () => backdrop.style.setProperty('--cc-h', `${panel.offsetHeight}px`);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(panel);
+    return () => ro.disconnect();
   }, []);
 
   // Focus moves into the panel (Tab then reaches the controls) without ringing a control.
@@ -66,7 +83,7 @@ export default function ControlCenter({ initialView = 'grid', onClose }) {
     close: onClose,
     // Close first, so the page is clear (a screenshot doesn't show the panel).
     run: (fn) => {
-      onClose();
+      onClose({ immediate: true });
       requestAnimationFrame(() => requestAnimationFrame(fn));
     },
     showDesktop: () => {
@@ -86,7 +103,9 @@ export default function ControlCenter({ initialView = 'grid', onClose }) {
   };
 
   return (
-    <div ref={panelRef} className={`cc${editing ? ' is-editing' : ''}`} role="dialog" aria-label="Control Center" tabIndex={-1}>
+    <>
+    <div ref={backdropRef} className={`cc-backdrop${closing ? ' is-closing' : ''}`} aria-hidden="true" />
+    <div ref={panelRef} className={`cc${editing ? ' is-editing' : ''}${closing ? ' is-closing' : ''}`} role="dialog" aria-label="Control Center" tabIndex={-1}>
       {view !== 'grid' ? (
         <ControlView view={view} onBack={() => setView('grid')} />
       ) : (
@@ -149,5 +168,6 @@ export default function ControlCenter({ initialView = 'grid', onClose }) {
         </>
       )}
     </div>
+    </>
   );
 }

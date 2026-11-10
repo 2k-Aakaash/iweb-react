@@ -4,6 +4,10 @@
 #   - a new GitHub Release (marked Latest) is created from that commit with
 #     iWeb.Extension.zip attached
 #
+# Release notes (scripts/release-notes.mjs): docs/releases/<tag>.md, written with each
+# release; without one, the pushed commits are listed. Earlier releases' notes are kept in
+# step with their files.
+#
 # Versioning (scripts/next-version.mjs), from the latest iWeb release + pushed commits:
 #   "feat: …"  → minor (v2.3 → v2.4) · "[major]" → major (v3.0) · anything else → patch (v2.4.1)
 #
@@ -133,15 +137,38 @@ jobs:
           fi
           echo "BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
+      - name: Write release notes
+        env:
+          COMMIT_MESSAGES_FILE: commit-messages.txt
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        run: |
+          # docs/releases/<tag>.md when written for this release, else the pushed commits.
+          node scripts/release-notes.mjs "${{ steps.version.outputs.tag }}" "${{ steps.version.outputs.kind }}" > release-notes.md
+          cat release-notes.md
+
       - name: Create Latest release in iWeb
         env:
           GH_TOKEN: ${{ secrets.IWEB_DEPLOY_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" iWeb.Extension.zip iWeb.Extension.zip.sha256 \
-            --repo "$TARGET_REPO" \
-            --target "$BUILD_COMMIT" \
-            --title "iWeb ${{ steps.version.outputs.tag }}" \
-            --notes "${{ steps.version.outputs.kind }} release · automated build of [iweb-react@${{ steps.version.outputs.short_sha }}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}).
+          gh release create "${{ steps.version.outputs.tag }}" iWeb.Extension.zip iWeb.Extension.zip.sha256             --repo "$TARGET_REPO"             --target "$BUILD_COMMIT"             --title "iWeb ${{ steps.version.outputs.tag }}"             --notes-file release-notes.md             --latest
 
-          Install: download **iWeb.Extension.zip**, unzip it, then open chrome://extensions → enable Developer mode → Load unpacked → select the unzipped folder." \
-            --latest
+      - name: Update notes of earlier releases
+        env:
+          GH_TOKEN: ${{ secrets.IWEB_DEPLOY_TOKEN }}
+          CURRENT_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          # Earlier releases take their description from docs/releases/<tag>.md too, so notes
+          # written or corrected later are published. Only changed descriptions are edited,
+          # and each keeps the source-commit link it already had.
+          set -uo pipefail
+          for file in docs/releases/*.md; do
+            tag=$(basename "$file" .md)
+            [ "$tag" = "$CURRENT_TAG" ] && continue
+            gh release view "$tag" --repo "$TARGET_REPO" --json body -q .body > existing-body.md 2>/dev/null || continue
+            EXISTING_BODY_FILE=existing-body.md node scripts/release-notes.mjs "$tag" > wanted-body.md
+            # gh trims the trailing newline; compare without it.
+            if [ "$(cat existing-body.md)" = "$(cat wanted-body.md)" ]; then continue; fi
+            echo "Updating notes of $tag"
+            gh release edit "$tag" --repo "$TARGET_REPO" --notes-file wanted-body.md || echo "::warning::Could not update notes of $tag"
+          done

@@ -5213,3 +5213,11 @@ svg {
   /* Liquid Glass card: the weather gradient tints the glass (see Weather.jsx). */
   --glass-tint-opacity: 0.68;
 }
+
+/* While an expandable card (Weather, Currency, Gold & Silver) changes size (morphCard in
+   useCardExpand.js), its rows keep their natural height and the frame clips them, rather
+   than the flex column squashing them to fit. */
+.is-morphing > * {
+  flex-shrink: 0 !important;
+  flex-basis: auto !important;
+}

@@ -14,8 +14,10 @@
   max-height: calc(100vh - var(--menubar-h, 32px) - 20px);
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 2px;
-  margin: -2px;
+  /* Room for focus rings and the edit badges that stick out past the tiles' corners;
+     the negative margin keeps the tiles where they were. */
+  padding: 8px;
+  margin: -8px;
   color: #fff;
   font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
@@ -42,6 +44,59 @@
 .cc input:focus-visible {
   outline: 2px solid rgba(10, 132, 255, 0.95);
   outline-offset: 2px;
+}
+
+/* The frosted haze behind the tiles, as in macOS 26: the desktop under Control Center is
+   blurred and dimmed, fading out softly past the panel's left and bottom edges. Its height
+   follows the panel (--cc-h, set in ControlCenter.jsx); it never takes clicks. */
+.cc-backdrop {
+  --cc-fade: 90px;
+  position: fixed;
+  top: var(--menubar-h, 32px);
+  right: 0;
+  z-index: 100590; /* under the panel, over app windows; below the menu bar's top edge */
+  width: calc(var(--cc-unit, 64px) * 4 + 12px * 3 + 24px + var(--cc-fade));
+  height: min(calc(var(--cc-h, 420px) + 8px + 12px + var(--cc-fade)), calc(100vh - var(--menubar-h, 32px)));
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.14) 70%, transparent),
+    rgba(20, 20, 24, 0.12);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  -webkit-mask-image:
+    linear-gradient(to left, #000 calc(100% - var(--cc-fade)), transparent),
+    linear-gradient(to bottom, #000 calc(100% - var(--cc-fade)), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to left, #000 calc(100% - var(--cc-fade)), transparent),
+    linear-gradient(to bottom, #000 calc(100% - var(--cc-fade)), transparent);
+  mask-composite: intersect;
+  animation: cc-haze-in 0.3s ease both;
+  transition: height 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes cc-haze-in {
+  from { opacity: 0; }
+}
+
+/* Closing: the tiles lift and fade toward the menu bar, and the haze clears with them
+   (CC_OUT_MS in MenuBar.jsx matches). */
+.cc.is-closing {
+  pointer-events: none;
+  transform-origin: 100% 0;
+  animation: cc-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.cc-backdrop.is-closing {
+  animation: cc-haze-out 0.22s ease both;
+}
+
+@keyframes cc-out {
+  to { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+
+@keyframes cc-haze-out {
+  to { opacity: 0; }
 }
 
 /* ── Grid ─────────────────────────────────────────────────────────────── */
@@ -333,17 +388,10 @@
 }
 
 .cc.is-editing .cc-cell {
-  animation: cc-wiggle 0.32s ease-in-out infinite alternate;
-  animation-delay: calc(var(--i, 0) * -70ms);
-  cursor: grab;
+  cursor: grab; /* tiles hold still while editing (no wiggle) */
 }
 
 .cc.is-editing .cc-cell.is-dragging { opacity: 0.35; }
-
-@keyframes cc-wiggle {
-  from { transform: rotate(-0.8deg); }
-  to { transform: rotate(0.8deg); }
-}
 
 .cc-remove {
   position: absolute;
@@ -375,6 +423,8 @@
   font-weight: normal;
   color: rgba(255, 255, 255, 0.6);
 }
+
+.cc-more ul:empty { display: none; }
 
 .cc-more ul {
   display: flex;
@@ -799,10 +849,16 @@ html.cc-focus .iu-notice { display: none !important; }
 .cc-night-shift.is-on { opacity: 0.32; }
 
 @media (prefers-reduced-motion: reduce) {
+  .cc.is-closing,
+  .cc-backdrop.is-closing {
+    animation: none !important;
+    opacity: 0;
+  }
+
+  .cc-backdrop,
   .cc-cell,
   .cc-view,
-  .cc-timer-bubble,
-  .cc.is-editing .cc-cell {
+  .cc-timer-bubble {
     animation: none !important;
   }
 }

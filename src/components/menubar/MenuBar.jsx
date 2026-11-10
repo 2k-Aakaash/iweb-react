@@ -25,7 +25,9 @@ import '../../styles/menubar.css';
 // --menubar-space tells the page how much room it takes (0 while hidden).
 
 const REVEAL_DELAY_MS = 90; // the pointer rests at the top edge this long before it slides in
+const REVEAL_EDGE_PX = 6; // how close to the top counts as "at the top edge"
 const HIDE_DELAY_MS = 350;
+const CC_OUT_MS = 220; // Control Center's closing animation (controlcenter.css, .is-closing)
 
 const IWEB_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
 const REPO_URL = `https://github.com/${RELEASES_REPO}`;
@@ -351,6 +353,39 @@ export default function MenuBar({ actions }) {
   };
   useEffect(() => () => clearTimeout(revealTimer.current), []);
 
+  // While hidden, reveal once the pointer reaches the top of the page. In a browser tab the page's
+  // top isn't the screen's edge, so a 1px strip is easy to overshoot: anything in the top few
+  // pixels counts, and so does leaving the page through its top (into the tab strip), as
+  // the pointer heads up there. Moving back down before the delay cancels it.
+  useEffect(() => {
+    if (!hidden || revealed) return undefined;
+    let armed = false;
+    const arm = () => {
+      if (armed) return;
+      armed = true;
+      reveal(true, REVEAL_DELAY_MS);
+    };
+    const disarm = () => {
+      if (!armed) return;
+      armed = false;
+      clearTimeout(revealTimer.current);
+    };
+    const onMove = (e) => {
+      if (e.buttons) return; // dragging something (a window, a widget) is not reaching for the bar
+      if (e.clientY <= REVEAL_EDGE_PX) arm();
+      else disarm();
+    };
+    const onLeave = (e) => {
+      if (!e.relatedTarget && !e.buttons && e.clientY <= REVEAL_EDGE_PX * 4) arm();
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    document.documentElement.addEventListener('mouseleave', onLeave);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      document.documentElement.removeEventListener('mouseleave', onLeave);
+    };
+  }, [hidden, revealed]);
+
   // While revealed, hide once the pointer moves down off the bar. (It slides in under a still
   // pointer, so the bar may never get pointerenter / pointerleave: follow the pointer's y.)
   const menuIsOpen = open !== null || cc !== null;
@@ -358,7 +393,7 @@ export default function MenuBar({ actions }) {
     if (!hidden || !revealed || menuIsOpen) return undefined;
     const onMove = (e) => {
       const bar = barRef.current;
-      const below = e.clientY > (bar?.offsetHeight ?? 32) + 6;
+      const below = e.clientY > (bar?.offsetHeight ?? 32) + 12;
       if (below && !bar?.contains(document.activeElement)) reveal(false, HIDE_DELAY_MS);
       else if (!below) clearTimeout(revealTimer.current);
     };
@@ -391,13 +426,24 @@ export default function MenuBar({ actions }) {
   };
 
   // Control Center: one thing open at a time (it or a menu); the bar stays while it's open.
-  const closeCc = () => {
-    setCc(null);
+  // It fades up and out before it's gone (CC_OUT_MS, as long as its .is-closing animation);
+  // { immediate } skips that, for a screenshot taken right after.
+  const ccTimer = useRef(0);
+  useEffect(() => () => clearTimeout(ccTimer.current), []);
+  const closeCc = ({ immediate = false } = {}) => {
+    clearTimeout(ccTimer.current);
+    if (immediate) setCc(null);
+    else {
+      setCc((c) => c && (c.closing ? c : { ...c, closing: true }));
+      ccTimer.current = setTimeout(() => setCc((c) => (c?.closing ? null : c)), CC_OUT_MS);
+    }
     if (!hoverRef.current) reveal(false, HIDE_DELAY_MS);
   };
+  const ccShown = cc !== null && !cc.closing;
   const openCc = (view = 'grid') => {
     setOpen(null);
     setActive(-1);
+    clearTimeout(ccTimer.current);
     clearTimeout(revealTimer.current);
     if (hidden) setRevealed(true);
     setCc({ view, key: Date.now() });
@@ -410,6 +456,7 @@ export default function MenuBar({ actions }) {
   }, []);
 
   const show = (index, highlightFirst = false) => {
+    clearTimeout(ccTimer.current);
     setCc(null);
     setOpen(index);
     setLeft(titleRefs.current[index]?.offsetLeft ?? 0);
@@ -478,9 +525,6 @@ export default function MenuBar({ actions }) {
 
   return (
     <>
-    {hidden && !revealed && (
-      <div className="mb-hotzone" aria-hidden="true" onPointerEnter={() => reveal(true, REVEAL_DELAY_MS)} onPointerLeave={() => clearTimeout(revealTimer.current)} />
-    )}
     <nav
       ref={barRef}
       className={`mb${menuIsOpen ? ' is-menu-open' : ''}${hidden ? ' is-autohide' : ''}${revealed ? ' is-revealed' : ''}`}
@@ -531,7 +575,7 @@ export default function MenuBar({ actions }) {
           </button>
         ))}
       </div>
-      <StatusIcons onSpotlight={actions.openSpotlight} ccOpen={cc !== null} onControlCenter={() => (cc ? closeCc() : openCc())} />
+      <StatusIcons onSpotlight={actions.openSpotlight} ccOpen={ccShown} onControlCenter={() => (ccShown ? closeCc() : openCc())} />
       {openMenu && (
         <MenuPanel
           menu={openMenu}
@@ -542,7 +586,7 @@ export default function MenuBar({ actions }) {
         />
       )}
     </nav>
-    {cc && <ControlCenter key={cc.key} initialView={cc.view} onClose={closeCc} />}
+    {cc && <ControlCenter key={cc.key} initialView={cc.view} closing={Boolean(cc.closing)} onClose={closeCc} />}
     </>
   );
 }
