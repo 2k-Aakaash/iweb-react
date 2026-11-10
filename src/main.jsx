@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/fonts.css'
 import './styles/style.css'
+import './styles/mac-controls.css'
 import './styles/scrollbars.css'
 import App from './App.jsx'
 import './libs/boot/bootReveal' // starts the veil's time limit

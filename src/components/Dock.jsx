@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import styles from "./Dock.module.css";
 import GlassSurface from "./glass/GlassSurface";
 import DockAppIcon from "./dock/DockAppIcon";
@@ -6,9 +6,26 @@ import { WINDOW_EVENT } from "../libs/window/useMacWindow";
 import { useFavicons } from "../libs/favicons/useFavicons";
 import { restoreMarkets } from "../libs/markets/marketService";
 import { openNews } from "../libs/news/newsEvents";
+import { usePref } from "../libs/prefs/storedPref";
+import {
+  dockMagnificationPref,
+  dockSizePref,
+  fitIconSize,
+  magnificationPx,
+  normalizeDockSize,
+} from "../libs/dock/dockPrefs";
 
 const defaultFavicon = "https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100";
-const maxAdditionalSize = 5;
+// Room kept clear on each side of the Dock when it shrinks to fit the window.
+const DOCK_MARGIN = 16;
+// Built-in apps always in the Dock: Add, Change BG, Notes, Music, Settings.
+const BUILT_IN_APPS = 5;
+
+const subscribeWidth = (cb) => {
+  window.addEventListener("resize", cb);
+  return () => window.removeEventListener("resize", cb);
+};
+const getWidth = () => window.innerWidth;
 
 const scaleValue = (value, from, to) => {
   const scale = (to[1] - to[0]) / (from[1] - from[0]);
@@ -39,6 +56,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
   const [badCached, setBadCached] = useState({});
 
   const dockRef = useRef(null);
+
   // Apps with an open or minimized window get the running dot under their icon (macOS).
   const [running, setRunning] = useState({});
   // Hover labels. Their glass is mounted only for the label showing and the one fading out,
@@ -67,6 +85,44 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
     return () => window.removeEventListener(WINDOW_EVENT, onWindow);
   }, []);
   const runningProps = (app) => (running[app] && running[app] !== "closed" ? { "data-running": running[app] } : {});
+
+  // Size, as in macOS 26 (dockPrefs.js): the chosen icon size, smaller when the apps wouldn't
+  // fit the window. Magnification grows with the chosen size, not the shrunk one.
+  const chosenSize = usePref(dockSizePref);
+  const magnification = usePref(dockMagnificationPref);
+  const viewportWidth = useSyncExternalStore(subscribeWidth, getWidth, () => 1440);
+  const magPx = magnificationPx(chosenSize, magnification);
+  const transientCount = ["markets", "news"].filter((app) => running[app] && running[app] !== "closed").length;
+  const iconSize = fitIconSize({
+    size: chosenSize,
+    count: bookmarks.length + BUILT_IN_APPS + transientCount,
+    dividers: bookmarks.length > 0 ? 1 : 0,
+    available: viewportWidth - DOCK_MARGIN * 2,
+    magnification: magPx,
+  });
+  // The wave's left/right lean follows the pointer across the icon (a sixth of the growth).
+  const maxAdditionalSize = magPx / 6;
+
+  // Drag the divider up or down to resize the Dock (macOS).
+  const [resizing, setResizing] = useState(false);
+  const resizeFrom = useRef(null);
+  const onDividerDown = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeFrom.current = { y: e.clientY, size: chosenSize };
+    setResizing(true);
+  };
+  const onDividerMove = (e) => {
+    const from = resizeFrom.current;
+    if (!from) return;
+    const next = normalizeDockSize(from.size + (from.y - e.clientY));
+    if (next !== null) dockSizePref.set(next);
+  };
+  const onDividerUp = () => {
+    resizeFrom.current = null;
+    setResizing(false);
+  };
 
   // A click that opens a new tab leaves Chrome's :hover stuck on that icon (the page gets no
   // mouse events while it is in the background), so on return the icon was still magnified
@@ -244,7 +300,9 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
         ref={dockRef}
         className={styles.dock}
         data-glass="dock"
-        data-hover-off={hoverOff || undefined}
+        data-hover-off={hoverOff || resizing || undefined}
+        data-resizing={resizing || undefined}
+        style={{ "--dock-u": `${iconSize}px`, "--dock-m": `${magPx}px` }}
         onPointerMove={hoverOff ? () => setHoverOff(false) : undefined}
         onMouseLeave={handleMouseLeave}
       >
@@ -338,8 +396,18 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
           })}
 
           {/* ── macOS-style vertical separator ── */}
+          {/* Dragging it up or down resizes the Dock, as in macOS. */}
           {bookmarks.length > 0 && (
-            <li className={styles.separator} aria-hidden="true" />
+            <li
+              className={styles.separator}
+              aria-hidden="true"
+              title="Drag up or down to resize the Dock"
+              onPointerDown={onDividerDown}
+              onPointerMove={onDividerMove}
+              onPointerUp={onDividerUp}
+              onPointerCancel={onDividerUp}
+              onLostPointerCapture={onDividerUp}
+            />
           )}
 
           {/* ── Add App Button ── */}

@@ -1,9 +1,14 @@
+/* Sizes follow the icon size --dock-u and the magnification --dock-m (extra px of the icon
+   under the pointer), set by Dock.jsx from Settings → Appearance → Dock (dockPrefs.js). At
+   the default 60px / Medium they are the original fixed sizes. */
 .dock {
+  --u: var(--dock-u, 60px);
+  --m: var(--dock-m, 30px);
   position: fixed;
   left: 50%;
   bottom: 16px;
-  border-radius: 24px;
-  padding: 10px 20px;
+  border-radius: calc(var(--u) * 0.4);
+  padding: calc(var(--u) / 6) calc(var(--u) / 3);
   z-index: 200;
 
   background: transparent;
@@ -44,22 +49,23 @@
 }
 
 .app {
-  width: 60px;
-  height: 60px;
+  width: var(--u);
+  height: var(--u);
   position: relative;
+  flex-shrink: 0;
   transition: width, height, margin-top;
   transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
   transition-duration: 100ms;
 }
 
 .link {
-  margin-top: 8px;
+  margin-top: calc(var(--u) * 0.1333);
   width: 70%;
   height: 70%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border-radius: calc(var(--u) * 0.2667);
   overflow: visible;
   color: #fff;
   text-decoration: none;
@@ -70,7 +76,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 16px;
+  border-radius: calc(var(--u) * 0.2667);
   user-select: none;
   pointer-events: none;
   -webkit-user-drag: none;
@@ -82,26 +88,29 @@
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: 16px;
+  border-radius: calc(var(--u) * 0.2667);
   background: rgba(255, 255, 255, 0.08);
 }
 
 /* ── macOS-style vertical separator ── */
 /* The line is drawn inside a full-height strip, so the pointer crossing it is still "in" the
    Dock's wave (see the magnification rules) rather than in a gap that drops it. */
+/* Dragging it up or down resizes the Dock (Dock.jsx), so it shows the resize pointer. */
 .separator {
   position: relative;
-  width: 17px;
-  height: 60px;
+  width: calc(var(--u) * 0.28);
+  height: var(--u);
   flex-shrink: 0;
+  cursor: ns-resize;
+  touch-action: none;
 }
 
 .separator::before {
   content: "";
   position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: 8px;
+  top: 20%;
+  bottom: 20%;
+  left: calc(50% - 0.5px);
   width: 1px;
   border-radius: 1px;
   background: rgba(255, 255, 255, 0.22);
@@ -121,7 +130,7 @@
   margin-top: 0;
   padding: 0;
   border: 0;
-  border-radius: 16px;
+  border-radius: calc(var(--u) * 0.2667);
   background: none;
   cursor: pointer;
   display: flex;
@@ -187,56 +196,67 @@
    every icon in the Dock (bookmarks and the built-in apps alike). The wave carries on over the
    separator, which takes no part in it. */
 .dock:not([data-hover-off]) .app:hover {
-  width: 90px;
-  height: 90px;
-  margin-top: -30px;
+  width: calc(var(--u) + var(--m));
+  height: calc(var(--u) + var(--m));
+  margin-top: calc(var(--m) * -1);
 }
 
 /* Right side */
 .dock:not([data-hover-off]) .app:hover + .app,
 .dock:not([data-hover-off]) .app:hover + .separator + .app {
-  width: calc(80px + var(--dock-offset-right, 0px));
-  height: calc(80px + var(--dock-offset-right, 0px));
-  margin-top: calc(-20px + var(--dock-offset-right, 0px) * -1);
+  width: calc(var(--u) + var(--m) * 2 / 3 + var(--dock-offset-right, 0px));
+  height: calc(var(--u) + var(--m) * 2 / 3 + var(--dock-offset-right, 0px));
+  margin-top: calc(var(--m) * -2 / 3 - var(--dock-offset-right, 0px));
 }
 
 .dock:not([data-hover-off]) .app:hover + .app + .app,
 .dock:not([data-hover-off]) .app:hover + .separator + .app + .app,
 .dock:not([data-hover-off]) .app:hover + .app + .separator + .app {
-  width: calc(70px + var(--dock-offset-right, 0px));
-  height: calc(70px + var(--dock-offset-right, 0px));
-  margin-top: calc(-10px + var(--dock-offset-right, 0px) * -1);
+  width: calc(var(--u) + var(--m) / 3 + var(--dock-offset-right, 0px));
+  height: calc(var(--u) + var(--m) / 3 + var(--dock-offset-right, 0px));
+  margin-top: calc(var(--m) / -3 - var(--dock-offset-right, 0px));
 }
 
 /* Left side (:has) */
 .dock:not([data-hover-off]) .app:has(+ .app:hover),
 .dock:not([data-hover-off]) .app:has(+ .separator + .app:hover) {
-  width: calc(80px + var(--dock-offset-left, 0px));
-  height: calc(80px + var(--dock-offset-left, 0px));
-  margin-top: calc(-20px + var(--dock-offset-left, 0px) * -1);
+  width: calc(var(--u) + var(--m) * 2 / 3 + var(--dock-offset-left, 0px));
+  height: calc(var(--u) + var(--m) * 2 / 3 + var(--dock-offset-left, 0px));
+  margin-top: calc(var(--m) * -2 / 3 - var(--dock-offset-left, 0px));
 }
 
 .dock:not([data-hover-off]) .app:has(+ .app + .app:hover),
 .dock:not([data-hover-off]) .app:has(+ .separator + .app + .app:hover),
 .dock:not([data-hover-off]) .app:has(+ .app + .separator + .app:hover) {
-  width: calc(70px + var(--dock-offset-left, 0px));
-  height: calc(70px + var(--dock-offset-left, 0px));
-  margin-top: calc(-10px + var(--dock-offset-left, 0px) * -1);
+  width: calc(var(--u) + var(--m) / 3 + var(--dock-offset-left, 0px));
+  height: calc(var(--u) + var(--m) / 3 + var(--dock-offset-left, 0px));
+  margin-top: calc(var(--m) / -3 - var(--dock-offset-left, 0px));
 }
 
 /* Over the separator: the wave stays, centred on the line (both neighbours raised). */
 .dock:not([data-hover-off]) .separator:hover + .app,
 .dock:not([data-hover-off]) .app:has(+ .separator:hover) {
-  width: 84px;
-  height: 84px;
-  margin-top: -24px;
+  width: calc(var(--u) + var(--m) * 0.8);
+  height: calc(var(--u) + var(--m) * 0.8);
+  margin-top: calc(var(--m) * -0.8);
 }
 
 .dock:not([data-hover-off]) .separator:hover + .app + .app,
 .dock:not([data-hover-off]) .app:has(+ .app + .separator:hover) {
-  width: 72px;
-  height: 72px;
-  margin-top: -12px;
+  width: calc(var(--u) + var(--m) * 0.4);
+  height: calc(var(--u) + var(--m) * 0.4);
+  margin-top: calc(var(--m) * -0.4);
+}
+
+/* While the divider is dragged, the Dock resizes smoothly with no wave. */
+.dock[data-resizing] .app,
+.dock[data-resizing] .separator {
+  transition-duration: 60ms;
+}
+
+.dock[data-resizing],
+.dock[data-resizing] * {
+  cursor: ns-resize !important;
 }
 
 /* iOS Jiggle / Wobble Edit State */
@@ -323,7 +343,7 @@
   content: "";
   position: absolute;
   left: 50%;
-  bottom: -6px; /* inside the Dock's padding, clear of its bright rim */
+  bottom: calc(var(--u) / -10); /* inside the Dock's padding, clear of its bright rim */
   width: 5px;
   height: 5px;
   margin-left: -2.5px;

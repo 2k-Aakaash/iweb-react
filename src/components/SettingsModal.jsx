@@ -8,7 +8,16 @@ import GlassSurface from './glass/GlassSurface';
 import { setGlassMode, useGlassMode } from './glass/glassMode';
 import { MENUBAR_MODES, setMenubarMode, useMenubarMode } from '../libs/menubar/menubarPrefs';
 import { CLOCK_STYLES, setClockStyle, useClockStyle } from '../libs/clock/clockStyle';
+import { usePref } from '../libs/prefs/storedPref';
+import {
+  DOCK_SIZE_MAX,
+  DOCK_SIZE_MIN,
+  MAGNIFICATIONS,
+  dockMagnificationPref,
+  dockSizePref,
+} from '../libs/dock/dockPrefs';
 import ConfirmDialog from './wallpaper/ConfirmDialog';
+import MacSlider from './ui/MacSlider';
 import SettingsTabIcon from './settings/SettingsTabIcon';
 import AboutPane from './settings/AboutPane';
 import ProfileCard from './settings/ProfileCard';
@@ -48,6 +57,8 @@ export default function SettingsModal({
   const glassMode = useGlassMode();
   const menubarMode = useMenubarMode();
   const clockStyle = useClockStyle();
+  const dockSize = usePref(dockSizePref);
+  const dockMagnification = usePref(dockMagnificationPref);
 
   // Escape closes Settings, like the other macOS-style windows.
   useEffect(() => {
@@ -720,6 +731,41 @@ export default function SettingsModal({
                       : 'While hidden, move the pointer to the top edge of the screen to show it.'}
                   </div>
                 </div>
+
+                <div className="settings-group-card-title">Dock</div>
+                <div className="settings-group-card">
+                  <div className="settings-row">
+                    <label className="settings-label" htmlFor="dock-size">Size</label>
+                    <div className="settings-value" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '60%' }}>
+                      <span style={{ fontSize: '11px', opacity: 0.6 }}>Small</span>
+                      <MacSlider
+                        id="dock-size"
+                        min={DOCK_SIZE_MIN}
+                        max={DOCK_SIZE_MAX}
+                        value={dockSize}
+                        onChange={(v) => dockSizePref.set(v)}
+                        style={{ flex: 1 }}
+                      />
+                      <span style={{ fontSize: '11px', opacity: 0.6 }}>Large</span>
+                    </div>
+                  </div>
+                  <div className="settings-row">
+                    <label className="settings-label" htmlFor="dock-magnification">Magnification</label>
+                    <select
+                      id="dock-magnification"
+                      className="settings-select"
+                      value={dockMagnification}
+                      onChange={(e) => dockMagnificationPref.set(e.target.value)}
+                    >
+                      {MAGNIFICATIONS.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="settings-row-hint">
+                    You can also drag the divider in the Dock up or down to resize it. When your apps don't fit the window, the Dock shrinks them so they all stay visible.
+                  </div>
+                </div>
               </div>
             )}
 
@@ -735,12 +781,12 @@ export default function SettingsModal({
                   <div className="settings-row">
                     <span className="settings-label">Playback Volume</span>
                     <div className="settings-value" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '60%' }}>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
+                      <MacSlider
+                        aria-label="Playback volume"
+                        min={0}
+                        max={100}
                         value={musicSettings.volume}
-                        onChange={(e) => handleMusicSettingChange('volume', parseInt(e.target.value, 10))}
+                        onChange={(v) => handleMusicSettingChange('volume', v)}
                         style={{ flex: 1 }}
                       />
                       <span style={{ fontSize: '13px', width: '25px', textAlign: 'right' }}>{musicSettings.volume}%</span>

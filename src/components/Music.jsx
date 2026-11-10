@@ -3,6 +3,7 @@ import { Howl, Howler } from 'howler';
 import { directoryOpen } from 'browser-fs-access';
 import GlassSurface from './glass/GlassSurface';
 import { useMacWindow } from '../libs/window/useMacWindow';
+import MacSlider from './ui/MacSlider';
 import { publishPlayer, registerPlayerController } from '../libs/music/playerStore';
 import { parseSearchIntent } from '../libs/intentParser';
 
@@ -2047,12 +2048,11 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                               <div style={{ fontWeight: '500', fontSize: '14px' }}>Audio Output Device</div>
                               <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Choose your active listening device type</div>
                             </div>
-                            <select 
-                              value={outputDevice} 
+                            <select
+                              className="settings-select"
+                              aria-label="Audio output device"
+                              value={outputDevice}
                               onChange={(e) => handleUpdateSetting('outputDevice', e.target.value)}
-                              style={{
-                                background: '#282828', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
-                              }}
                             >
                               <option value="speakers">Speakers</option>
                               <option value="buds">Earbuds</option>
@@ -2066,13 +2066,13 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                               <div style={{ fontWeight: '500', fontSize: '14px' }}>Default Startup Volume</div>
                               <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Initial playback volume level ({volume}%)</div>
                             </div>
-                            <input 
-                              type="range" 
-                              min="0" 
-                              max="100" 
+                            <MacSlider
+                              aria-label="Default startup volume"
+                              min={0}
+                              max={100}
                               value={volume}
-                              onChange={(e) => handleUpdateSetting('volume', parseInt(e.target.value))}
-                              style={{ width: '120px', cursor: 'pointer' }}
+                              onChange={(v) => handleUpdateSetting('volume', v)}
+                              style={{ width: '140px' }}
                             />
                           </div>
 
@@ -2086,7 +2086,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                               type="checkbox" 
                               checked={rememberPlayback}
                               onChange={(e) => handleUpdateSetting('rememberPlayback', e.target.checked)}
-                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                              className="settings-switch"
                             />
                           </div>
 
@@ -2100,7 +2100,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                               type="checkbox" 
                               checked={silentAutoReconnect}
                               onChange={(e) => handleUpdateSetting('silentAutoReconnect', e.target.checked)}
-                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                              className="settings-switch"
                             />
                           </div>
 
@@ -2114,7 +2114,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                               type="checkbox" 
                               checked={enableHoverExpand}
                               onChange={(e) => handleUpdateSetting('enableHoverExpand', e.target.checked)}
-                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                              className="settings-switch"
                             />
                           </div>
 
@@ -2128,7 +2128,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                               type="checkbox" 
                               checked={displayLyrics}
                               onChange={(e) => handleUpdateSetting('displayLyrics', e.target.checked)}
-                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                              className="settings-switch"
                             />
                           </div>
 

@@ -1,0 +1,182 @@
+/* macOS 26 form controls, for every control that has no look of its own:
+ *
+ *   Slider      .mac-slider (MacSlider.jsx), and any range input without a class
+ *   Checkbox    any checkbox without a class
+ *   Radio       any radio button without a class
+ *
+ * Controls with their own design (Control Center's sliders, the Music player's seek and
+ * volume bars, Notes' task checkboxes, the switches .settings-switch) keep it.
+ */
+
+:root {
+  --mac-accent: #0a84ff;
+}
+
+/* ── Slider ───────────────────────────────────────────────────────────────
+   A thin rounded track filled with the accent colour up to the value (--fill, set by
+   MacSlider.jsx), and a white capsule knob that turns into a clear glass lens while it's
+   dragged, as in macOS 26. */
+
+.mac-slider,
+input[type="range"]:not([class]) {
+  --track-h: 5px;
+  --knob-w: 24px;
+  --knob-h: 15px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 60px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+  touch-action: pan-y;
+}
+
+.mac-slider::-webkit-slider-runnable-track,
+input[type="range"]:not([class])::-webkit-slider-runnable-track {
+  height: var(--track-h);
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--mac-accent) 0 var(--fill, 0%), rgba(255, 255, 255, 0.16) var(--fill, 0%) 100%);
+  box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.25);
+}
+
+.mac-slider::-webkit-slider-thumb,
+input[type="range"]:not([class])::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: var(--knob-w);
+  height: var(--knob-h);
+  margin-top: calc((var(--track-h) - var(--knob-h)) / 2);
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Dragging: the knob swells into a see-through lens over the track. */
+.mac-slider:active::-webkit-slider-thumb,
+input[type="range"]:not([class]):active::-webkit-slider-thumb {
+  transform: scale(1.35, 1.45);
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.mac-slider:focus-visible,
+input[type="range"]:not([class]):focus-visible {
+  outline: none;
+}
+
+.mac-slider:focus-visible::-webkit-slider-thumb,
+input[type="range"]:not([class]):focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 3px rgba(10, 132, 255, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.mac-slider:disabled,
+input[type="range"]:not([class]):disabled {
+  opacity: 0.45;
+}
+
+/* Firefox */
+.mac-slider::-moz-range-track,
+input[type="range"]:not([class])::-moz-range-track {
+  height: var(--track-h);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mac-slider::-moz-range-progress,
+input[type="range"]:not([class])::-moz-range-progress {
+  height: var(--track-h);
+  border-radius: 999px;
+  background: var(--mac-accent);
+}
+
+.mac-slider::-moz-range-thumb,
+input[type="range"]:not([class])::-moz-range-thumb {
+  width: var(--knob-w);
+  height: var(--knob-h);
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* ── Checkbox ─────────────────────────────────────────────────────────────
+   A small rounded square; filled with the accent colour and a white tick when checked. */
+
+input[type="checkbox"]:not([class]) {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1) no-repeat center / 11px 11px;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.35),
+    0 0.5px 1px rgba(0, 0, 0, 0.25);
+  vertical-align: middle;
+  cursor: default;
+  transition: background-color 0.12s ease;
+}
+
+input[type="checkbox"]:not([class]):checked {
+  background-color: var(--mac-accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.3 5 8.6l4.4-5.2' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.25);
+}
+
+input[type="checkbox"]:not([class]):active {
+  filter: brightness(1.2);
+}
+
+/* ── Radio button ─────────────────────────────────────────────────────────
+   A small circle; filled with the accent colour and a white dot when chosen. */
+
+input[type="radio"]:not([class]) {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.35),
+    0 0.5px 1px rgba(0, 0, 0, 0.25);
+  vertical-align: middle;
+  cursor: default;
+  transition: background-color 0.12s ease;
+}
+
+input[type="radio"]:not([class]):checked {
+  background: var(--mac-accent) radial-gradient(circle, #fff 0 2.6px, transparent 3px);
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.25);
+}
+
+input[type="checkbox"]:not([class]):focus-visible,
+input[type="radio"]:not([class]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.55);
+}
+
+input[type="checkbox"]:not([class]):disabled,
+input[type="radio"]:not([class]):disabled {
+  opacity: 0.45;
+}
