@@ -155,7 +155,6 @@ function Creator({ size, platform }) {
 
 const PREVIEWS = {
   youtube: (props) => <Creator {...props} platform="youtube" />,
-  instagram: (props) => <Creator {...props} platform="instagram" />,
   weather: Weather, currency: Currency, metals: Metals, markets: Markets, news: News, stack: Stack, clock: Clock, quote: Quote, search: Search };
 
 export default function WidgetPreview({ id, size }) {

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { showConfirm } from '../../libs/dialogs/dialogs';
 import {
   PRIORITIES,
   addDays,
@@ -310,9 +311,15 @@ export default function TaskChecklist({ content, today, onChange, renderMarkdown
     addRef.current.value = '';
   };
 
-  const clear = () => {
+  const clear = async () => {
     if (!done) return;
-    if (window.confirm(`Delete ${done === 1 ? 'the completed task' : `the ${done} completed tasks`} from this note?`)) onChange(clearCompleted(contentRef.current));
+    const ok = await showConfirm({
+      title: done === 1 ? 'Delete the completed task?' : `Delete the ${done} completed tasks?`,
+      message: 'They’re removed from this note.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) onChange(clearCompleted(contentRef.current));
   };
 
   const hiddenCount = hideDone ? done : 0;

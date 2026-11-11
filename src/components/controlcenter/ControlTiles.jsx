@@ -21,7 +21,7 @@ import {
 // Center first, then does something on the page (Show Desktop, Screenshot…).
 
 function Glass() {
-  return <GlassSurface preset="card" />;
+  return <GlassSurface preset="tile" />;
 }
 
 function RoundTile({ label, on = false, disabled = false, onClick, children }) {

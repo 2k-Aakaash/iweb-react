@@ -59,7 +59,7 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', fetchMock);
   _resetCreatorStore();
   creatorPrefs._reset();
-  await creatorPrefs.set({ youtube: null, instagram: null, refreshMinutes: 30 });
+  await creatorPrefs.set({ youtube: null, refreshMinutes: 30 });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -206,8 +206,7 @@ describe('removing', () => {
   it('deletes the account, its snapshots and the widget’s choice, and revokes Google access', async () => {
     const id = await connectAccount('youtube');
     await selectAccount('youtube', id);
-    const result = await removeAccount(id);
-    expect(result.manual).toBe(false);
+    await removeAccount(id);
     expect(ops()).toContain('revoke');
     expect(getState().accounts[id]).toBeUndefined();
     expect(await readAccount(id)).toBeNull();

@@ -23,9 +23,7 @@ export function snapshotOf(accountId, data) {
   if (!data || !Number.isFinite(data.fetchedAt)) return null;
   const s = data.stats || {};
   const pick = (v) => (Number.isFinite(v) ? v : null);
-  const metrics = data.platform === 'instagram'
-    ? { followers: pick(s.followers), media: pick(s.media) }
-    : { subscribers: s.subscribersHidden ? null : pick(s.subscribers), views: pick(s.views), videos: pick(s.videos) };
+  const metrics = { subscribers: s.subscribersHidden ? null : pick(s.subscribers), views: pick(s.views), videos: pick(s.videos) };
   if (Object.values(metrics).every((v) => v === null)) return null;
   return { accountId, platform: data.platform, at: data.fetchedAt, metrics };
 }

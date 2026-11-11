@@ -1,5 +1,5 @@
 // Vercel serverless function: /api/creator?op=config|channel|authorize|exchange|fetch|revoke
-// The Creator widgets' server side (YouTube and Instagram analytics); see _creatorProxy.js.
+// The Creator widget's server side (YouTube Analytics); see _creatorProxy.js.
 
 import { clientIp, handleCreator, readJsonBody } from './_creatorProxy.js';
 

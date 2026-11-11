@@ -122,6 +122,7 @@ function StickyNote({ note, card, today, viewport }) {
     <section
       ref={ref}
       data-color={card.color || undefined}
+      data-force-dark // on the wallpaper, like the widgets: white ink in both appearances
       className={`stk-card${card.expanded ? ' is-expanded' : ''}${dragging ? ' is-dragging' : ''}`}
       data-sticky-note={note.id}
       aria-label={`${title}, task note on the desktop`}

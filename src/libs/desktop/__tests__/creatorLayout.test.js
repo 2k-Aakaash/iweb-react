@@ -5,7 +5,6 @@ describe('Creator widgets in the layout', () => {
   it('start off the desktop and outside the Smart Stack', () => {
     const layout = normalizeLayout(DEFAULT_LAYOUT);
     expect(placementOf(layout, 'youtube')).toBe('hidden');
-    expect(placementOf(layout, 'instagram')).toBe('hidden');
     expect(ITEMS.youtube.stackable).toBeFalsy();
     expect(layout.stack.pages).not.toContain('youtube');
   });
@@ -29,12 +28,12 @@ describe('Creator widgets in the layout', () => {
   it('remember their size and position once placed', () => {
     const layout = normalizeLayout({ ...DEFAULT_LAYOUT, youtube: { ax: 'right', x: 182, ay: 'top', y: 348, size: 'large', hidden: false } });
     expect(layout.youtube).toEqual({ ax: 'right', x: 182, ay: 'top', y: 348, size: 'large', hidden: false });
-    expect(normalizeLayout({ ...DEFAULT_LAYOUT, instagram: { ...DEFAULT_LAYOUT.instagram, size: 'huge' } }).instagram.size).toBe('medium');
+    expect(normalizeLayout({ ...DEFAULT_LAYOUT, youtube: { ...DEFAULT_LAYOUT.youtube, size: 'huge' } }).youtube.size).toBe('medium');
   });
 
-  it('never place Instagram Analytics while it is in development', () => {
-    expect(ITEMS.instagram.inDevelopment).toBe(true);
-    const layout = normalizeLayout({ ...DEFAULT_LAYOUT, instagram: { ...DEFAULT_LAYOUT.instagram, hidden: false } });
-    expect(layout.instagram.hidden).toBe(true);
+  it('drop Instagram Analytics from layouts saved before it was removed', () => {
+    expect(ITEMS.instagram).toBeUndefined();
+    const layout = normalizeLayout({ ...DEFAULT_LAYOUT, instagram: { ax: 'left', x: 16, ay: 'top', y: 348, size: 'medium', hidden: false } });
+    expect(layout.instagram).toBeUndefined();
   });
 });

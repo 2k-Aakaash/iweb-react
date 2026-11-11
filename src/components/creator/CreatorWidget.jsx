@@ -9,7 +9,7 @@ import { loadConfig, refreshAccount } from '../../libs/creator/creatorStore';
 import { selectAccount } from '../../libs/creator/creatorPrefs';
 import '../../styles/creator.css';
 
-// The shell both Creator widgets share (YouTubeWidget, InstagramWidget): who the account
+// The Creator widget's shell (YouTubeWidget): who the account
 // is, its metrics, when they were last updated, and the controls (refresh, switch account,
 // manage). Sizes: small (one headline number), medium (four metrics; Details flips to the
 // rest in place) and large (both). A refresh that fails keeps the numbers on screen and
@@ -159,7 +159,7 @@ function statusOf(account, refreshing, now) {
 }
 
 export default function CreatorWidget({
-  id, // 'youtube' | 'instagram'
+  id, // 'youtube'
   title,
   glyph,
   size = 'medium',

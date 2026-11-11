@@ -1,0 +1,173 @@
+/* The macOS 26 alert (components/dialogs/DialogHost.jsx): a narrow glass card, centred, with
+   the app icon, a bold title, the message and capsule buttons. Its Light look is generated
+   (scripts/postcss-light-appearance.mjs). */
+
+.ma-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100800; /* over everything, Apps included */
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.22);
+  animation: ma-fade 0.18s ease both;
+}
+
+@keyframes ma-fade {
+  from { opacity: 0; }
+}
+
+.ma-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(272px, 100%);
+  padding: 22px 18px 16px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-align: center;
+  animation: ma-pop 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes ma-pop {
+  from { opacity: 0; transform: scale(1.08); }
+}
+
+.ma-card .glass-surface {
+  border-radius: inherit;
+}
+
+.ma-card > :not(.glass-surface) {
+  position: relative;
+}
+
+.ma-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.3));
+}
+
+.ma-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.ma-message {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.ma-buttons {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.ma-buttons.is-two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ma-btn {
+  height: 30px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: default;
+  transition: filter 0.12s ease;
+}
+
+.ma-btn:hover {
+  filter: brightness(1.12);
+}
+
+.ma-btn:active {
+  filter: brightness(0.88);
+}
+
+.ma-btn.is-main {
+  background: #0a84ff;
+  color: #fff;
+}
+
+.ma-btn.is-destructive {
+  background: #ff453a;
+  color: #fff;
+}
+
+.ma-btn:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ma-overlay,
+  .ma-card {
+    animation: none;
+  }
+}
+
+/* Add App (components/dock/AddAppSheet.jsx): the alert with fields. */
+.ma-sheet {
+  width: min(300px, 100%);
+}
+
+.ma-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.ma-field {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  outline: none;
+}
+
+.ma-field::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+}
+
+.ma-field:focus {
+  border-color: rgba(10, 132, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+}
+
+.ma-error {
+  margin: 0;
+  font-size: 11.5px;
+  text-align: left;
+  color: #ff6961;
+}
+
+.ma-btn:disabled {
+  opacity: 0.45;
+  filter: none;
+}

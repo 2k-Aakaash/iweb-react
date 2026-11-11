@@ -133,6 +133,7 @@ function buildMenus(front, windows, actions) {
       { label: 'Change Wallpaper…', onSelect: () => openSettings('wallpaper') },
       { label: 'Next Wallpaper', onSelect: actions.nextWallpaper },
       SEP,
+      { label: 'Apps', shortcut: 'F4', onSelect: () => window.dispatchEvent(new Event('apps:toggle')) },
       { label: 'Spotlight Search', shortcut: 'Ctrl K', onSelect: actions.openSpotlight },
     ],
   };
@@ -195,6 +196,11 @@ function buildMenus(front, windows, actions) {
     items: [
       { label: 'Minimize', disabled: !controller, onSelect: () => controller.minimize() },
       { label: front?.maximized ? 'Exit Full Size' : 'Zoom', disabled: !controller, onSelect: () => controller.toggleMaximize() },
+      SEP,
+      // Move & Resize, as in macOS (also: drag a window to a screen edge).
+      { label: 'Left Half', disabled: !controller, checked: controller?.tile === 'left', onSelect: () => controller.snapTo('left') },
+      { label: 'Right Half', disabled: !controller, checked: controller?.tile === 'right', onSelect: () => controller.snapTo('right') },
+      { label: 'Fill', disabled: !controller || front?.maximized, onSelect: () => controller.toggleMaximize() },
       ...(running.length
         ? [SEP, ...running.map((w) => ({
           label: w.state === 'minimized' ? `${w.title} (minimized)` : w.title,
@@ -272,7 +278,7 @@ function TrafficLights({ front }) {
   );
 }
 
-function StatusIcons({ onSpotlight, ccOpen, onControlCenter }) {
+function StatusIcons({ onSpotlight, ccOpen, onControlCenter, ncOpen, onNotificationCenter }) {
   const now = useNow();
   const online = useOnline();
   const battery = useBattery();
@@ -318,10 +324,21 @@ function StatusIcons({ onSpotlight, ccOpen, onControlCenter }) {
       >
         <ControlCenterIcon size={16} />
       </button>
-      <time className="mb-clock" dateTime={now.toISOString()}>
-        <span>{date}</span>
-        <span>{time}</span>
-      </time>
+      {/* The clock opens Notification Center, as in macOS. */}
+      <button
+        type="button"
+        className={`mb-status-btn mb-clock-btn${ncOpen ? ' is-open' : ''}`}
+        aria-label="Notification Center"
+        aria-expanded={ncOpen}
+        aria-haspopup="dialog"
+        data-nc-toggle
+        onClick={onNotificationCenter}
+      >
+        <time className="mb-clock" dateTime={now.toISOString()}>
+          <span>{date}</span>
+          <span>{time}</span>
+        </time>
+      </button>
     </div>
   );
 }
@@ -388,7 +405,14 @@ export default function MenuBar({ actions }) {
 
   // While revealed, hide once the pointer moves down off the bar. (It slides in under a still
   // pointer, so the bar may never get pointerenter / pointerleave: follow the pointer's y.)
-  const menuIsOpen = open !== null || cc !== null;
+  // Notification Center (NotificationCenter.jsx) reports whether it's open.
+  const [ncOpen, setNcOpen] = useState(false);
+  useEffect(() => {
+    const onState = (e) => setNcOpen(Boolean(e.detail?.open));
+    window.addEventListener('notifications:state', onState);
+    return () => window.removeEventListener('notifications:state', onState);
+  }, []);
+  const menuIsOpen = open !== null || cc !== null || ncOpen;
   useEffect(() => {
     if (!hidden || !revealed || menuIsOpen) return undefined;
     const onMove = (e) => {
@@ -441,6 +465,7 @@ export default function MenuBar({ actions }) {
   };
   const ccShown = cc !== null && !cc.closing;
   const openCc = (view = 'grid') => {
+    window.dispatchEvent(new Event('notifications:close'));
     setOpen(null);
     setActive(-1);
     clearTimeout(ccTimer.current);
@@ -575,7 +600,15 @@ export default function MenuBar({ actions }) {
           </button>
         ))}
       </div>
-      <StatusIcons onSpotlight={actions.openSpotlight} ccOpen={ccShown} onControlCenter={() => (ccShown ? closeCc() : openCc())} />
+      <StatusIcons onSpotlight={actions.openSpotlight} ccOpen={ccShown}
+        onControlCenter={() => (ccShown ? closeCc() : openCc())}
+        ncOpen={ncOpen}
+        onNotificationCenter={() => {
+          if (cc) closeCc({ immediate: true });
+          setOpen(null);
+          window.dispatchEvent(new Event('notifications:toggle'));
+        }}
+      />
       {openMenu && (
         <MenuPanel
           menu={openMenu}

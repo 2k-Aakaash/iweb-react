@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { showAlert } from '../libs/dialogs/dialogs';
+import { notify } from '../libs/notifications/notifications';
 // Backups (jszip, the search database…) load when one is restored, not with Settings.
 const loadBackupService = () => import('../libs/backupService');
 import { openIwebDB } from '../libs/wallpaper/db';
@@ -9,6 +11,8 @@ import { setGlassMode, useGlassMode } from './glass/glassMode';
 import { MENUBAR_MODES, setMenubarMode, useMenubarMode } from '../libs/menubar/menubarPrefs';
 import { CLOCK_STYLES, setClockStyle, useClockStyle } from '../libs/clock/clockStyle';
 import { usePref } from '../libs/prefs/storedPref';
+import { APPEARANCES, appearancePref } from '../libs/appearance/appearance';
+import { ACCENTS, accentPref } from '../libs/appearance/accent';
 import {
   DOCK_SIZE_MAX,
   DOCK_SIZE_MIN,
@@ -23,6 +27,7 @@ import AboutPane from './settings/AboutPane';
 import ProfileCard from './settings/ProfileCard';
 import DataControlsPane from './settings/DataControlsPane';
 import WidgetsPane from './settings/WidgetsPane';
+import BookmarksPane from './settings/BookmarksPane';
 import { deleteCustomFonts, listCustomFonts } from '../libs/fonts/customFonts';
 
 export default function SettingsModal({
@@ -58,6 +63,8 @@ export default function SettingsModal({
   const menubarMode = useMenubarMode();
   const clockStyle = useClockStyle();
   const dockSize = usePref(dockSizePref);
+  const appearance = usePref(appearancePref);
+  const accent = usePref(accentPref);
   const dockMagnification = usePref(dockMagnificationPref);
 
   // Escape closes Settings, like the other macOS-style windows.
@@ -159,7 +166,7 @@ export default function SettingsModal({
       exitFontSelection();
     } catch (err) {
       console.error('Failed to delete custom fonts:', err);
-      alert('Couldn’t delete the selected fonts.');
+      showAlert({ title: 'The fonts couldn’t be deleted' });
     } finally {
       setDeletingFonts(false);
       setFontsToDelete(null);
@@ -280,7 +287,7 @@ export default function SettingsModal({
   // Select Folder reconnect handler
   const handleReconnectMusicFolder = async () => {
     if (!('showDirectoryPicker' in window)) {
-      alert('Browser does not support folder picker.');
+      showAlert({ title: 'This browser can’t choose folders', message: 'Use Chrome or Edge to connect a music folder.' });
       return;
     }
     try {
@@ -292,7 +299,7 @@ export default function SettingsModal({
         const store = tx.objectStore('settings');
         store.put(handle, 'directory-handle');
         setMusicFolderName(handle.name);
-        alert(`Successfully reconnected folder: ${handle.name}. Please rescan files in your Music Library to play tracks.`);
+        notify({ app: 'music', title: 'Music folder connected', body: `“${handle.name}” is connected. Rescan your Music Library to play its songs.` });
       };
     } catch (err) {
       console.error(err);
@@ -320,7 +327,7 @@ export default function SettingsModal({
       
       setShowImportConfirm(true);
     } catch (err) {
-      alert(`Invalid backup: ${err.message}`);
+      showAlert({ title: 'That isn’t an iWeb backup', message: err.message });
     }
     e.target.value = null; // Reset input picker
   };
@@ -330,10 +337,10 @@ export default function SettingsModal({
     try {
       const { restoreFromIwebBackup } = await loadBackupService();
       await restoreFromIwebBackup(importingZip, importMetadata, importModules);
-      alert('Backup imported successfully. The page will reload to apply changes.');
+      await showAlert({ title: 'Backup restored', message: 'iWeb will reload to show it.', buttonLabel: 'Reload' });
       window.location.reload();
     } catch (err) {
-      alert(`Restore failed: ${err.message}`);
+      showAlert({ title: 'The backup couldn’t be restored', message: err.message });
     }
   };
 
@@ -623,20 +630,21 @@ export default function SettingsModal({
               <div className="settings-tab-pane">
                 <div className="settings-group-card">
                   <div className="settings-row" style={{ alignItems: 'flex-start' }}>
-                    <span className="settings-label" style={{ marginTop: '10px' }}>Appearance</span>
-                    <div className="settings-appearance-picker">
-                      <div className="settings-appearance-option active">
-                        <div className="appearance-preview-light"></div>
-                        <span>Light</span>
-                      </div>
-                      <div className="settings-appearance-option">
-                        <div className="appearance-preview-dark"></div>
-                        <span>Dark</span>
-                      </div>
-                      <div className="settings-appearance-option">
-                        <div className="appearance-preview-auto"></div>
-                        <span>Auto</span>
-                      </div>
+                    <span className="settings-label" id="appearance-label" style={{ marginTop: '10px' }}>Appearance</span>
+                    <div className="settings-appearance-picker" role="radiogroup" aria-labelledby="appearance-label">
+                      {APPEARANCES.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={appearance === option.id}
+                          className={`settings-appearance-option${appearance === option.id ? ' active' : ''}`}
+                          onClick={() => appearancePref.set(option.id)}
+                        >
+                          <div className={`appearance-preview-${option.id}`}></div>
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -645,14 +653,19 @@ export default function SettingsModal({
                 <div className="settings-group-card">
                   <div className="settings-row">
                     <span className="settings-label">Accent Colour</span>
-                    <div className="settings-accent-colors">
-                      <span className="accent-dot accent-multicolor active"></span>
-                      <span className="accent-dot accent-blue"></span>
-                      <span className="accent-dot accent-purple"></span>
-                      <span className="accent-dot accent-pink"></span>
-                      <span className="accent-dot accent-red"></span>
-                      <span className="accent-dot accent-orange"></span>
-                      <span className="accent-dot accent-green"></span>
+                    <div className="settings-accent-colors" role="radiogroup" aria-label="Accent colour">
+                      {ACCENTS.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={accent === option.id}
+                          aria-label={option.label}
+                          title={option.label}
+                          className={`accent-dot accent-${option.id}${accent === option.id ? ' active' : ''}`}
+                          onClick={() => accentPref.set(option.id)}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -842,7 +855,7 @@ export default function SettingsModal({
                       If browser security prevents access to your local music directory, reconnect it below:
                     </p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '5px', width: '100%' }}>
-                      <span className="settings-value" style={{ fontSize: '13px', color: '#ffb300' }}>
+                      <span className="settings-value settings-warning" style={{ fontSize: '13px' }}>
                         {musicFolderName ? `Connected: ${musicFolderName}` : 'Access lost / Folder disconnected'}
                       </span>
                       <button 
@@ -859,29 +872,7 @@ export default function SettingsModal({
             )}
 
             {/* 5. BOOKMARKS TAB */}
-            {activeTab === 'bookmarks' && (
-              <div className="settings-tab-pane">
-                <div className="settings-group-card-title">Dock Bookmarks ({bookmarks.length})</div>
-                <div className="settings-group-card" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                  {bookmarks.map((bm, index) => (
-                    <div key={index} className="settings-row">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <img src={bm.favicon} alt="" style={{ width: '16px', height: '16px', borderRadius: '4px' }} />
-                        <span className="settings-label" style={{ fontWeight: '500' }}>{bm.websiteName}</span>
-                      </div>
-                      <a href={bm.url} target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: '#0a84ff', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                        {bm.url}
-                      </a>
-                    </div>
-                  ))}
-                  {bookmarks.length === 0 && (
-                    <div className="settings-row">
-                      <span className="settings-label" style={{ color: 'rgba(255,255,255,0.5)' }}>No dock bookmarks.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {activeTab === 'bookmarks' && <BookmarksPane bookmarks={bookmarks} setBookmarks={setBookmarks} />}
 
             {/* 6. DATA CONTROLS TAB */}
             {activeTab === 'widgets' && <WidgetsPane onClose={onClose} />}

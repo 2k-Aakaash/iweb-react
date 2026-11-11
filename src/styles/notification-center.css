@@ -1,0 +1,444 @@
+/* Notification Center and notification banners (components/notifications), after macOS 26:
+   glass cards at the top right, under the menu bar; widgets below the notifications. Its Light
+   look is generated (scripts/postcss-light-appearance.mjs). */
+
+.nc,
+.nc-banner {
+  --nc-w: 344px;
+  position: fixed;
+  top: calc(var(--menubar-h, 32px) + 8px);
+  right: 12px;
+  width: var(--nc-w);
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.nc button,
+.nc-banner button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+  cursor: default;
+}
+
+.nc button:focus-visible,
+.nc-banner button:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 2px;
+}
+
+/* ── The panel ──────────────────────────────────────────────────────────── */
+
+.nc {
+  z-index: 100600; /* with Control Center: over the menu bar and app windows */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - var(--menubar-h, 32px) - 20px);
+  padding: 4px;
+  margin: -4px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  outline: none;
+  animation: nc-in 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.nc.is-closing {
+  pointer-events: none;
+  animation: nc-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes nc-in {
+  from { opacity: 0; transform: translateX(28px); }
+}
+
+@keyframes nc-out {
+  to { opacity: 0; transform: translateX(28px); }
+}
+
+/* The blurred haze behind it, as behind Control Center. */
+.nc-backdrop {
+  position: fixed;
+  top: var(--menubar-h, 32px);
+  right: 0;
+  bottom: 0;
+  z-index: 100590;
+  width: calc(344px + 24px + 90px);
+  pointer-events: none;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.12) 75%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 90px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 90px), transparent);
+  animation: nc-haze-in 0.3s ease both;
+}
+
+.nc-backdrop.is-closing {
+  animation: nc-haze-out 0.22s ease both;
+}
+
+@keyframes nc-haze-in {
+  from { opacity: 0; }
+}
+
+@keyframes nc-haze-out {
+  to { opacity: 0; }
+}
+
+.nc-section-head,
+.nc-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 0;
+}
+
+.nc-section-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.nc-group-head {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nc-group-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.nc-text-btn {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.nc-text-btn:hover {
+  color: #fff !important;
+}
+
+.nc-none {
+  margin: 4px 6px 6px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.nc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Several from one app, collapsed: one card with two edges peeking out below. */
+.nc-group.is-stacked .nc-card {
+  margin-bottom: 10px;
+  box-shadow:
+    0 6px 0 -3px rgba(255, 255, 255, 0.16),
+    0 12px 0 -6px rgba(255, 255, 255, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* ── A notification ─────────────────────────────────────────────────────── */
+
+.nc-card {
+  position: relative;
+  border-radius: 22px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.nc-card .glass-surface {
+  border-radius: inherit;
+}
+
+.nc-card-main {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px !important;
+  text-align: left;
+}
+
+.nc-card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nc-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.nc-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-card-time {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.nc-card-body {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.85);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* The × at the top left on hover, as in macOS. */
+.nc-card-close {
+  position: absolute !important;
+  top: -6px;
+  left: -6px;
+  display: grid !important;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50% !important;
+  background: rgba(60, 60, 66, 0.92) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.nc-card-close svg {
+  width: 10px;
+  height: 10px;
+}
+
+.nc-card:hover .nc-card-close,
+.nc-card:focus-within .nc-card-close {
+  opacity: 1;
+}
+
+.nc-app-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.nc-app-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nc-app-icon.is-timer { background: linear-gradient(180deg, #ff9f0a, #ff6a00); }
+.nc-app-icon.is-update { background: linear-gradient(180deg, #8e8e93, #5a5a60); }
+.nc-app-icon.is-notes { background: linear-gradient(180deg, #ffd60a, #f2b700); color: #3a2c00; }
+.nc-app-icon.is-music { background: linear-gradient(180deg, #ff6d86, #f5213f); }
+.nc-app-icon.is-dock { background: linear-gradient(180deg, #5e5ce6, #3d3ab8); }
+.nc-app-icon.is-backup { background: linear-gradient(180deg, #30d158, #1f9e40); }
+.nc-app-icon.is-iweb { background: linear-gradient(180deg, #0a84ff, #0060d0); }
+
+/* ── Banner ─────────────────────────────────────────────────────────────── */
+
+.nc-banner {
+  z-index: 100650;
+  animation: nc-banner-in 0.42s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes nc-banner-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.97); }
+}
+
+/* ── Widgets ────────────────────────────────────────────────────────────── */
+
+.nc-widgets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.nc-widget {
+  position: relative;
+  padding: 14px 16px;
+  border-radius: 22px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.nc-widget .glass-surface {
+  border-radius: inherit;
+}
+
+.nc-widget > :not(.glass-surface) {
+  position: relative;
+}
+
+.nc-widget-head {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff9f0a !important;
+}
+
+.nc-widget-head.is-static {
+  display: block !important;
+}
+
+.nc-widget-count {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+/* Calendar: today on the left, the month on the right. */
+.nc-calendar {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.nc-cal-today {
+  display: flex;
+  flex-direction: column;
+  width: 92px;
+}
+
+.nc-cal-weekday {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ff453a;
+  text-transform: uppercase;
+}
+
+.nc-cal-day {
+  font-size: 44px;
+  font-weight: 300;
+  line-height: 1.05;
+}
+
+.nc-cal-month {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.nc-cal-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px 0;
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.nc-cal-wd {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.nc-cal-cell {
+  display: grid;
+  place-items: center;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.nc-cal-cell.is-today {
+  justify-self: center;
+  width: 18px;
+  background: #ff453a;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Today's tasks from Notes. */
+.nc-task-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nc-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12.5px;
+}
+
+.nc-task + .nc-task {
+  border-top: 0.5px solid rgba(255, 255, 255, 0.12);
+}
+
+.nc-task-dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+.nc-task.is-overdue .nc-task-dot {
+  box-shadow: inset 0 0 0 1.5px #ff453a;
+}
+
+.nc-task-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-task-flag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #ff6961;
+}
+
+.nc-empty-line {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.nc-timer-left {
+  font-size: 30px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nc,
+  .nc.is-closing,
+  .nc-backdrop,
+  .nc-banner {
+    animation: none !important;
+  }
+
+  .nc.is-closing,
+  .nc-backdrop.is-closing {
+    opacity: 0;
+  }
+}

@@ -16,7 +16,7 @@ import { AudioOutputIcon, CheckIcon, ChevronLeftIcon, SpeakerIcon, SpeakerMutedI
 function ViewShell({ title, onBack, children, className = '' }) {
   return (
     <section className={`cc-view glass-host ${className}`} aria-label={title}>
-      <GlassSurface preset="card" />
+      <GlassSurface preset="tile" />
       <header className="cc-view-head">
         <button type="button" className="cc-view-back" onClick={onBack} aria-label="Back to Control Center">
           <ChevronLeftIcon size={13} />

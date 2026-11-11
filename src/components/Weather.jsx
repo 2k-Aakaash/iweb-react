@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collapsedWidth, morphCard } from './widgets/shared/useCardExpand';
 import GlassSurface from './glass/GlassSurface';
+import { showAlert } from '../libs/dialogs/dialogs';
 
 export default function Weather({ onExpandedChange }) {
   const [weatherData, setWeatherData] = useState(null);
@@ -136,10 +137,7 @@ export default function Weather({ onExpandedChange }) {
 
   const handleSearch = () => {
     const query = searchInput.trim();
-    if (!query) {
-      alert("Please enter a location name.");
-      return;
-    }
+    if (!query) return; // nothing typed yet
 
     const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&email=admin@iweb-dashboard.local`;
 
@@ -155,12 +153,12 @@ export default function Weather({ onExpandedChange }) {
           fetchWeatherData(lat, lon, displayName);
           setSearchInput('');
         } else {
-          alert("Location not found. Please try another search.");
+          showAlert({ title: `“${query}” wasn’t found`, message: 'Try another place name.' });
         }
       })
       .catch(error => {
         console.error('Geocoding error:', error);
-        alert("Error finding location. Please try again.");
+        showAlert({ title: 'The place couldn’t be looked up', message: 'Check your connection and try again.' });
       });
   };
 

@@ -6,6 +6,8 @@ import { useMacWindow } from '../libs/window/useMacWindow';
 import MacSlider from './ui/MacSlider';
 import { publishPlayer, registerPlayerController } from '../libs/music/playerStore';
 import { parseSearchIntent } from '../libs/intentParser';
+import { showAlert, showConfirm } from '../libs/dialogs/dialogs';
+import { notify } from '../libs/notifications/notifications';
 
 // Supported formats
 const SUPPORTED_FORMATS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'alac', 'aiff', 'opus'];
@@ -420,7 +422,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     if (connected) return true;
 
     if (!dirHandle) {
-      alert("Please open the Music Library and select a folder first.");
+      showAlert({ title: 'Choose a music folder', message: 'Open the Music Library and choose the folder with your music first.' });
       return false;
     }
 
@@ -434,7 +436,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     } catch (err) {
       console.error("Permission request error:", err);
     }
-    alert("Folder access permission denied. Please grant permission to play local tracks.");
+    showAlert({ title: 'iWeb can’t open your music folder', message: 'Allow access to the folder to play your music.' });
     return false;
   };
 
@@ -595,14 +597,14 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
 
   const handleRescan = async () => {
     if (!dirHandle) {
-      alert("No directory loaded. Please select a folder first.");
+      showAlert({ title: 'Choose a music folder', message: 'Choose the folder with your music first.' });
       return;
     }
     try {
       setStatusText("Verifying permission...");
       const permission = await dirHandle.requestPermission({ mode: 'read' });
       if (permission !== 'granted') {
-        alert("Permission denied to folder.");
+        showAlert({ title: 'iWeb can’t open your music folder', message: 'Allow access to the folder, then try again.' });
         return;
       }
 
@@ -877,7 +879,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   };
 
   const handleClearLibrary = async () => {
-    if (window.confirm("Are you sure you want to clear your music library and all playlists?")) {
+    if (await showConfirm({ title: 'Clear your music library?', message: 'Every song and playlist is removed from iWeb. The files in your folder stay.', confirmLabel: 'Clear', destructive: true })) {
       if (soundRef.current) {
         soundRef.current.stop();
         soundRef.current.unload();
@@ -989,7 +991,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     if (!trimmed) return;
 
     if (playlists[trimmed]) {
-      alert("A playlist with that name already exists.");
+      showAlert({ title: `There’s already a playlist called “${trimmed}”`, message: 'Choose another name.' });
       return;
     }
 
@@ -1006,7 +1008,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
 
   const handleDeletePlaylist = async (e, name) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete the playlist "${name}"?`)) {
+    if (await showConfirm({ title: `Delete the playlist “${name}”?`, message: 'The songs stay in your library.', confirmLabel: 'Delete', destructive: true })) {
       const updated = { ...playlists };
       delete updated[name];
       setPlaylists(updated);
@@ -1058,7 +1060,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     if (!contextMenuTrackId) return;
     const pTracks = playlists[playlistName] || [];
     if (pTracks.includes(contextMenuTrackId)) {
-      alert(`Song is already in playlist "${playlistName}"`);
+      notify({ app: 'music', title: 'Already in the playlist', body: `This song is already in “${playlistName}”.` });
       return;
     }
 
@@ -1071,7 +1073,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     const db = await getDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put(updatedPlaylists, PLAYLISTS_KEY);
-    alert(`Added to playlist "${playlistName}"`);
+    notify({ app: 'music', title: 'Added to playlist', body: `Added to “${playlistName}”.` });
   };
 
   const handleRemoveTrackFromPlaylist = async () => {
@@ -1701,9 +1703,10 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       >
         <div
           ref={libraryWindowRef}
+          data-force-dark /* Music keeps its dark design in the Light appearance */
           className={`remove-bg-content music-overhaul-modal glass-host${libraryWindow.maximized ? ' window-maximized' : ''}`}
         >
-          <GlassSurface preset="window" />
+          <GlassSurface preset="window" appearance="dark" />
           {/* macOS window dots */}
           <div className="window-controls">
             <span className="window-dot dot-close" role="button" aria-label="Close" onClick={libraryWindow.close}></span>

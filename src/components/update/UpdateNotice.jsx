@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { checkForUpdate, dismissUpdate, getUpdateMode, isDismissed } from '../../libs/updater/updater';
+import { notifyOnce } from '../../libs/notifications/notifications';
 import '../../styles/update.css';
 
 // Small new-tab notice when a newer extension release exists. Uses the cached
@@ -12,7 +13,16 @@ export default function UpdateNotice() {
     let cancelled = false;
     checkForUpdate()
       .then((status) => {
-        if (!cancelled && status.available && !isDismissed(status.latest.tag)) setLatest(status.latest);
+        if (!cancelled && status.available && !isDismissed(status.latest.tag)) {
+          setLatest(status.latest);
+          // Also in Notification Center, once per release.
+          notifyOnce(`update:${status.latest.tag}`, {
+            app: 'update',
+            title: 'Software Update',
+            body: `iWeb ${status.latest.tag} is available.`,
+            action: { event: 'settings:open', detail: { tab: 'about' } },
+          });
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };

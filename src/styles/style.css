@@ -4509,6 +4509,11 @@ body {
 .settings-btn:active {
   transform: scale(0.97);
 }
+/* A warning in a settings row (e.g. the music folder is disconnected). */
+.settings-warning {
+  color: #ffb300;
+}
+
 .settings-btn:focus-visible {
   box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.5);
 }
@@ -4594,6 +4599,11 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   cursor: pointer;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.7);
@@ -4648,20 +4658,33 @@ body {
 }
 
 .accent-dot {
+  position: relative;
   width: 20px;
   height: 20px;
+  margin: 0;
+  padding: 0;
   border-radius: 50%;
   cursor: pointer;
-  border: 2px solid transparent;
+  border: 0;
   box-sizing: border-box;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s ease;
 }
 .accent-dot:hover {
   transform: scale(1.1);
 }
-.accent-dot.active {
-  border-color: white;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+/* The chosen colour: a white dot in its middle, as in macOS. */
+.accent-dot.active::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
+}
+.accent-dot:focus-visible {
+  outline: 2px solid rgb(var(--accent-rgb));
+  outline-offset: 2px;
 }
 
 .accent-multicolor {
@@ -4682,8 +4705,14 @@ body {
 .accent-orange {
   background: #ff9500;
 }
+.accent-yellow {
+  background: #ffcc00;
+}
 .accent-green {
   background: #34c759;
+}
+.accent-graphite {
+  background: #8e8e93;
 }
 
 /* Wallpaper Section */

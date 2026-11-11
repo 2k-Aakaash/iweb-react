@@ -1,0 +1,267 @@
+/* Apps (components/apps/AppsLauncher.jsx), after macOS 26: a full-screen grid over the blurred,
+   dimmed desktop. Its labels sit on the wallpaper, so they're white in both appearances. */
+
+.al {
+  position: fixed;
+  inset: 0;
+  z-index: 100700; /* over everything, the menu bar included, as Launchpad was */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgba(0, 0, 0, 0.32);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  animation: al-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.al.is-closing {
+  pointer-events: none;
+  animation: al-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes al-in {
+  from { opacity: 0; }
+}
+
+@keyframes al-out {
+  to { opacity: 0; }
+}
+
+/* The grid zooms in and out with it, as Launchpad did. */
+.al .al-scroll {
+  animation: al-zoom-in 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.al.is-closing .al-scroll {
+  animation: al-zoom-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes al-zoom-in {
+  from { transform: scale(1.08); }
+}
+
+@keyframes al-zoom-out {
+  to { transform: scale(1.06); }
+}
+
+.al button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+/* ── Search and tabs ────────────────────────────────────────────────────── */
+
+.al-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 52px 24px 18px;
+}
+
+.al-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(320px, 80vw);
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.al-search svg {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.al-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.al-search input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 1;
+}
+
+.al-search:focus-within {
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.5), 0 0 0 3px rgba(10, 132, 255, 0.45);
+}
+
+.al-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+}
+
+.al-tab {
+  padding: 4px 14px !important;
+  border-radius: 999px !important;
+  font-size: 12.5px !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.al-tab.is-active {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #1d1d1f !important;
+}
+
+.al-tab:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 1px;
+}
+
+/* ── The grid ───────────────────────────────────────────────────────────── */
+
+.al-scroll {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.al-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 128px);
+  justify-content: center;
+  gap: 18px 12px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 12px 24px 60px;
+  list-style: none;
+}
+
+.al-cell {
+  animation: al-cell-in 0.42s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-delay: calc(min(var(--i, 0), 24) * 12ms);
+}
+
+@keyframes al-cell-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.92); }
+}
+
+.al-item {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 128px;
+  padding: 10px 6px !important;
+  border-radius: 18px !important;
+  transition: background-color 0.15s ease;
+}
+
+.al-item.is-active {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.al-item:active .al-icon {
+  filter: brightness(0.8);
+}
+
+.al-item:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+}
+
+.al-icon {
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.3));
+  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.al-item.is-active .al-icon {
+  transform: scale(1.05);
+}
+
+.al-icon .mac-app-icon {
+  width: 100%;
+  height: 100%;
+}
+
+/* A bookmark: its site icon on a white tile, like a web app in macOS. */
+.al-favicon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 24%;
+  background: linear-gradient(180deg, #fff, #ececf0);
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.al-favicon img {
+  width: 62%;
+  height: 62%;
+  object-fit: contain;
+}
+
+.al-add {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 24%;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.al-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 13px;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.al-none {
+  margin-top: 60px;
+  font-size: 15px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al,
+  .al.is-closing,
+  .al .al-scroll,
+  .al.is-closing .al-scroll,
+  .al-cell {
+    animation: none !important;
+  }
+
+  .al.is-closing {
+    opacity: 0;
+  }
+}

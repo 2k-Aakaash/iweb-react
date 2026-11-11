@@ -19,6 +19,7 @@ import { ComposeIcon, DesktopIcon, MoreIcon, NewTaskIcon, PinIcon, SearchIcon, S
 import '../styles/notes-sidebar.css';
 import '../styles/notes-markdown.css';
 import '../styles/notes-workspace.css';
+import { showAlert, showConfirm } from '../libs/dialogs/dialogs';
 
 // Notes: Markdown notes and Task Notes (daily to-dos) in one window, after macOS 26 Notes:
 // views on the left (All Notes, Pinned, Today, Overdue, Upcoming, All Tasks, Completed,
@@ -294,14 +295,19 @@ export default function Notes({ open, setOpen, initialRequest = null }) {
       openNote(note);
     } catch (err) {
       console.error('Notes: could not create a note:', err);
-      window.alert('The note couldn’t be created. Your browser may be out of storage space.');
+      showAlert({ title: 'The note couldn’t be created', message: 'Your browser may be out of storage space.' });
     }
   };
 
   const removeNote = async (note) => {
     const pinnedToDesktop = desktopIds.has(String(note.id));
-    const message = `Delete “${titleOf(note)}”? This can’t be undone.${pinnedToDesktop ? '\n\nIt will also be removed from your desktop.' : ''}`;
-    if (!window.confirm(message)) return;
+    const ok = await showConfirm({
+      title: `Delete “${titleOf(note)}”?`,
+      message: `This can’t be undone.${pinnedToDesktop ? ' It will also be removed from your desktop.' : ''}`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     const wasOpen = note.id === draft.id;
     const i = ordered.findIndex((n) => n.id === note.id);
     const next = ordered[i + 1] || ordered[i - 1] || null;
@@ -313,7 +319,7 @@ export default function Notes({ open, setOpen, initialRequest = null }) {
       await deleteNote(note.id);
     } catch (err) {
       console.error('Notes: could not delete the note:', err);
-      window.alert('The note couldn’t be deleted.');
+      showAlert({ title: 'The note couldn’t be deleted' });
       return;
     }
     removeFromDesktop(note.id);
@@ -480,11 +486,17 @@ export default function Notes({ open, setOpen, initialRequest = null }) {
   const onRowAction = useCallback((action, note, extra) => rowActionsRef.current?.[action]?.(note, extra), []);
 
   // Opening on a note or a new note (a sticky card's Open in Notes; File → New in the menu
-  // bar). The first request arrives with the window (App.jsx); later ones as events.
+  // bar; { view } from Notification Center). The first request arrives with the window (App.jsx); later ones as events.
   const handleRequest = (detail) => {
     if (!detail) return;
     if (detail.create) {
       newNote(detail.create === 'task' ? 'task' : 'note');
+      return;
+    }
+    // A view (Notification Center's Today widget, a tasks notification): show it.
+    if (detail.view && !detail.noteId) {
+      setQuery('');
+      setUi((u) => ({ ...u, view: detail.view }));
       return;
     }
     const note = detail.noteId !== undefined && detail.noteId !== null ? getNote(detail.noteId) : null;

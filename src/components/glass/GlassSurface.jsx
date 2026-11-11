@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Glass } from '@samasante/liquid-glass';
-import { GLASS_PRESETS, STATIC_PRESETS } from './glassPresets';
+import { GLASS_PRESETS, LIGHT_GLASS_PRESETS, LIGHT_STATIC_PRESETS, STATIC_PRESETS } from './glassPresets';
+import { useResolvedAppearance } from '../../libs/appearance/appearance';
 import { useGlassMode } from './glassMode';
 import { loadWallpaper, paintStaticGlass, staticGlassSupported, wallpaperUrl } from './staticGlass';
 import '../../styles/glass-surface.css';
@@ -130,7 +131,8 @@ function veilOf(mode, liquid, still) {
   return (light ? a : -a) + still.lift;
 }
 
-export default function GlassSurface({ preset = 'panel', optics, radius }) {
+// `appearance`: 'dark' keeps the dark glass in the Light appearance (Music's window).
+export default function GlassSurface({ preset = 'panel', optics, radius, appearance }) {
   const ref = useRef(null);
   const canvasRef = useRef(null);
   const [box, setBox] = useState(null);
@@ -159,8 +161,9 @@ export default function GlassSurface({ preset = 'panel', optics, radius }) {
     };
   }, []);
 
-  const liquidLook = { ...GLASS_PRESETS[preset], ...(isStatic ? null : optics) };
-  const staticLook = { ...STATIC_PRESETS[preset], ...(isStatic ? optics : null) };
+  const light = useResolvedAppearance() === 'light' && appearance !== 'dark';
+  const liquidLook = { ...((light && LIGHT_GLASS_PRESETS[preset]) || GLASS_PRESETS[preset]), ...(isStatic ? null : optics) };
+  const staticLook = { ...((light && LIGHT_STATIC_PRESETS[preset]) || STATIC_PRESETS[preset]), ...(isStatic ? optics : null) };
 
   // Static: render the glass whenever the box, the wallpaper or the look changes; at most every
   // REPAINT_INTERVAL_MS while the box keeps changing, and once more when it settles.

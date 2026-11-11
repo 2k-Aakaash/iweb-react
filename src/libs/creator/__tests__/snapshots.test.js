@@ -11,8 +11,7 @@ describe('snapshotOf', () => {
     expect(snapshotOf('a', { platform: 'youtube', fetchedAt: 1, stats: { subscribers: 10, views: 5, videos: 2, subscribersHidden: false } }).metrics)
       .toEqual({ subscribers: 10, views: 5, videos: 2 });
     expect(snapshotOf('a', { platform: 'youtube', fetchedAt: 1, stats: { subscribers: null, subscribersHidden: true, views: 5, videos: 2 } }).metrics.subscribers).toBeNull();
-    expect(snapshotOf('b', { platform: 'instagram', fetchedAt: 1, stats: { followers: 7, media: 3 } }).metrics).toEqual({ followers: 7, media: 3 });
-    expect(snapshotOf('b', { platform: 'instagram', fetchedAt: 1, stats: {} })).toBeNull();
+    expect(snapshotOf('b', { platform: 'youtube', fetchedAt: 1, stats: {} })).toBeNull();
     expect(snapshotOf('b', null)).toBeNull();
   });
 });

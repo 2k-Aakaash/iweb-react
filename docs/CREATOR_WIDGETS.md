@@ -1,12 +1,13 @@
-# Creator Widgets: YouTube Analytics and Instagram Analytics
+# Creator Widgets: YouTube Analytics
 
-Two desktop widgets for creators, under **Creator Widgets** in the widget gallery (Settings → Widgets):
+A desktop widget for creators, under **Creator Widgets** in the widget gallery (Settings → Widgets):
 
 - **YouTube Analytics** shows any channel's public stats.
   - The channel's owner can connect it to add 28-day analytics and, optionally, estimated revenue.
-- **Instagram Analytics** shows a connected Instagram Business or Creator account: followers, posts, and 28-day insights.
 
-They use only the official Google and Meta APIs: no scraping, and no unofficial endpoints. Every number on screen is either:
+Instagram Analytics was planned too, and removed before it shipped: Meta's API needs App Review and Business Verification for anyone outside the app's testers.
+
+It uses only the official Google APIs: no scraping, and no unofficial endpoints. Every number on screen is either:
 
 - reported by those APIs, or
 - worked out from earlier updates saved on the device.
@@ -30,10 +31,10 @@ The creator widgets are ordinary desktop widgets. Nothing about them uses a sepa
 
 | Concern | Where |
 | --- | --- |
-| Position, size, visibility, dragging, slots | The existing desktop layout: `ITEMS` and `DEFAULT_LAYOUT` in `src/libs/desktop/layout.js` (`youtube`, `instagram`; `category: 'creator'`) |
+| Position, size, visibility, dragging, slots | The existing desktop layout: `ITEMS` and `DEFAULT_LAYOUT` in `src/libs/desktop/layout.js` (`youtube`; `category: 'creator'`) |
 | Gallery category, adding and removing | `src/components/settings/WidgetsPane.jsx` (the `CATEGORIES` list) |
 | Accounts UI (add, connect, switch, disconnect, refresh interval) | `src/components/settings/CreatorAccounts.jsx`, inside each widget's gallery section |
-| Widget UI | `src/components/creator/`: `CreatorWidget.jsx` (shared shell), `YouTubeWidget.jsx`, `InstagramWidget.jsx` |
+| Widget UI | `src/components/creator/`: `CreatorWidget.jsx` (the shell), `YouTubeWidget.jsx` |
 | State, scheduler, cache | `src/libs/creator/creatorStore.js` (hooks in `useCreator.js`) |
 | Storage | iWebDB v7: `creator_accounts` and `creator_snapshots` (`creatorDb.js`), plus the `creator_widgets` pref (`creatorPrefs.js`) |
 | Sign-in | `src/libs/creator/creatorAuth.js` |
@@ -41,7 +42,7 @@ The creator widgets are ordinary desktop widgets. Nothing about them uses a sepa
 
 ### Loading
 
-- The widget code loads only when a creator widget is on the desktop. Both are `React.lazy` in `App.jsx`, and `DesktopItem` renders nothing for a hidden item.
+- The widget code loads only when the creator widget is on the desktop. It's `React.lazy` in `App.jsx`, and `DesktopItem` renders nothing for a hidden item.
 - Until someone adds a creator widget, iWeb makes no creator API calls, and the startup bundle doesn't change.
 - The account-management code ships with the Settings chunk, which is already lazy.
 
@@ -49,7 +50,7 @@ The creator widgets are ordinary desktop widgets. Nothing about them uses a sepa
 
 - **Small:** one headline number.
 - **Medium:** four metrics; Details flips to four more, in place.
-- **Large:** both, plus a daily-views chart (YouTube owner) or recent posts (Instagram).
+- **Large:** both, plus a daily-views chart (for a connected channel).
 
 ### Controls
 
@@ -66,14 +67,6 @@ The YouTube and Google facts below were checked against the official pages on 2 
 - YouTube Analytics `reports.query`, plus its metrics and data-model pages
 - Google OAuth 2.0 for web server apps
 
-The Instagram facts come from developers.facebook.com:
-
-- Instagram Platform
-- Business Login for Instagram
-- the access-token and refresh references
-- the Graph API v22 changelog (retirement of `impressions`)
-
-The Instagram pages could not be opened directly during that check, so the Instagram rows rest on search summaries of the official pages. Re-check them against the current docs, especially the insights metric list.
 
 ### Matrix
 
@@ -87,12 +80,6 @@ The Instagram pages could not be opened directly during that check, so the Insta
 | YouTube | Subscribers gained, lost, net | No | Yes (`subscribersGained`, `subscribersLost`) | Exact for the period, unlike the rounded public count. |
 | YouTube | Average view duration | No | Yes (`averageViewDuration`) | Seconds; shown as m:ss. |
 | YouTube | Estimated revenue | **Never** | Yes, with `yt-analytics-monetary.readonly` | Only for channels in the YouTube Partner Program; others get HTTP 403, shown as "Unavailable", never 0. In the currency chosen per account (default from the locale; YouTube converts at daily rates). |
-| Instagram | Followers, posts | No (needs the owner's sign-in) | Yes (`followers_count`, `media_count`) | |
-| Instagram | Reach (28d) | No | Yes (`reach`, `total_value`) | |
-| Instagram | Views (28d) | No | Yes (`views`, `total_value`) | `impressions` was retired on 21 April 2025 and is not used; views are never relabelled impressions. |
-| Instagram | Accounts engaged, interactions, profile visits, link taps (28d) | No | Yes, where Instagram provides them | `accounts_engaged`, `total_interactions`, `profile_views`, `profile_links_taps`. Unconfirmed names: each is requested separately if a combined request fails, and any Instagram refuses shows as "Not provided". Some need 100+ followers. |
-| Instagram | Recent posts | No | Yes (`like_count`, `comments_count`) | Likes are missing when the owner hides them. |
-| Instagram | Revenue | No | **No** | The Instagram API has no earnings data, so the widget has no revenue field. |
 
 Growth indicators ("+1.2K 7d") are worked out on the device from saved snapshots, and labelled as such in their tooltips. See [Refreshing, caching and history](#refreshing-caching-and-history).
 
@@ -111,7 +98,7 @@ A missing variable switches its feature off: the widgets and Settings say what i
 
 ### 2. Redirect URI
 
-Set `CREATOR_REDIRECT_URI` to `https://<your-vercel-domain>/api/creator-callback`. Register exactly this URI with both Google and Meta.
+Set `CREATOR_REDIRECT_URI` to `https://<your-vercel-domain>/api/creator-callback`. Register exactly this URI with Google.
 
 - Sign-in for the website works only on that domain. Vercel preview URLs differ.
 - The extension works from any install, because its own `chromiumapp.org` address is reached through this callback.
@@ -139,24 +126,13 @@ Quota: the default daily quota is 10,000 units.
 - A public lookup costs 1 unit. It is cached at the CDN for 10 minutes, so many people watching one channel cost one call.
 - An owner refresh costs 1 Data API unit plus 2–3 Analytics queries.
 
-### 4. Instagram
-
-1. At [Meta for Developers](https://developers.facebook.com/), create an app (Business type) and add **Instagram → API setup with Instagram login**.
-2. Under Business login settings, add the redirect URI from step 2. Meta requires https, so test locally through a tunnel or a deployed preview.
-3. Set `INSTAGRAM_APP_ID` and `INSTAGRAM_APP_SECRET` (the *Instagram* app ID and secret).
-4. Permissions used: `instagram_business_basic` and `instagram_business_manage_insights`.
-5. **Access levels:**
-   - Standard Access: only accounts with a role on the app (added as testers) can connect.
-   - Anyone else: you need **Advanced Access**, which requires App Review (with a screencast) and **Business Verification**.
-6. Optional: `INSTAGRAM_API_VERSION` pins the Graph API version (default `v25.0`).
-
-### 5. Extension builds
+### 4. Extension builds
 
 The extension calls the same server. `src/libs/apiBase.js` takes its origin from `VITE_API_ORIGIN`, or from the existing `VITE_UNSPLASH_PROXY_URL` that the release workflow already sets, so no new build variable is needed.
 
 The manifest gains the `identity` permission, for `chrome.identity.launchWebAuthFlow`. Chrome shows no install warning for it, and the extension's ID (and so its data) doesn't change.
 
-### 6. Development without credentials
+### 5. Development without credentials
 
 Run `VITE_CREATOR_MOCK=1 npm run dev`. The creator API then answers with clearly labelled sample data ("Sample Channel…") from `src/libs/creator/creatorMock.js`, so the UI can be worked on.
 
@@ -166,8 +142,7 @@ The mock is loaded behind `import.meta.env.DEV`, which every production build re
 
 ### Why a server
 
-- **Client secrets:** Google's and Meta's must stay secret.
-- **Instagram:** its code exchange and long-lived-token exchange both require the app secret.
+- **Client secrets:** Google's must stay secret.
 - **Existing setup:** iWeb already runs serverless functions on Vercel (`/api/*`), so the creator API is one more. It is **stateless**: no database, nothing stored, no request bodies logged.
 
 ### Sign-in
@@ -178,7 +153,6 @@ The flow is the OAuth 2.0 authorization code flow:
 2. The server builds the consent URL (client IDs stay on the server) with the minimum scopes:
    - YouTube: `youtube.readonly` plus `yt-analytics.readonly`.
    - With revenue: `youtube.readonly` plus `yt-analytics-monetary.readonly`, instead of the plain analytics scope. The monetary scope includes the non-monetary reports.
-   - Instagram: `instagram_business_basic` plus `instagram_business_manage_insights`.
 3. The provider redirects to `/api/creator-callback`. It sends the result only to:
    - `https://<extension-id>.chromiumapp.org/` (for the extension; the ID comes from `state` and must be 32 letters a–p), or
    - the iWeb site's own origin, through a `BroadcastChannel` on a page served with a hash-locked CSP.
@@ -186,13 +160,13 @@ The flow is the OAuth 2.0 authorization code flow:
    It never redirects to an arbitrary URL.
 4. The app checks that `state` matches, then sends the code and the verifier to the server. The server exchanges them, adding the client secret.
 
-PKCE: Google validates it. Instagram Login doesn't document PKCE, so for Instagram the protection is `state` plus the server-held secret.
+PKCE: Google validates it.
 
 ### Tokens
 
-- **Never in the browser in usable form.** The long-lived credential (Google's refresh token, Instagram's 60-day token) is encrypted on the server with AES-256-GCM, bound to the platform, using `CREATOR_TOKEN_KEY`.
-- **The sealed grant.** The browser stores only this encrypted value in IndexedDB. It can't be read, and it can't be used against Google or Meta directly.
-- **Short-lived tokens.** Access tokens are created on the server for each refresh and never returned. A renewed Instagram token comes back sealed.
+- **Never in the browser in usable form.** The long-lived credential (Google's refresh token) is encrypted on the server with AES-256-GCM, bound to the platform, using `CREATOR_TOKEN_KEY`.
+- **The sealed grant.** The browser stores only this encrypted value in IndexedDB. It can't be read, and it can't be used against Google directly.
+- **Short-lived tokens.** Access tokens are created on the server for each refresh and never returned.
 - **Kept out of the UI.** The grant stays inside `creatorStore.js`; UI state only has `connected: true`.
 - **Kept out of backups.** The creator stores are not part of backups.
 
@@ -200,12 +174,10 @@ PKCE: Google validates it. Instagram Login doesn't document PKCE, so for Instagr
 
 ### Other safeguards
 
-- **Disconnect:** deletes the account, its snapshots and the widget's selection on the device.
-  - Google: it also asks Google to revoke the token.
-  - Instagram: it offers no revoke API, so Settings tells people to remove iWeb under Instagram → Settings → Apps and websites.
+- **Disconnect:** deletes the account, its snapshots and the widget's selection on the device, and asks Google to revoke the token.
 - **CORS:** credentialed `POST` operations accept only the extension (`chrome-extension://`), localhost, the redirect URI's origin and `CREATOR_ALLOWED_ORIGINS`. Public lookups are open, and cached.
 - **Input checks:** every input is validated: channel input, state, challenge, verifier, code, platform, currency, and body size (16 KB).
-- **Rate limiting:** per IP and per function instance. Best effort, since Vercel runs several instances. Google and Meta enforce their own limits on top.
+- **Rate limiting:** per IP and per function instance. Best effort, since Vercel runs several instances. Google enforces its own limits on top.
 - **Privacy:**
   - **What's fetched:** only what the widgets show.
   - **Where it goes:** analytics pass through iWeb's own server on the way to the browser. They aren't stored or logged there, and nothing goes to third parties.
@@ -227,7 +199,7 @@ There is one scheduler (`creatorStore.js`) for both widgets:
 ### Failures and backoff
 
 - **Retries back off:** 1, 2, 5, 15, then 60 minutes, or the server's `Retry-After` (quota, rate limits).
-- **Errors the person has to fix** (revoked access, missing permission, personal Instagram account, deleted channel) are never retried automatically.
+- **Errors the person has to fix** (revoked access, missing permission, deleted channel) are never retried automatically.
 - **Data is never lost to a failure.** A failed refresh keeps the last data on screen and in storage.
 
 ### Snapshots and growth
@@ -248,7 +220,7 @@ There is one scheduler (`creatorStore.js`) for both widgets:
 
 | Situation | What the widget shows |
 | --- | --- |
-| No account yet | "Add a YouTube channel…" or "Connect an Instagram Business or Creator account…", with a button to Settings |
+| No account yet | "Add a YouTube channel…", with a button to Settings |
 | Server not set up for this platform | "…isn't set up on this iWeb server yet." |
 | Server unreachable | "Can't reach iWeb's server", with Retry |
 | Refreshing | A spinning refresh button and "Updating…" |
@@ -257,8 +229,6 @@ There is one scheduler (`creatorStore.js`) for both widgets:
 | Public channel: owner-only metric | "Owner only", with a tooltip on how to connect |
 | Revenue not requested, or channel not in the Partner Program | "Not allowed" or "Unavailable", never 0 |
 | Hidden subscriber count | "Hidden" |
-| Instagram metric not provided | "Not provided" |
-| Personal Instagram account | "Only Instagram Business and Creator accounts can be connected…" |
 | Channel not found, `/c/` custom link | An explanation in Settings, asking for the @handle |
 | Sign-in cancelled, or popup blocked | No error for a cancel; a clear message for a blocked popup |
 
@@ -267,12 +237,10 @@ There is one scheduler (`creatorStore.js`) for both widgets:
 - **YouTube `/c/` links:** custom links can't be resolved by `channels.list`. People are asked for the @handle; iWeb doesn't use `search.list`, which costs 100× the quota and can match the wrong channel.
 - **YouTube subscriber counts are rounded**, so growth of the public count moves in steps. Owner analytics give exact gains and losses.
 - **YouTube Analytics lags 48–72 hours.** The 28-day window is labelled with the last finished day.
-- **Instagram metric names** for insights couldn't be confirmed directly against the reference during development. The widget asks for each and shows "Not provided" for any Instagram refuses.
-- **Instagram without App Review:** only app testers can connect until the app has Advanced Access.
 - **Website sign-in** works only on the domain of `CREATOR_REDIRECT_URI`. The extension works anywhere.
 - **The website popup can't be watched for closing:** the providers' pages cut the link to it. Waiting ends with a result, Cancel, or a 5-minute timeout.
 - **Rate limiting** is per server instance (best effort).
-- **Look:** the widgets use iWeb's dark-tinted Liquid Glass in both light and dark mode, like the other widgets, so text stays readable on any wallpaper.
+- **Look:** the widget uses iWeb's dark-tinted Liquid Glass in both light and dark mode, like the other widgets, so text stays readable on any wallpaper.
 
 ## Testing
 
@@ -283,7 +251,7 @@ npm run build
 
 | Suite | Covers |
 | --- | --- |
-| `creatorProxy.test.js` | Grant sealing and tampering; config; public lookup (handle, not found, hidden, quota, no key leaks); consent URLs and minimum scopes; callback redirect allow-list and CSP; YouTube exchange and fetch (revenue 403 → unavailable, no revenue without scope, `invalid_grant` → revoked, forged grants, revoke); Instagram exchange, personal accounts, metric fallback, token renewal, expiry; CORS; methods; rate limiting; Pacific days |
+| `creatorProxy.test.js` | Grant sealing and tampering; config; public lookup (handle, not found, hidden, quota, no key leaks); consent URLs and minimum scopes; callback redirect allow-list and CSP; YouTube exchange and fetch (revenue 403 → unavailable, no revenue without scope, `invalid_grant` → revoked, forged grants, revoke); CORS; methods; rate limiting; Pacific days |
 | `creatorStore.test.js` | Adding and connecting; grants kept out of UI state; deduplicated refreshes; manual-refresh gap; failures keep data and back off; `Retry-After`; no retry for action-needed errors; snapshots; renewed grants; scheduling only for watched accounts; removal deleting data and revoking |
 | `creatorAuth.test.js` | PKCE (RFC 7636 vector); state validation; cancel and failure; extension or website target |
 | `snapshots.test.js` | Retention; growth windows only from nearby snapshots; hidden counts |
@@ -297,8 +265,8 @@ npm run build
 With `VITE_CREATOR_MOCK=1 npm run dev`:
 
 1. Open Settings → Widgets → Creator Widgets.
-2. Add a channel, then Connect with Google… (with revenue) and Connect with Instagram….
-3. Add both widgets to the desktop.
+2. Add a channel, then Connect with Google… (with revenue).
+3. Add the widget to the desktop.
 
 Checked this way at 1920×1080, 1366×768, 1280×720, and 1280×720 at 80% and 125% zoom:
 

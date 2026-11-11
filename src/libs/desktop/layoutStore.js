@@ -62,7 +62,6 @@ export function updateItem(id, patch) {
 
 /** Shows an item on the desktop (out of the Smart Stack if it was there), at `size`. */
 export function showOnDesktop(id, size = null) {
-  if (ITEMS[id].inDevelopment) return;
   const current = state.layout[id];
   const nextSize = size && ITEMS[id].sizes.includes(size) ? size : current.size;
   if (!current.hidden) {
@@ -81,7 +80,6 @@ export function showOnDesktop(id, size = null) {
 
 /** Places an item at `position` (anchors), e.g. dropped from the widget gallery. */
 export function placeOnDesktop(id, size, position) {
-  if (ITEMS[id].inDevelopment) return;
   const nextSize = ITEMS[id].sizes.includes(size) ? size : state.layout[id].size;
   save(detachFromStack(state.layout, id, { ...position, size: nextSize }));
 }

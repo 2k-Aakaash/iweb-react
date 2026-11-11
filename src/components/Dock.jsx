@@ -6,6 +6,11 @@ import { WINDOW_EVENT } from "../libs/window/useMacWindow";
 import { useFavicons } from "../libs/favicons/useFavicons";
 import { restoreMarkets } from "../libs/markets/marketService";
 import { openNews } from "../libs/news/newsEvents";
+import { addBookmark, moveBookmark, removeBookmark, saveBookmarks } from "../libs/dock/bookmarks";
+import { notify } from "../libs/notifications/notifications";
+import PopupMenu from "./notes/PopupMenu";
+import AddAppSheet from "./dock/AddAppSheet";
+import { appMenu, bookmarkMenu, dockMenu } from "./dock/dockMenu";
 import { usePref } from "../libs/prefs/storedPref";
 import {
   dockMagnificationPref,
@@ -36,19 +41,6 @@ const scaleValue = (value, from, to) => {
 export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenNotes, onOpenSettings, onOpenMusicLibrary }) {
   const [isJiggling, setIsJiggling] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  // Escape closes the Add App dialog.
-  useEffect(() => {
-    if (!showAddModal) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") setShowAddModal(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showAddModal]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState({ show: false, bookmark: null });
-  const [newName, setNewName] = useState("");
-  const [newUrl, setNewUrl] = useState("");
-
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [faviconSteps, setFaviconSteps] = useState({});
   // Bookmark icons from iWebDB (refreshed weekly from /api/favicon); a broken cached image
@@ -232,60 +224,114 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
     setBookmarks(updated);
   };
 
-  const handleDragEnd = () => {
-    localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
+  const handleDragEnd = (e) => {
+    const top = dockRef.current?.getBoundingClientRect().top ?? 0;
+    const index = draggedIndex;
     setDraggedIndex(null);
+    if (index !== null && e.clientY > 0 && e.clientY < top - 60) {
+      removeAt(index);
+      return;
+    }
+    localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
   };
 
-  // Deletion logic
+  // Remove from Dock (its menu, or dragged out of the Dock): gone at once, as in macOS, with
+  // Undo in the notification it posts.
+  const removeAt = (index) => {
+    const item = bookmarks[index];
+    if (!item) return;
+    const { list } = removeBookmark(bookmarks, index);
+    saveBookmarks(list);
+    setBookmarks(list);
+    notify({
+      app: "dock",
+      title: `Removed “${item.websiteName}” from the Dock`,
+      body: "Click to put it back.",
+      key: `dock-removed:${item.websiteName}`,
+      action: { event: "dock:restore", detail: { item, index } },
+    });
+  };
+  const moveAt = (from, to) => {
+    const { list } = moveBookmark(bookmarks, from, to);
+    saveBookmarks(list);
+    setBookmarks(list);
+  };
+  const restoreRef = useRef(null);
+  useEffect(() => {
+    restoreRef.current = ({ item, index }) => {
+      setBookmarks((current) => {
+        if (current.some((b) => b.websiteName === item.websiteName)) return current;
+        const list = [...current];
+        list.splice(Math.min(index, list.length), 0, item);
+        const next = list.map((b, i) => ({ ...b, order: i }));
+        saveBookmarks(next);
+        return next;
+      });
+    };
+  });
+  useEffect(() => {
+    const onRestore = (e) => e.detail?.item && restoreRef.current?.(e.detail);
+    window.addEventListener("dock:restore", onRestore);
+    return () => window.removeEventListener("dock:restore", onRestore);
+  }, []);
+
+  // Apps' Add App tile (and this Dock's Apps menu) open the Add App dialog.
+  useEffect(() => {
+    const onAdd = () => setShowAddModal(true);
+    window.addEventListener("dock:add-app", onAdd);
+    return () => window.removeEventListener("dock:add-app", onAdd);
+  }, []);
+
+  // Right-click menus (dock/dockMenu.js), above the icon as in macOS.
+  const [menu, setMenu] = useState(null); // { anchor: { x, y }, items, label }
+  const onContextMenu = (e) => {
+    if (isJiggling) return;
+    e.preventDefault();
+    e.stopPropagation(); // not the desktop's menu too (ContextMenu.jsx)
+    // The icon under the menu settles back (no magnification or label while it's open).
+    setHoverOff(true);
+    dockRef.current?.style.setProperty("--dock-offset-left", "0px");
+    dockRef.current?.style.setProperty("--dock-offset-right", "0px");
+    const li = e.target.closest("li");
+    const top = dockRef.current?.getBoundingClientRect().top ?? e.clientY;
+    const anchor = { x: e.clientX - 20, y: top - 8 };
+    let items;
+    let label = "Dock";
+    const index = li?.dataset.index !== undefined ? Number(li.dataset.index) : -1;
+    if (index >= 0 && bookmarks[index]) {
+      label = bookmarks[index].websiteName;
+      items = bookmarkMenu({ bookmark: bookmarks[index], index, count: bookmarks.length, move: moveAt, remove: removeAt });
+    } else if (li?.dataset.action) {
+      const app = li.dataset.action;
+      const opens = { notes: onOpenNotes, music: onOpenMusicLibrary, settings: onOpenSettings, markets: restoreMarkets, news: openNews };
+      label = app;
+      items = appMenu({
+        app,
+        state: running[app],
+        open: opens[app] || (() => {}),
+        actions: { addApp: () => setShowAddModal(true), changeBg: onChangeBg },
+      });
+    } else {
+      items = dockMenu();
+    }
+    setMenu({ anchor, items, label });
+  };
+
+  // The × badge in edit mode: removed at once, with Undo in its notification (removeAt).
   const requestDelete = (e, bookmark) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowDeleteConfirm({ show: true, bookmark });
+    removeAt(bookmarks.findIndex((b) => b.websiteName === bookmark.websiteName));
   };
 
-  const handleConfirmDelete = () => {
-    const target = showDeleteConfirm.bookmark;
-    if (!target) return;
-
-    const updated = bookmarks.filter((b) => b.websiteName !== target.websiteName);
-    localStorage.setItem("bookmarks", JSON.stringify(updated));
-    setBookmarks(updated);
-    setShowDeleteConfirm({ show: false, bookmark: null });
-  };
-
-  // Adding App logic
-  const handleAddApp = () => {
-    let url = newUrl.trim();
-    let name = newName.trim();
-
-    if (!url || !name) {
-      alert("Please enter both a name and URL.");
-      return;
-    }
-
-    if (!/^((ftp|http|https):\/\/|www\.)[^ "]+$/.test(url)) {
-      url = "https://www." + url + ".com";
-    }
-
-    const domain = getWebsiteDomain(url);
-    const favicon = `https://www.google.com/s2/favicons?sz=256&domain_url=${url}`;
-    const maxOrder = bookmarks.length > 0 ? Math.max(...bookmarks.map((b) => b.order || 0)) : 0;
-
-    const newB = {
-      url,
-      favicon,
-      websiteName: name,
-      order: maxOrder + 1,
-    };
-
-    const updated = [...bookmarks, newB];
-    localStorage.setItem("bookmarks", JSON.stringify(updated));
-    setBookmarks(updated);
-
-    setNewName("");
-    setNewUrl("");
+  // Add App (the sheet; the same checks as Settings → Bookmarks: libs/dock/bookmarks.js).
+  const handleAddApp = ({ name, url }) => {
+    const result = addBookmark(bookmarks, { name, url });
+    if (result.error) return result.error;
+    saveBookmarks(result.list);
+    setBookmarks(result.list);
     setShowAddModal(false);
+    return null;
   };
 
   const handleMouseLeave = () => {
@@ -305,6 +351,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
         style={{ "--dock-u": `${iconSize}px`, "--dock-m": `${magPx}px` }}
         onPointerMove={hoverOff ? () => setHoverOff(false) : undefined}
         onMouseLeave={handleMouseLeave}
+        onContextMenu={onContextMenu}
       >
         <div className={`${styles.dockBg} glass-host`}>
           <GlassSurface preset="dock" />
@@ -341,6 +388,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
             return (
               <li
                 key={app.websiteName}
+                data-index={index}
                 className={`${styles.app} ${isJiggling ? styles.jiggling : ""}`}
                 onMouseMove={handleAppHover}
                 {...labelProps(`app:${app.url}`)}
@@ -411,14 +459,15 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
           )}
 
           {/* ── Add App Button ── */}
-          <li className={`${styles.app} ${styles.action}`} data-action="add" onMouseMove={handleAppHover} {...labelProps("add")}>
+          {/* ── Apps (macOS 26): every app and bookmark; Add App is in it and in this icon's menu ── */}
+          <li className={`${styles.app} ${styles.action}`} data-action="apps" onMouseMove={handleAppHover} {...labelProps("apps")}>
             <button
               type="button"
               className={styles.actionBtn}
-              onClick={() => setShowAddModal(true)}
+              onClick={() => window.dispatchEvent(new Event("apps:toggle"))}
             >
               <DockAppIcon name="add" className={styles.appIcon} />
-              {label("add", "Add app")}
+              {label("apps", "Apps")}
             </button>
           </li>
 
@@ -496,84 +545,11 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
         </ul>
       </nav>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm.show && (
-        <div className={styles.confirmOverlay}>
-          <div className="confirmation-dialog glass-host">
-            <GlassSurface preset="window" />
-            <p>
-              Are you sure you want to delete the selected link? This action cannot be undone.
-            </p>
-            <button className="delete-button" onClick={handleConfirmDelete}>
-              Delete
-            </button>
-            <button
-              className="cancel-button"
-              onClick={() => setShowDeleteConfirm({ show: false, bookmark: null })}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {menu && (
+        <PopupMenu anchor={menu.anchor} items={menu.items} label={menu.label} onClose={() => setMenu(null)} />
       )}
 
-      {/* Add App Modal */}
-      {showAddModal && (
-        <div className="remove-bg-window" style={{ display: "block" }}>
-          <div className="remove-bg-content glass-host" style={{ maxWidth: "400px", padding: "20px", position: "relative" }}>
-            <GlassSurface preset="window" />
-            {/* A small dialog, not an app window: close only, title centred (macOS sheet). */}
-            <div className={styles.dialogHeader}>
-              <div className={`window-controls ${styles.dialogControls}`}>
-                <span className="window-dot dot-close" role="button" aria-label="Close" onClick={() => setShowAddModal(false)}></span>
-              </div>
-              <h2 className={styles.dialogTitle}>Add New App Link</h2>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "15px",
-                marginTop: "15px",
-              }}
-            >
-              <input
-                type="text"
-                placeholder="App Name (e.g. Reddit)"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="link-input"
-                style={{
-                  width: "100%",
-                  height: "35px",
-                  padding: "5px 10px",
-                  boxSizing: "border-box",
-                }}
-              />
-              <input
-                type="text"
-                placeholder="URL (e.g. reddit.com)"
-                value={newUrl}
-                onChange={(e) => setNewUrl(e.target.value)}
-                className="link-input"
-                style={{
-                  width: "100%",
-                  height: "35px",
-                  padding: "5px 10px",
-                  boxSizing: "border-box",
-                }}
-              />
-              <button
-                className="add-bookmark"
-                style={{ width: "100%", height: "40px", marginTop: 0 }}
-                onClick={handleAddApp}
-              >
-                Add App
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showAddModal && <AddAppSheet onAdd={handleAddApp} onClose={() => setShowAddModal(false)} />}
     </>
   );
 }

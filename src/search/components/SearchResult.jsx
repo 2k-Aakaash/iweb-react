@@ -10,6 +10,7 @@ import { CurrencyAnswer } from './CurrencyAnswer';
 import { MarketAnswer } from './MarketAnswer';
 import GlassSurface from '../../components/glass/GlassSurface';
 import '../styles/search.css';
+import { showConfirm } from '../../libs/dialogs/dialogs';
 
 // Layout after macOS 26 Spotlight: a large field with the top hit hinted after the typed text,
 // a row of category chips, and results with an icon, a title and a subtitle naming the source.
@@ -584,8 +585,8 @@ export const SearchResult = ({ isOpen, onClose }) => {
                                 <div className="search-settings-desc">Wipe search metrics, clicks, and logs.</div>
                               </div>
                               <button 
-                                onClick={() => {
-                                  if (window.confirm('Clear all search query history?')) {
+                                onClick={async () => {
+                                  if (await showConfirm({ title: 'Clear your search history?', message: 'Recent searches and what you clicked are removed.', confirmLabel: 'Clear', destructive: true })) {
                                     clearHistory();
                                   }
                                 }}

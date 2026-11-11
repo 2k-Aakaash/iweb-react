@@ -56,7 +56,7 @@ async function call(op, { params = {}, body = null, signal } = {}) {
   return data;
 }
 
-/** { youtube: { lookup, connect }, instagram: { connect } } — what this server can do. */
+/** { youtube: { lookup, connect } } — what this server can do. */
 export const getConfig = (opts) => call('config', opts);
 
 /** Public stats of a YouTube channel (@handle, ID or link). */
@@ -73,5 +73,5 @@ export const exchangeCode = ({ platform, code, verifier, currency }, opts) =>
 /** Latest data for a connected account: { data, grant? } (a renewed grant replaces the old). */
 export const fetchOwnerData = ({ platform, grant, currency }, opts) => call('fetch', { ...opts, body: { platform, grant, currency } });
 
-/** Asks the provider to revoke access (Google); Instagram answers { manual: true }. */
+/** Asks Google to revoke access. */
 export const revokeGrant = ({ platform, grant }, opts) => call('revoke', { ...opts, body: { platform, grant } });

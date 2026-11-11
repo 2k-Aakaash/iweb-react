@@ -6,7 +6,7 @@ import { normalizeCreatorPrefs } from '../creatorPrefs.js';
 // The app's code (everything under src/, which is what gets bundled) must never read the
 // creator server's secrets: they exist only as Vercel environment variables, read by
 // api/_creatorProxy.js. A VITE_-prefixed secret would be inlined into the bundle.
-const SECRETS = ['GOOGLE_CLIENT_SECRET', 'INSTAGRAM_APP_SECRET', 'CREATOR_TOKEN_KEY', 'YOUTUBE_API_KEY', 'GOOGLE_CLIENT_ID', 'INSTAGRAM_APP_ID'];
+const SECRETS = ['GOOGLE_CLIENT_SECRET', 'CREATOR_TOKEN_KEY', 'YOUTUBE_API_KEY', 'GOOGLE_CLIENT_ID'];
 
 function files(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -36,9 +36,12 @@ describe('frontend code', () => {
 
 describe('creator prefs', () => {
   it('accept only valid account ids and refresh intervals', () => {
-    expect(normalizeCreatorPrefs({ youtube: 'youtube:UC1', instagram: 'youtube:UC1', refreshMinutes: 7 }))
-      .toEqual({ youtube: 'youtube:UC1', instagram: null, refreshMinutes: 30 });
-    expect(normalizeCreatorPrefs({ youtube: '<script>', refreshMinutes: 0 })).toEqual({ youtube: null, instagram: null, refreshMinutes: 0 });
+    expect(normalizeCreatorPrefs({ youtube: 'youtube:UC1', refreshMinutes: 7 }))
+      .toEqual({ youtube: 'youtube:UC1', refreshMinutes: 30 });
+    expect(normalizeCreatorPrefs({ youtube: '<script>', refreshMinutes: 0 })).toEqual({ youtube: null, refreshMinutes: 0 });
+    // Saved before Instagram Analytics was removed: its choice is dropped.
+    expect(normalizeCreatorPrefs({ youtube: 'instagram:17840', instagram: 'instagram:17840', refreshMinutes: 30 }))
+      .toEqual({ youtube: null, refreshMinutes: 30 });
     expect(normalizeCreatorPrefs(null)).toBeNull();
   });
 });

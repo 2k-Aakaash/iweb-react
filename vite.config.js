@@ -5,6 +5,8 @@ import { proxyMarket } from './api/_marketProxy.js'
 import { proxyFavicon } from './api/_faviconProxy.js'
 import { proxyNews } from './api/_newsProxy.js'
 import { clientIp, handleCallback, handleCreator, readJsonBody } from './api/_creatorProxy.js'
+import lightAppearance from './scripts/postcss-light-appearance.mjs'
+import accentColors from './scripts/postcss-accent.mjs'
 
 // Serves /api/unsplash, /api/market, /api/favicon, /api/news and /api/creator during `npm run dev` with the
 // same logic as the Vercel functions, reading the server-only keys (UNSPLASH_ACCESS_KEY, the
@@ -58,6 +60,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), apiDevProxy(env.UNSPLASH_ACCESS_KEY, env)],
+    // Settings → Appearance → Light: generated from the dark CSS (scripts/postcss-light-appearance.mjs).
+    css: { postcss: { plugins: [lightAppearance(), accentColors()] } },
     // UNSPLASH_APP_NAME is non-secret (attribution utm_source), so expose it to the client too.
     envPrefix: ['VITE_', 'UNSPLASH_APP_NAME'],
     server: {

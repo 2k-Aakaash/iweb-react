@@ -24,7 +24,7 @@ import '../../styles/settings-widgets.css';
 
 const ORDER = ['clock', 'quote', 'search', 'news', 'stack', 'weather', 'currency', 'metals', 'markets'];
 const CATEGORIES = [
-  { id: 'creator', label: 'Creator Widgets', description: 'Stats for your YouTube channel. Instagram Analytics is in development.', items: ['youtube', 'instagram'] },
+  { id: 'creator', label: 'Creator Widgets', description: 'Stats for your YouTube channel.', items: ['youtube'] },
 ];
 const DESCRIPTIONS = {
   clock: 'The time. Always on the desktop.',
@@ -37,9 +37,8 @@ const DESCRIPTIONS = {
   metals: 'Gold and silver prices.',
   markets: 'Indices and the stocks you follow.',
   youtube: 'Subscribers and views of any channel; analytics and revenue for your own.',
-  instagram: 'In development: followers, reach and views of your Business or Creator account. Not available yet.',
 };
-const STATUS = { desktop: 'On Desktop', stack: 'In Smart Stack', hidden: 'Not on Desktop', development: 'In Development' };
+const STATUS = { desktop: 'On Desktop', stack: 'In Smart Stack', hidden: 'Not on Desktop' };
 
 // Full-size dimensions, as on the desktop; the clock, quote and search bar scale with their size.
 const SCALE_SIZES = {
@@ -93,33 +92,6 @@ function WidgetSection({ id, layout, onPick, onDragStart }) {
   const where = placementOf(layout, id);
   const item = layout[id];
   const stackPages = id === 'stack' ? layout.stack.pages : null;
-  // In development: shown as coming soon, with a preview, but it can't be added or set up.
-  if (def.inDevelopment) {
-    return (
-      <section className="wg-section is-development" aria-labelledby={`wg-${id}`} aria-disabled="true">
-        <header className="wg-section-head">
-          <SettingsTabIcon id={id} className="wg-section-icon" />
-          <div className="wg-section-text">
-            <h3 id={`wg-${id}`}>{def.label}</h3>
-            <p>{DESCRIPTIONS[id]}</p>
-          </div>
-          <span className="wg-status is-development">{STATUS.development}</span>
-        </header>
-        <div className="wg-sizes" aria-hidden="true">
-          {def.sizes.map((size) => (
-            <div key={size} className="wg-size">
-              <span className="wg-tile" style={{ width: dimsOf(id, size).w * PREVIEW_SCALE, height: dimsOf(id, size).h * PREVIEW_SCALE }}>
-                <span className="wg-tile-inner" style={{ width: dimsOf(id, size).w, height: dimsOf(id, size).h, transform: `scale(${PREVIEW_SCALE})` }}>
-                  <WidgetPreview id={id} size={size} />
-                </span>
-              </span>
-              <span className="wg-size-label">{sizeLabel(id, size)}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  }
   return (
     <section className="wg-section" aria-labelledby={`wg-${id}`}>
       <header className="wg-section-head">

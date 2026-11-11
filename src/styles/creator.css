@@ -1,4 +1,4 @@
-/* Creator Widgets: YouTube Analytics and Instagram Analytics (src/components/creator).
+/* Creator Widgets: YouTube Analytics (src/components/creator).
    Same card language as News and the Smart Stack: Liquid Glass with a dark tint so white
    text reads on any wallpaper, a hint of each platform's colour, 18px corners. Sizes come
    from the desktop item (--widget-w × --widget-h: 150², 316×150, 316²). */
@@ -39,12 +39,6 @@
   --crw-accent: #ff4d4d;
   --crw-glyph-bg: linear-gradient(160deg, #ff4b4b, #d61f1f);
   --crw-glyph-cut: #d92323;
-}
-
-.crw-instagram {
-  --glass-tint: linear-gradient(160deg, rgba(118, 38, 128, 0.5), rgba(170, 60, 40, 0.42));
-  --crw-accent: #ff6fae;
-  --crw-glyph-bg: linear-gradient(45deg, #f9b234 0%, #e8333f 45%, #c0309a 75%, #6a4ce0 100%);
 }
 
 .crw-card button {

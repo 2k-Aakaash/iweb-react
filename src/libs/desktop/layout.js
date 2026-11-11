@@ -40,8 +40,7 @@ export const PITCH = WIDGET_SIZES.small.w + GUTTER; // 166
 // scale. `stackable` widgets can live in the Smart Stack (stack.pages) or on the desktop on
 // their own, never both. The search bar can be removed: Ctrl K still opens Spotlight.
 // `category` groups widgets in the gallery (Creator Widgets); `findSpot` widgets take the
-// first free slot when added, since they have no place of their own yet. `inDevelopment`
-// widgets are listed in the gallery as coming soon but can't be placed (always hidden).
+// first free slot when added, since they have no place of their own yet.
 export const ITEMS = Object.freeze({
   clock: { label: 'Clock', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: false },
   quote: { label: 'Quote', kind: 'scale', sizes: ['small', 'medium', 'large'], removable: true },
@@ -53,7 +52,6 @@ export const ITEMS = Object.freeze({
   metals: { label: 'Gold & Silver', kind: 'widget', sizes: ['small', 'medium'], removable: true, stackable: true },
   markets: { label: 'Markets', kind: 'widget', sizes: ['small', 'medium'], removable: true, stackable: true },
   youtube: { label: 'YouTube Analytics', kind: 'widget', sizes: ['small', 'medium', 'large'], removable: true, category: 'creator', findSpot: true },
-  instagram: { label: 'Instagram Analytics', kind: 'widget', sizes: ['small', 'medium', 'large'], removable: true, category: 'creator', findSpot: true, inDevelopment: true },
 });
 
 export const STACKABLE = Object.freeze(Object.keys(ITEMS).filter((id) => ITEMS[id].stackable));
@@ -85,7 +83,6 @@ export const DEFAULT_LAYOUT = Object.freeze({
   markets: { ax: 'left', x: 182, ay: 'top', y: 348, size: 'small', hidden: true },
   // Creator widgets start off the desktop; added, they take the first free slot.
   youtube: { ax: 'left', x: 16, ay: 'top', y: 182, size: 'medium', hidden: true },
-  instagram: { ax: 'left', x: 16, ay: 'top', y: 348, size: 'medium', hidden: true },
 });
 
 const AX = ['left', 'center', 'right'];
@@ -123,7 +120,7 @@ export function normalizeLayout(input) {
     out[id] = {
       ...(validPos(item) ? { ax: item.ax, x: item.x, ay: item.ay, y: item.y } : { ax: def.ax, x: def.x, ay: def.ay, y: def.y }),
       size: ITEMS[id].sizes.includes(item?.size) ? item.size : def.size,
-      hidden: ITEMS[id].inDevelopment ? true : ITEMS[id].removable ? Boolean(item?.hidden ?? def.hidden) : false,
+      hidden: ITEMS[id].removable ? Boolean(item?.hidden ?? def.hidden) : false,
     };
   }
   // Stack pages: known stackable widgets, each once, in order; a widget shown on the desktop

@@ -1,0 +1,25 @@
+/* Accent colour (Settings → Appearance; libs/appearance/accent.js): --accent-rgb, read by
+   every accent colour in the CSS (scripts/postcss-accent.mjs rewrites them to it). macOS's
+   shades: brighter in Dark, deeper in Light. Multicolor is blue. */
+
+:root {
+  --accent-rgb: 10 132 255;
+  --accent: rgb(var(--accent-rgb));
+}
+
+:root[data-accent="purple"] { --accent-rgb: 191 90 242; }
+:root[data-accent="pink"] { --accent-rgb: 255 55 95; }
+:root[data-accent="red"] { --accent-rgb: 255 69 58; }
+:root[data-accent="orange"] { --accent-rgb: 255 159 10; }
+:root[data-accent="yellow"] { --accent-rgb: 255 214 10; }
+:root[data-accent="green"] { --accent-rgb: 48 209 88; }
+:root[data-accent="graphite"] { --accent-rgb: 142 142 147; }
+
+:root[data-appearance="light"] { --accent-rgb: 0 122 255; }
+:root[data-appearance="light"][data-accent="purple"] { --accent-rgb: 175 82 222; }
+:root[data-appearance="light"][data-accent="pink"] { --accent-rgb: 255 45 85; }
+:root[data-appearance="light"][data-accent="red"] { --accent-rgb: 255 59 48; }
+:root[data-appearance="light"][data-accent="orange"] { --accent-rgb: 245 140 0; }
+:root[data-appearance="light"][data-accent="yellow"] { --accent-rgb: 230 180 0; }
+:root[data-appearance="light"][data-accent="green"] { --accent-rgb: 40 180 70; }
+:root[data-appearance="light"][data-accent="graphite"] { --accent-rgb: 128 128 133; }

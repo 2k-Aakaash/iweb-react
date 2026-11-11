@@ -1,0 +1,81 @@
+/* Light appearance (Settings → Appearance; libs/appearance/appearance.js): the touches that
+   can't be derived from the dark CSS. The rest of the light look is generated at build time
+   (scripts/postcss-light-appearance.mjs). */
+
+:root[data-appearance="light"] {
+  color-scheme: light;
+}
+
+/* Control Center: switched-on round controls are the accent colour with a white glyph. */
+:root[data-appearance="light"] .cc-round.is-on,
+:root[data-appearance="light"] .cc-pill-icon.is-on,
+:root[data-appearance="light"] .cc-net-icon.is-on {
+  background: var(--cc-blue, #0a84ff) !important;
+  color: #fff;
+}
+
+:root[data-appearance="light"] .cc-edit-btn {
+  color: var(--cc-blue, #0a84ff) !important;
+}
+
+/* Control Center's sliders: a darker track so the white fill shows on light tiles. */
+:root[data-appearance="light"] .cc-slider {
+  background: linear-gradient(to right, #fff var(--cc-fill), rgba(0, 0, 0, 0.16) var(--cc-fill));
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+}
+
+/* Placeholders in windows and dialogs (the global ::placeholder is white). */
+:root[data-appearance="light"] :is(.remove-bg-content, .settings-modal, .settings-dialog):not([data-force-dark]) ::placeholder,
+:root[data-appearance="light"] .search-modal-content ::placeholder {
+  color: rgba(0, 0, 0, 0.42);
+  opacity: 1;
+}
+
+/* Switches: the off track is a clear grey, so the white knob reads on light glass. */
+:root[data-appearance="light"] .settings-switch:not(:checked):not([data-force-dark] *) {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+:root[data-appearance="light"] .settings-switch:not([data-force-dark] *)::before {
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Sliders: a darker track behind the accent fill. */
+:root[data-appearance="light"] :is(.mac-slider, input[type="range"]:not([class])):not([data-force-dark] *)::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, var(--mac-accent) 0 var(--fill, 0%), rgba(0, 0, 0, 0.18) var(--fill, 0%) 100%);
+  box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-appearance="light"] :is(.mac-slider, input[type="range"]:not([class])):not([data-force-dark] *)::-moz-range-track {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* White text set inline (style="color: …") inside windows and dialogs. */
+:root[data-appearance="light"] :is(.settings-modal, .settings-dialog, .remove-bg-content:not([data-force-dark]), .search-modal-content)
+  :is([style*="color: white"], [style*="color: rgb(255, 255, 255)"], [style*="color: rgba(255, 255, 255"], [style*="color: #fff"]):not([data-force-dark] *) {
+  color: rgba(0, 0, 0, 0.62) !important;
+}
+
+/* Settings → Bookmarks: the selected row keeps white text on the accent colour. */
+:root[data-appearance="light"] .bm-row.is-selected,
+:root[data-appearance="light"] .bm-row.is-selected .bm-url,
+:root[data-appearance="light"] .bm-row.is-selected .bm-handle {
+  color: #fff;
+}
+
+/* Notification Center's headings sit on the wallpaper, not on a card: white in both, as the
+   desktop's labels. */
+:root[data-appearance="light"] :is(.nc-section-head, .nc-group-head, .nc-none),
+:root[data-appearance="light"] :is(.nc-section-head, .nc-group-head) .nc-text-btn {
+  color: rgba(255, 255, 255, 0.92) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* Alerts: the main (accent) and destructive buttons keep white text. */
+:root[data-appearance="light"] .ma-btn:is(.is-main, .is-destructive) {
+  color: #fff;
+}
+
+:root[data-appearance="light"] .ma-field::placeholder {
+  color: rgba(0, 0, 0, 0.42);
+}

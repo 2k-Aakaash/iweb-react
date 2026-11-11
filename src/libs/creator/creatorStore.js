@@ -154,7 +154,7 @@ export function loadConfig({ force = false } = {}) {
     configLoading = getConfig()
       .then((config) => set({ config: { ...config, error: null } }))
       .catch((err) => {
-        set({ config: { youtube: { lookup: false, connect: false }, instagram: { connect: false }, error: { code: err.code || 'NETWORK', message: err.message } } });
+        set({ config: { youtube: { lookup: false, connect: false }, error: { code: err.code || 'NETWORK', message: err.message } } });
         configLoading = null; // ask again next time
       });
   }
@@ -354,19 +354,16 @@ export async function connectAccount(platform, { revenue = false, currency, sign
 
 /**
  * Removes an account and everything stored for it on this device. A Google grant is also
- * revoked with Google; Instagram has no revoke API, so `{ manual: true }` asks the person to
- * remove iWeb in Instagram's settings.
+ * revoked with Google.
  */
 export async function removeAccount(id) {
   const record = recordOf(id);
-  if (!record) return { manual: false };
-  let manual = false;
+  if (!record) return;
   if (record.grant) {
     try {
-      const result = await revokeGrant({ platform: record.platform, grant: record.grant });
-      manual = Boolean(result?.manual);
+      await revokeGrant({ platform: record.platform, grant: record.grant });
     } catch {
-      manual = record.platform === 'instagram';
+      // Offline or refused: the account still goes from this device.
     }
   }
   clearTimeout(timers.get(id));
@@ -376,7 +373,6 @@ export async function removeAccount(id) {
   broadcast({ type: 'account', id });
   const prefs = creatorPrefs.get();
   if (prefs[record.platform] === id) creatorPrefs.set({ ...prefs, [record.platform]: null });
-  return { manual };
 }
 
 /** Revenue currency of a YouTube owner account; refreshes it in that currency. */

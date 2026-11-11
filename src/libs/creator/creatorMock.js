@@ -46,29 +46,12 @@ function youtube(ref, mode, now) {
   };
 }
 
-function instagram(now) {
-  return {
-    platform: 'instagram',
-    mode: 'owner',
-    fetchedAt: now,
-    profile: { id: '17840000000000001', name: 'Sample Studio', handle: '@sample.studio', avatar: null, accountType: 'Creator' },
-    stats: { followers: 48210 + Math.floor((now / 3600000) % 100), following: 312, media: 486 },
-    period: { start: new Date(now - 28 * 86400000).toISOString(), end: new Date(now).toISOString(), days: 28 },
-    insights: { status: 'ok', values: { reach: 182400, views: 641200, accounts_engaged: 9120, total_interactions: 22840 }, unavailable: ['profile_views', 'profile_links_taps'] },
-    media: [
-      { id: '1', type: 'Reel', at: now - 2 * 86400000, url: null, likes: 3120, comments: 84 },
-      { id: '2', type: 'Carousel', at: now - 5 * 86400000, url: null, likes: 1840, comments: 37 },
-      { id: '3', type: 'Photo', at: now - 9 * 86400000, url: null, likes: 960, comments: 12 },
-    ],
-  };
-}
-
 export async function mockCall(op, { params = {}, body = null } = {}) {
   await delay(350);
   const now = Date.now();
   switch (op) {
     case 'config':
-      return { youtube: { lookup: true, connect: true }, instagram: { connect: true } };
+      return { youtube: { lookup: true, connect: true } };
     case 'channel': {
       const ref = `UCsample${String(params.q || 'x').replace(/[^A-Za-z0-9]/g, '').slice(0, 16).padEnd(16, '0')}`;
       return youtube(ref, 'public', now);
@@ -76,14 +59,14 @@ export async function mockCall(op, { params = {}, body = null } = {}) {
     case 'authorize':
       return { url: `mock:${params.platform}` };
     case 'exchange': {
-      const data = body.platform === 'youtube' ? youtube('UCsampleOwnerChannel0000', 'owner', now) : instagram(now);
-      const scopes = body.platform === 'youtube' ? { analytics: true, revenue: true } : { insights: true };
+      const data = youtube('UCsampleOwnerChannel0000', 'owner', now);
+      const scopes = { analytics: true, revenue: true };
       return { account: { platform: body.platform, ref: data.profile.id, mode: 'owner', profile: data.profile, scopes }, grant: `g1.sample-${body.platform}`, data };
     }
     case 'fetch':
-      return { data: body.platform === 'youtube' ? youtube('UCsampleOwnerChannel0000', 'owner', now) : instagram(now) };
+      return { data: youtube('UCsampleOwnerChannel0000', 'owner', now) };
     case 'revoke':
-      return { revoked: body.platform === 'youtube', manual: body.platform === 'instagram' };
+      return { revoked: true };
     default:
       throw new Error(`Unknown mock op ${op}`);
   }

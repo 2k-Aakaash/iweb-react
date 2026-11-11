@@ -1,12 +1,11 @@
-// Server side of the Creator widgets (YouTube Analytics, Instagram Analytics), shared by the
+// Server side of the Creator widget (YouTube Analytics), shared by the
 // Vercel functions (api/creator.js, api/creator-callback.js) and the Vite dev-server
 // middleware (vite.config.js). See docs/CREATOR_WIDGETS.md.
 //
 // Why a server: the OAuth client secrets and the YouTube API key must never ship in the
-// extension or the website, and Instagram's code exchange needs the app secret. The
-// long-lived credential of a connected account (Google's refresh token, Instagram's
-// long-lived token) is sealed here with AES-256-GCM (CREATOR_TOKEN_KEY): the browser stores
-// only that sealed "grant", which it can't read or use against Google or Meta on its own.
+// extension or the website. The long-lived credential of a connected channel (Google's
+// refresh token) is sealed here with AES-256-GCM (CREATOR_TOKEN_KEY): the browser stores
+// only that sealed "grant", which it can't read or use against Google on its own.
 // Every refresh sends the grant back here; this proxy opens it, calls the official APIs and
 // returns the numbers. Stateless: nothing is stored here, and tokens are never logged or
 // returned to the browser.
@@ -44,20 +43,6 @@ export const YT_SCOPES = {
 const YT_TIME_ZONE = 'America/Los_Angeles';
 const PERIOD_DAYS = 28;
 
-const IG_AUTH = 'https://www.instagram.com/oauth/authorize';
-const IG_TOKEN = 'https://api.instagram.com/oauth/access_token';
-const IG_GRAPH = 'https://graph.instagram.com';
-// Graph API version for graph.instagram.com; INSTAGRAM_API_VERSION overrides it.
-export const IG_VERSION = 'v25.0';
-export const IG_SCOPES = ['instagram_business_basic', 'instagram_business_manage_insights'];
-// Account insights over the period (metric_type=total_value). Each is optional: an account
-// without one (fewer than 100 followers, a metric Meta retired) keeps the others, and the
-// widget shows it as unavailable. `impressions` is not used: Meta retired it in April 2025.
-export const IG_METRICS = ['reach', 'views', 'accounts_engaged', 'total_interactions', 'profile_views', 'profile_links_taps'];
-const IG_ACCOUNT_TYPES = new Set(['BUSINESS', 'MEDIA_CREATOR']);
-const IG_REFRESH_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // renew the 60-day token weekly
-const IG_RECENT_MEDIA = 4;
-
 const CURRENCY_RE = /^[A-Z]{3}$/;
 // state = "<target>.<random>"; the target says where the callback sends the code.
 export const STATE_RE = /^(web|ext-[a-p]{32})\.[A-Za-z0-9_-]{32,128}$/;
@@ -81,24 +66,19 @@ export function settingsFrom(env = {}) {
   return {
     youtubeKey: text(env.YOUTUBE_API_KEY),
     google: { id: text(env.GOOGLE_CLIENT_ID), secret: text(env.GOOGLE_CLIENT_SECRET) },
-    instagram: { id: text(env.INSTAGRAM_APP_ID), secret: text(env.INSTAGRAM_APP_SECRET) },
     sealKey,
     redirectUri,
     oauthReady,
-    igVersion: /^v\d+\.\d+$/.test(text(env.INSTAGRAM_API_VERSION)) ? text(env.INSTAGRAM_API_VERSION) : IG_VERSION,
     origins: text(env.CREATOR_ALLOWED_ORIGINS).split(',').map((o) => o.trim()).filter(Boolean),
   };
 }
 
-/** What the app may offer: public lookup, YouTube owner analytics, Instagram. */
+/** What the app may offer: public lookup and YouTube owner analytics. */
 export function configOf(s) {
   return {
     youtube: {
       lookup: Boolean(s.youtubeKey),
       connect: Boolean(s.oauthReady && s.google.id && s.google.secret),
-    },
-    instagram: {
-      connect: Boolean(s.oauthReady && s.instagram.id && s.instagram.secret),
     },
   };
 }
@@ -424,176 +404,20 @@ function accountOf(data, scopes = []) {
     ref: data.profile.id,
     mode: data.mode,
     profile: data.profile,
-    scopes: data.platform === 'youtube'
-      ? { analytics: scopes.includes(YT_SCOPES.analytics) || scopes.includes(YT_SCOPES.revenue), revenue: scopes.includes(YT_SCOPES.revenue) }
-      : { insights: scopes.includes('instagram_business_manage_insights') },
+    scopes: { analytics: scopes.includes(YT_SCOPES.analytics) || scopes.includes(YT_SCOPES.revenue), revenue: scopes.includes(YT_SCOPES.revenue) },
   };
-}
-
-// ---- Instagram -----------------------------------------------------------------------------
-
-function instagramError(status, body, what) {
-  const e = body?.error || {};
-  if (status === 429 || [4, 17, 32, 613].includes(e.code)) {
-    return new ProxyError(429, 'RATE_LIMITED', 'Instagram is limiting requests right now. iWeb will try again later.');
-  }
-  if (e.code === 190 || status === 401) return new ProxyError(401, 'REVOKED', 'Access to this Instagram account has expired or was removed. Connect it again.');
-  if (e.code === 10 || e.code === 200 || status === 403) return new ProxyError(403, 'PERMISSION', `Instagram didn’t allow access to ${what}.`);
-  if (e.code === 100) return new ProxyError(400, 'UNAVAILABLE', `Instagram doesn’t provide ${what} for this account.`);
-  return new ProxyError(502, 'UPSTREAM', `Instagram couldn’t return ${what} right now.`);
-}
-
-let igVersion = IG_VERSION;
-const igUrl = (path, params) => `${IG_GRAPH}/${igVersion}/${path}?${new URLSearchParams(params)}`;
-
-const PROFILE_FIELDS = 'username,name,profile_picture_url,followers_count,follows_count,media_count';
-
-async function instagramProfile(fetchImpl, token) {
-  let { status, body } = await upstream(fetchImpl, igUrl('me', { fields: `user_id,account_type,${PROFILE_FIELDS}`, access_token: token }));
-  // A field this API version doesn't know fails the whole request: ask for the core fields.
-  if (status !== 200 && body?.error?.code === 100) {
-    ({ status, body } = await upstream(fetchImpl, igUrl('me', { fields: `id,${PROFILE_FIELDS}`, access_token: token })));
-  }
-  if (status !== 200 || !body) throw instagramError(status, body, 'this account');
-  // Instagram Login only lets professional accounts in; the type is checked when reported.
-  if (body.account_type && !IG_ACCOUNT_TYPES.has(body.account_type)) {
-    throw new ProxyError(422, 'UNSUPPORTED_ACCOUNT', 'Only Instagram Business and Creator accounts can be connected. Switch to a professional account in Instagram’s settings, then try again.');
-  }
-  return {
-    profile: {
-      id: str(String(body.user_id ?? body.id ?? ''), 64),
-      name: str(body.name) || str(body.username),
-      handle: body.username ? `@${str(body.username, 64)}` : null,
-      avatar: httpsImage(body.profile_picture_url),
-      accountType: body.account_type === 'MEDIA_CREATOR' ? 'Creator' : body.account_type === 'BUSINESS' ? 'Business' : 'Professional',
-    },
-    stats: { followers: num(body.followers_count), following: num(body.follows_count), media: num(body.media_count) },
-  };
-}
-
-async function instagramInsights(fetchImpl, token, since, until) {
-  const request = (metrics) => upstream(fetchImpl, igUrl('me/insights', {
-    metric: metrics.join(','),
-    period: 'day',
-    metric_type: 'total_value',
-    since: String(since),
-    until: String(until),
-    access_token: token,
-  }));
-  const read = (body) => {
-    const out = {};
-    for (const entry of body?.data || []) {
-      const value = num(entry?.total_value?.value);
-      if (IG_METRICS.includes(entry?.name) && value !== null) out[entry.name] = value;
-    }
-    return out;
-  };
-  const all = await request(IG_METRICS);
-  if (all.status === 200) return { values: read(all.body), unavailable: IG_METRICS.filter((m) => !(m in read(all.body))) };
-  const err = instagramError(all.status, all.body, 'insights');
-  if (err.code !== 'UNAVAILABLE') throw err;
-  // One metric Instagram won't give this account fails the whole request: ask one by one.
-  const each = await Promise.all(IG_METRICS.map((m) => request([m])));
-  const values = {};
-  each.forEach((r) => {
-    if (r.status === 200) Object.assign(values, read(r.body));
-  });
-  return { values, unavailable: IG_METRICS.filter((m) => !(m in values)) };
-}
-
-async function instagramMedia(fetchImpl, token) {
-  const request = (extra) => upstream(fetchImpl, igUrl('me/media', {
-    fields: `id,media_type,${extra}timestamp,permalink,like_count,comments_count`,
-    limit: String(IG_RECENT_MEDIA),
-    access_token: token,
-  }));
-  let { status, body } = await request('media_product_type,');
-  if (status !== 200 && body?.error?.code === 100) ({ status, body } = await request(''));
-  if (status !== 200) return null;
-  return (body?.data || []).slice(0, IG_RECENT_MEDIA).map((m) => ({
-    id: str(String(m.id), 64),
-    type: m.media_product_type === 'REELS' ? 'Reel' : m.media_type === 'CAROUSEL_ALBUM' ? 'Carousel' : m.media_type === 'VIDEO' ? 'Video' : 'Photo',
-    at: Date.parse(m.timestamp) || null,
-    url: typeof m.permalink === 'string' && m.permalink.startsWith('https://www.instagram.com/') ? m.permalink : null,
-    likes: num(m.like_count),
-    comments: num(m.comments_count),
-  }));
-}
-
-/** Profile, the last 28 days of account insights and recent posts. */
-export async function instagramData(fetchImpl, token, now = Date.now()) {
-  const until = Math.floor(now / 1000);
-  const since = until - PERIOD_DAYS * 24 * 60 * 60;
-  const account = await instagramProfile(fetchImpl, token);
-  const [insights, media] = await Promise.all([
-    instagramInsights(fetchImpl, token, since, until).then(
-      (r) => ({ status: 'ok', ...r }),
-      (err) => {
-        if (err.code === 'REVOKED' || err.code === 'RATE_LIMITED') throw err;
-        return { status: 'unavailable', code: err.code, message: err.message, values: {}, unavailable: IG_METRICS };
-      },
-    ),
-    instagramMedia(fetchImpl, token),
-  ]);
-  return {
-    platform: 'instagram',
-    mode: 'owner',
-    fetchedAt: now,
-    ...account,
-    period: { start: new Date(since * 1000).toISOString(), end: new Date(until * 1000).toISOString(), days: PERIOD_DAYS },
-    insights,
-    media,
-  };
-}
-
-async function instagramExchange(body, s, fetchImpl) {
-  const short = await upstream(fetchImpl, IG_TOKEN, form({
-    client_id: s.instagram.id,
-    client_secret: s.instagram.secret,
-    grant_type: 'authorization_code',
-    redirect_uri: s.redirectUri,
-    code: body.code,
-  }));
-  // Answered as { access_token, user_id, permissions } or wrapped in data: [ … ].
-  const shortToken = short.body?.access_token || short.body?.data?.[0]?.access_token;
-  if (short.status !== 200 || !shortToken) {
-    throw new ProxyError(400, 'AUTH_FAILED', 'Instagram didn’t accept the sign-in. Try connecting again.');
-  }
-  const rawPermissions = short.body?.permissions ?? short.body?.data?.[0]?.permissions ?? '';
-  const permissions = Array.isArray(rawPermissions) ? rawPermissions : String(rawPermissions).split(',').map((p) => p.trim()).filter(Boolean);
-  const long = await upstream(fetchImpl, `${IG_GRAPH}/access_token?${new URLSearchParams({
-    grant_type: 'ig_exchange_token',
-    client_secret: s.instagram.secret,
-    access_token: shortToken,
-  })}`);
-  if (long.status !== 200 || !long.body?.access_token) throw instagramError(long.status, long.body, 'lasting access');
-  const now = Date.now();
-  const token = long.body.access_token;
-  const data = await instagramData(fetchImpl, token, now);
-  const grant = sealGrant({ t: token, iat: now, exp: now + (num(long.body.expires_in) || 0) * 1000, uid: data.profile.id }, 'instagram', s.sealKey);
-  return { account: accountOf(data, permissions.length ? permissions : IG_SCOPES), grant, data };
-}
-
-async function instagramRenew(fetchImpl, payload, s, now) {
-  if (now - payload.iat < IG_REFRESH_AFTER_MS) return null;
-  const { status, body } = await upstream(fetchImpl, `${IG_GRAPH}/refresh_access_token?${new URLSearchParams({
-    grant_type: 'ig_refresh_token',
-    access_token: payload.t,
-  })}`);
-  if (status !== 200 || !body?.access_token) return null; // keep the current token; try next time
-  return { ...payload, t: body.access_token, iat: now, exp: now + (num(body.expires_in) || 0) * 1000 };
 }
 
 // ---- operations ----------------------------------------------------------------------------
 
 function requirePlatform(platform) {
-  if (platform !== 'youtube' && platform !== 'instagram') throw new ProxyError(400, 'BAD_REQUEST', 'Unknown platform.');
+  if (platform !== 'youtube') throw new ProxyError(400, 'BAD_REQUEST', 'Unknown platform.');
 }
 
 function requireConnect(platform, s) {
   const config = configOf(s);
   if (!config[platform].connect) {
-    throw new ProxyError(503, 'NOT_CONFIGURED', `${platform === 'youtube' ? 'YouTube' : 'Instagram'} sign-in isn’t set up on this iWeb server.`);
+    throw new ProxyError(503, 'NOT_CONFIGURED', 'YouTube sign-in isn’t set up on this iWeb server.');
   }
 }
 
@@ -604,9 +428,8 @@ export function authorizeUrl(query, s) {
   const state = query.get('state') || '';
   const challenge = query.get('challenge') || '';
   if (!STATE_RE.test(state) || !CHALLENGE_RE.test(challenge)) throw new ProxyError(400, 'BAD_REQUEST', 'Invalid sign-in request.');
-  if (platform === 'youtube') {
-    const scopes = [YT_SCOPES.channel, query.get('revenue') === '1' ? YT_SCOPES.revenue : YT_SCOPES.analytics];
-    return `${GOOGLE_AUTH}?${new URLSearchParams({
+  const scopes = [YT_SCOPES.channel, query.get('revenue') === '1' ? YT_SCOPES.revenue : YT_SCOPES.analytics];
+  return `${GOOGLE_AUTH}?${new URLSearchParams({
       client_id: s.google.id,
       redirect_uri: s.redirectUri,
       response_type: 'code',
@@ -619,14 +442,6 @@ export function authorizeUrl(query, s) {
       prompt: 'consent select_account',
       include_granted_scopes: 'false',
     })}`;
-  }
-  return `${IG_AUTH}?${new URLSearchParams({
-    client_id: s.instagram.id,
-    redirect_uri: s.redirectUri,
-    response_type: 'code',
-    scope: IG_SCOPES.join(','),
-    state,
-  })}`;
 }
 
 async function fetchData(body, s, fetchImpl) {
@@ -635,31 +450,21 @@ async function fetchData(body, s, fetchImpl) {
   const payload = openGrant(body.grant, body.platform, s.sealKey);
   if (!payload) throw new ProxyError(401, 'REVOKED', 'This connection is no longer valid. Connect the account again.');
   const now = Date.now();
-  if (body.platform === 'youtube') {
-    const token = await googleRefresh(fetchImpl, s, payload.rt);
-    return { data: await youtubeOwnerData(fetchImpl, token, { scopes: payload.sc || [], currency: body.currency }, now) };
-  }
-  if (payload.exp && payload.exp <= now) throw new ProxyError(401, 'REVOKED', 'Access to this Instagram account has expired. Connect it again.');
-  const renewed = await instagramRenew(fetchImpl, payload, s, now);
-  const data = await instagramData(fetchImpl, (renewed || payload).t, now);
-  return { data, ...(renewed ? { grant: sealGrant(renewed, 'instagram', s.sealKey) } : null) };
+  const token = await googleRefresh(fetchImpl, s, payload.rt);
+  return { data: await youtubeOwnerData(fetchImpl, token, { scopes: payload.sc || [], currency: body.currency }, now) };
 }
 
 async function revoke(body, s, fetchImpl) {
   requirePlatform(body.platform);
   const payload = s.sealKey.length >= 32 ? openGrant(body.grant, body.platform, s.sealKey) : null;
   if (!payload) return { revoked: false };
-  if (body.platform === 'youtube') {
-    const { status } = await upstream(fetchImpl, GOOGLE_REVOKE, form({ token: payload.rt }));
-    return { revoked: status === 200 };
-  }
-  // Instagram has no endpoint to revoke a token: the person removes iWeb in Instagram.
-  return { revoked: false, manual: true };
+  const { status } = await upstream(fetchImpl, GOOGLE_REVOKE, form({ token: payload.rt }));
+  return { revoked: status === 200 };
 }
 
 function validExchange(body) {
   return body && typeof body.code === 'string' && CODE_RE.test(body.code)
-    && (body.platform === 'instagram' || (typeof body.verifier === 'string' && VERIFIER_RE.test(body.verifier)));
+    && typeof body.verifier === 'string' && VERIFIER_RE.test(body.verifier);
 }
 
 /**
@@ -668,7 +473,6 @@ function validExchange(body) {
  */
 export async function handleCreator(req, env, fetchImpl = fetch) {
   const s = settingsFrom(env);
-  igVersion = s.igVersion;
   const op = req.query.get('op') || '';
   const isPost = ['exchange', 'fetch', 'revoke'].includes(op);
   const cors = corsHeaders(req.origin, s, { open: !isPost });
@@ -694,10 +498,7 @@ export async function handleCreator(req, env, fetchImpl = fetch) {
         if (!validExchange(req.body)) throw new ProxyError(400, 'BAD_REQUEST', 'Invalid sign-in response.');
         requirePlatform(req.body.platform);
         requireConnect(req.body.platform, s);
-        const result = req.body.platform === 'youtube'
-          ? await youtubeExchange(req.body, s, fetchImpl)
-          : await instagramExchange(req.body, s, fetchImpl);
-        return json(200, result, cors);
+        return json(200, await youtubeExchange(req.body, s, fetchImpl), cors);
       }
       case 'fetch':
         if (!req.body || typeof req.body.grant !== 'string') throw new ProxyError(400, 'BAD_REQUEST', 'Missing account.');

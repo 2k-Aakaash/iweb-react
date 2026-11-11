@@ -8,6 +8,7 @@ import { importLocalFiles } from '../libs/wallpaper/importManager';
 import { changeUnsplashBackground, prefetchNextUnsplash } from '../libs/wallpaper/discovery';
 import { requestWallpaperColor, showWallpaper, showDefaultWallpaper } from '../libs/wallpaper/wallpaperRenderer';
 import { getClockStyle, useClockStyle } from '../libs/clock/clockStyle';
+import { showAlert } from '../libs/dialogs/dialogs';
 
 const DEFAULT_KEY = 'default';
 
@@ -352,10 +353,10 @@ export default function Background({
         setActiveWallpaper({ source: 'local', id: result.imported[result.imported.length - 1] });
       } else if (result.failed.length > 0) {
         const reasons = result.failed.map((f) => `${f.name}: ${f.reason}`).join('\n');
-        alert(`Failed to add background image:\n${reasons}`);
+        showAlert({ title: result.failed.length === 1 ? 'The image couldn’t be added' : 'Some images couldn’t be added', message: reasons });
       }
     } catch (err) {
-      alert('Failed to save background image: ' + (err?.message || err));
+      showAlert({ title: 'The image couldn’t be saved', message: String(err?.message || err) });
     }
   };
 

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import GlassSurface from '../glass/GlassSurface';
 import { TimerIcon } from './ccIcons';
 import { finishTimer, formatRemaining, isActive, isRunning, playChime, remainingAt, useTicker, useTimer } from '../../libs/controlcenter/timer';
+import { notify } from '../../libs/notifications/notifications';
 import { OPEN_CONTROL_CENTER } from '../../libs/controlcenter/controls';
 import '../../styles/controlcenter.css';
 
@@ -58,7 +59,16 @@ export default function TimerBubble() {
 
   // Reaching zero ends it (in whichever tab notices first)…
   useEffect(() => {
-    if (isRunning(timer) && left <= 0) finishTimer();
+    if (isRunning(timer) && left <= 0 && finishTimer()) {
+      const mins = Math.round(timer.duration / 60000);
+      notify({
+        app: 'timer',
+        title: 'Timer',
+        body: mins >= 60 ? `Your ${+(mins / 60).toFixed(1)} hr timer has finished.` : `Your ${mins} min timer has finished.`,
+        key: 'timer',
+        action: { event: 'controlcenter:open', detail: { view: 'timer' } },
+      });
+    }
   }, [timer, left]);
   // …and the tab in view rings.
   const wasDone = useRef(timer.done);

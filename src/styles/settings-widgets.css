@@ -823,10 +823,6 @@ html.wg-dragging * {
   color: #fff;
 }
 
-.wgp-creator-instagram {
-  background: linear-gradient(160deg, #47224f, #4a2a22);
-}
-
 .wgp-creator-head {
   display: flex;
   align-items: center;
@@ -893,18 +889,3 @@ html.wg-dragging * {
   height: 9px;
 }
 
-/* ---- In development (Instagram Analytics): previewed, not usable ---- */
-.wg-section.is-development .wg-sizes {
-  opacity: 0.45;
-  filter: grayscale(0.6);
-  pointer-events: none;
-}
-
-.wg-section.is-development .wg-tile {
-  cursor: default;
-}
-
-.wg-status.is-development {
-  background: rgba(255, 159, 10, 0.18);
-  color: #ffc46b;
-}

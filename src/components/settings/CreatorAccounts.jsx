@@ -5,7 +5,7 @@ import { useCreatorAccounts, useCreatorConfig, useCreatorState } from '../../lib
 import { formatAgo } from '../../libs/creator/creatorFormat';
 
 // Accounts of a Creator widget, in its gallery section (Settings → Widgets): add a public
-// YouTube channel, connect a channel or an Instagram account with its owner's sign-in,
+// YouTube channel, connect a channel with its owner's sign-in,
 // choose which one the widget shows, set how often they refresh, and remove them (which
 // deletes everything kept for them on this device and, for Google, revokes access).
 
@@ -19,7 +19,6 @@ function defaultCurrency() {
 }
 
 function modeText(account) {
-  if (account.platform === 'instagram') return `${account.profile?.accountType || 'Professional'} account · connected`;
   if (account.mode !== 'owner') return 'Public stats';
   return account.scopes?.revenue ? 'Connected · analytics and revenue' : 'Connected · analytics';
 }
@@ -30,9 +29,7 @@ function AccountRow({ account, selected, showPick, canConnect, busy, onConnectOw
   const owner = account.mode === 'owner';
   const remove = async () => {
     setRemoving(true);
-    const { manual } = await removeAccount(account.id).catch(() => ({ manual: false }));
-    // The row unmounts once removed; Instagram's note is shown by the list (see below).
-    if (manual) window.dispatchEvent(new CustomEvent('creator:instagramRemoved'));
+    await removeAccount(account.id).catch(() => {});
     setRemoving(false);
   };
   return (
@@ -109,11 +106,6 @@ export default function CreatorAccounts({ platform }) {
   const canConnect = Boolean(config?.[platform]?.connect);
   const shownId = accounts.find((a) => a.id === prefs[platform])?.id || accounts[0]?.id;
 
-  useEffect(() => {
-    const onRemoved = () => setMessage({ tone: 'info', text: 'Removed from iWeb. Instagram has no way for apps to give up access themselves: to end it completely, remove iWeb in Instagram under Settings → Apps and websites.' });
-    if (!youtube) window.addEventListener('creator:instagramRemoved', onRemoved);
-    return () => window.removeEventListener('creator:instagramRemoved', onRemoved);
-  }, [youtube]);
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const add = async (e) => {
@@ -149,12 +141,12 @@ export default function CreatorAccounts({ platform }) {
     }
   };
 
-  const notSetUp = config && !config.error && (youtube ? !canLookup && !canConnect : !canConnect);
+  const notSetUp = config && !config.error && !canLookup && !canConnect;
 
   return (
     <div className="wg-cr">
       {accounts.length > 0 && (
-        <ul className="wg-cr-accounts" aria-label={youtube ? 'YouTube channels' : 'Instagram accounts'}>
+        <ul className="wg-cr-accounts" aria-label="YouTube channels">
           {accounts.map((account) => (
             <AccountRow
               key={account.id}
@@ -170,7 +162,7 @@ export default function CreatorAccounts({ platform }) {
         </ul>
       )}
       {ready && accounts.length === 0 && (
-        <p className="wg-cr-note">{youtube ? 'No channels yet.' : 'No accounts yet.'}</p>
+        <p className="wg-cr-note">No channels yet.</p>
       )}
 
       {config?.error && (
@@ -178,7 +170,7 @@ export default function CreatorAccounts({ platform }) {
       )}
       {notSetUp && (
         <p className="wg-cr-note">
-          {youtube ? 'YouTube' : 'Instagram'} Analytics needs API credentials on the iWeb server, and this server has none yet.
+          YouTube Analytics needs API credentials on the iWeb server, and this server has none yet.
           Whoever runs it can follow docs/CREATOR_WIDGETS.md to set it up.
         </p>
       )}
@@ -205,13 +197,13 @@ export default function CreatorAccounts({ platform }) {
         <div className="wg-cr-connect">
           {busy === 'connect' ? (
             <>
-              <span className="wg-cr-waiting">Waiting for {youtube ? 'Google' : 'Instagram'}… finish signing in in the window that opened.</span>
+              <span className="wg-cr-waiting">Waiting for Google… finish signing in in the window that opened.</span>
               <button type="button" className="wg-btn wg-btn-quiet" onClick={() => abortRef.current?.abort()}>Cancel</button>
             </>
           ) : (
             <>
               <button type="button" className="wg-btn wg-btn-primary" onClick={() => connect()} disabled={Boolean(busy)}>
-                {youtube ? 'Connect with Google…' : 'Connect with Instagram…'}
+                Connect with Google…
               </button>
               {youtube && (
                 <label className="wg-cr-inline">
@@ -225,9 +217,7 @@ export default function CreatorAccounts({ platform }) {
       )}
       {canConnect && (
         <p className="wg-cr-note">
-          {youtube
-            ? <>For channels you own: adds 28-day views, watch time and subscriber changes from YouTube Analytics (read-only access). Revenue asks for permission to view revenue reports and is only available to channels in the YouTube Partner Program.</>
-            : <>Needs an Instagram <b>Business</b> or <b>Creator</b> account: Instagram’s API doesn’t support personal accounts. iWeb asks for read-only access to the profile and its insights. Instagram’s API has no revenue data.</>}
+          For channels you own: adds 28-day views, watch time and subscriber changes from YouTube Analytics (read-only access). Revenue asks for permission to view revenue reports and is only available to channels in the YouTube Partner Program.
           {' '}Sign-in goes through iWeb’s server, which keeps the app secrets; this device keeps only an encrypted connection that works through that server.
         </p>
       )}

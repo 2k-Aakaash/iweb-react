@@ -1,4 +1,4 @@
-// Connecting a YouTube channel (Google) or an Instagram professional account (Meta).
+// Connecting a YouTube channel (Google).
 //
 // Authorization code flow through iWeb's server (api/_creatorProxy.js), which holds the
 // client secrets:

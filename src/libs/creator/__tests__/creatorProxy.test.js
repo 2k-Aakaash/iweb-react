@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  IG_METRICS,
   YT_SCOPES,
   _resetRateLimits,
   handleCallback,
@@ -16,8 +15,6 @@ const ENV = {
   YOUTUBE_API_KEY: 'yt-key-123',
   GOOGLE_CLIENT_ID: 'gid',
   GOOGLE_CLIENT_SECRET: 'gsecret',
-  INSTAGRAM_APP_ID: 'igid',
-  INSTAGRAM_APP_SECRET: 'igsecret',
   CREATOR_TOKEN_KEY: KEY,
   CREATOR_REDIRECT_URI: 'https://iweb.test/api/creator-callback',
 };
@@ -85,7 +82,7 @@ describe('sealed grants', () => {
     const sealed = sealGrant({ rt: 'secret-refresh' }, 'youtube', KEY);
     expect(sealed).not.toContain('secret-refresh');
     expect(openGrant(sealed, 'youtube', KEY).rt).toBe('secret-refresh');
-    expect(openGrant(sealed, 'instagram', KEY)).toBeNull();
+    expect(openGrant(sealed, 'other', KEY)).toBeNull();
     expect(openGrant(sealed, 'youtube', 'x'.repeat(40))).toBeNull();
     const flipped = sealed.slice(0, -2) + (sealed.endsWith('A') ? 'B' : 'A') + sealed.slice(-1);
     expect(openGrant(flipped, 'youtube', KEY)).toBeNull();
@@ -95,15 +92,14 @@ describe('sealed grants', () => {
 
 describe('config', () => {
   it('reports what is set up', async () => {
-    expect(parse(await handleCreator(request('config'), ENV))).toEqual({ youtube: { lookup: true, connect: true }, instagram: { connect: true } });
+    expect(parse(await handleCreator(request('config'), ENV))).toEqual({ youtube: { lookup: true, connect: true } });
     const bare = parse(await handleCreator(request('config'), { YOUTUBE_API_KEY: 'k' }));
-    expect(bare).toEqual({ youtube: { lookup: true, connect: false }, instagram: { connect: false } });
+    expect(bare).toEqual({ youtube: { lookup: true, connect: false } });
   });
 
   it('needs a long enough sealing key for sign-in', async () => {
     const weak = parse(await handleCreator(request('config'), { ...ENV, CREATOR_TOKEN_KEY: 'short' }));
     expect(weak.youtube.connect).toBe(false);
-    expect(weak.instagram.connect).toBe(false);
   });
 });
 
@@ -160,13 +156,6 @@ describe('authorize', () => {
   it('asks for revenue reports only when asked', async () => {
     const url = new URL(parse(await handleCreator(request('authorize', { params: { ...params, revenue: '1' } }), ENV)).url);
     expect(url.searchParams.get('scope').split(' ')).toEqual([YT_SCOPES.channel, YT_SCOPES.revenue]);
-  });
-
-  it('builds Instagram’s consent URL', async () => {
-    const url = new URL(parse(await handleCreator(request('authorize', { params: { ...params, platform: 'instagram' } }), ENV)).url);
-    expect(url.origin + url.pathname).toBe('https://www.instagram.com/oauth/authorize');
-    expect(url.searchParams.get('scope')).toBe('instagram_business_basic,instagram_business_manage_insights');
-    expect(url.toString()).not.toContain('igsecret');
   });
 
   it('rejects a malformed state or challenge, and unconfigured platforms', async () => {
@@ -269,74 +258,6 @@ describe('YouTube owner', () => {
     const fetchImpl = youtubeRoutes();
     expect(parse(await handleCreator(request('revoke', { method: 'POST', body: { platform: 'youtube', grant } }), ENV, fetchImpl))).toEqual({ revoked: true });
     expect(String(fetchImpl.mock.calls[0][1].body)).toBe('token=rt-x');
-  });
-});
-
-describe('Instagram', () => {
-  const PROFILE = { user_id: '1784', username: 'studio', name: 'Studio', account_type: 'MEDIA_CREATOR', profile_picture_url: 'https://scontent.cdninstagram.com/p.jpg', followers_count: 4800, follows_count: 10, media_count: 120 };
-  const insights = (names) => ({ data: names.map((name, i) => ({ name, period: 'day', total_value: { value: 1000 + i } })) });
-
-  it('exchanges a code for a long-lived token, kept sealed', async () => {
-    const fetchImpl = upstreamFake([
-      ['api.instagram.com/oauth/access_token', reply(200, { access_token: 'short', user_id: 1784, permissions: 'instagram_business_basic,instagram_business_manage_insights' })],
-      ['ig_exchange_token', reply(200, { access_token: 'long-secret', expires_in: 5183944 })],
-      ['/me/insights', reply(200, insights(IG_METRICS))],
-      ['/me/media', reply(200, { data: [{ id: '9', media_type: 'VIDEO', media_product_type: 'REELS', timestamp: '2026-10-30T10:00:00+0000', permalink: 'https://www.instagram.com/reel/x/', like_count: 50, comments_count: 3 }] })],
-      ['/me?', reply(200, PROFILE)],
-    ]);
-    const result = await handleCreator(request('exchange', { method: 'POST', body: { platform: 'instagram', code: 'c0de' } }), ENV, fetchImpl);
-    expect(result.status).toBe(200);
-    expect(result.body).not.toContain('long-secret');
-    const body = parse(result);
-    expect(body.account).toMatchObject({ ref: '1784', profile: { handle: '@studio', accountType: 'Creator' }, scopes: { insights: true } });
-    expect(openGrant(body.grant, 'instagram', KEY).t).toBe('long-secret');
-    expect(body.data.stats).toEqual({ followers: 4800, following: 10, media: 120 });
-    expect(body.data.insights.values.reach).toBe(1000);
-    expect(body.data.media[0]).toMatchObject({ type: 'Reel', likes: 50, comments: 3 });
-  });
-
-  it('turns away personal accounts', async () => {
-    const grant = sealGrant({ t: 'tok', iat: Date.now(), exp: Date.now() + 1e9 }, 'instagram', KEY);
-    const fetchImpl = upstreamFake([['/me?', reply(200, { ...PROFILE, account_type: 'PERSONAL' })]]);
-    const result = await handleCreator(request('fetch', { method: 'POST', body: { platform: 'instagram', grant } }), ENV, fetchImpl);
-    expect(parse(result).error.code).toBe('UNSUPPORTED_ACCOUNT');
-  });
-
-  it('asks metric by metric when one is refused, and lists the missing ones', async () => {
-    const grant = sealGrant({ t: 'tok', iat: Date.now(), exp: Date.now() + 1e9 }, 'instagram', KEY);
-    const fetchImpl = upstreamFake([
-      ['/me/insights', (u) => {
-        const metric = new URL(u).searchParams.get('metric');
-        if (metric.includes(',') || metric === 'profile_views') return reply(400, { error: { code: 100, message: 'invalid metric' } });
-        return reply(200, insights([metric]));
-      }],
-      ['/me/media', reply(200, { data: [] })],
-      ['/me?', reply(200, PROFILE)],
-    ]);
-    const body = parse(await handleCreator(request('fetch', { method: 'POST', body: { platform: 'instagram', grant } }), ENV, fetchImpl));
-    expect(body.data.insights.status).toBe('ok');
-    expect(body.data.insights.unavailable).toEqual(['profile_views']);
-    expect(body.data.insights.values.reach).toBe(1000);
-  });
-
-  it('renews a week-old token and returns the new sealed grant', async () => {
-    const week = 8 * 24 * 60 * 60 * 1000;
-    const grant = sealGrant({ t: 'old', iat: Date.now() - week, exp: Date.now() + 1e9 }, 'instagram', KEY);
-    const fetchImpl = upstreamFake([
-      ['refresh_access_token', reply(200, { access_token: 'renewed', expires_in: 5183944 })],
-      ['/me/insights', reply(200, insights(IG_METRICS))],
-      ['/me/media', reply(200, { data: [] })],
-      ['/me?', reply(200, PROFILE)],
-    ]);
-    const body = parse(await handleCreator(request('fetch', { method: 'POST', body: { platform: 'instagram', grant } }), ENV, fetchImpl));
-    expect(openGrant(body.grant, 'instagram', KEY).t).toBe('renewed');
-  });
-
-  it('reports an expired token without calling Instagram', async () => {
-    const grant = sealGrant({ t: 'tok', iat: 0, exp: Date.now() - 1 }, 'instagram', KEY);
-    const fetchImpl = vi.fn();
-    expect(parse(await handleCreator(request('fetch', { method: 'POST', body: { platform: 'instagram', grant } }), ENV, fetchImpl)).error.code).toBe('REVOKED');
-    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 

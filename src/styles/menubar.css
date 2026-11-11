@@ -125,8 +125,20 @@
   cursor: default;
 }
 
+/* The clock is a button too: it opens Notification Center. */
+.mb-clock-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+}
+
 .mb-status-btn:hover,
-.mb-cc-btn.is-open {
+.mb-cc-btn.is-open,
+.mb-clock-btn.is-open {
   background: rgba(255, 255, 255, 0.2);
 }
 

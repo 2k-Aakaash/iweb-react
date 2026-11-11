@@ -14,15 +14,14 @@ export const REFRESH_OPTIONS = [
 ];
 export const DEFAULT_REFRESH_MINUTES = 30;
 
-const ID_RE = /^(youtube|instagram):[A-Za-z0-9_-]{1,64}$/;
-const DEFAULTS = { youtube: null, instagram: null, refreshMinutes: DEFAULT_REFRESH_MINUTES };
+const ID_RE = /^youtube:[A-Za-z0-9_-]{1,64}$/;
+const DEFAULTS = { youtube: null, refreshMinutes: DEFAULT_REFRESH_MINUTES };
 
 export function normalizeCreatorPrefs(v) {
   if (!v || typeof v !== 'object') return null;
   const pick = (id, platform) => (typeof id === 'string' && ID_RE.test(id) && id.startsWith(`${platform}:`) ? id : null);
   return {
     youtube: pick(v.youtube, 'youtube'),
-    instagram: pick(v.instagram, 'instagram'),
     refreshMinutes: REFRESH_OPTIONS.some((o) => o.minutes === v.refreshMinutes) ? v.refreshMinutes : DEFAULT_REFRESH_MINUTES,
   };
 }

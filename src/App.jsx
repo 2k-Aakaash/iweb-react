@@ -11,6 +11,9 @@ import { STACK_WIDGETS } from './components/widgets/stackWidgets';
 import Music from './components/Music';
 import { SearchBar } from './search/components/SearchBar';
 import UpdateNotice from './components/update/UpdateNotice';
+import NotificationCenter from './components/notifications/NotificationCenter';
+import AppsLauncher from './components/apps/AppsLauncher';
+import DialogHost from './components/dialogs/DialogHost';
 import { openIwebDB } from './libs/wallpaper/db';
 import { OPEN_EVENT as MARKETS_OPEN_EVENT } from './libs/markets/marketService';
 import { NEWS_OPEN_EVENT } from './libs/news/newsEvents';
@@ -77,7 +80,7 @@ const SettingsModal = React.lazy(() => loadSettings().catch((err) => {
   return { default: ({ onClose }) => <AppUnavailable setOpen={() => onClose?.()} /> };
 }));
 
-// The Creator widgets (YouTube and Instagram analytics) load only when on the desktop: until
+// The Creator widget (YouTube Analytics) loads only when on the desktop: until
 // someone adds one, none of their code is fetched. DesktopItem renders nothing for a hidden
 // item, so the lazy import never starts for them.
 const YouTubeWidget = React.lazy(() => import('./components/creator/YouTubeWidget').catch((err) => {
@@ -281,6 +284,12 @@ export default function App() {
           running timer beside the Dynamic Island */}
       <DesktopModes />
       <TimerBubble />
+      {/* Notification Center (the menu bar clock) and notification banners */}
+      <NotificationCenter />
+      {/* Apps (the Dock's Apps icon, F4): every app and bookmark */}
+      <AppsLauncher bookmarks={bookmarks} actions={desktopActions} />
+      {/* macOS alerts (libs/dialogs/dialogs.js) in place of the browser's alert() / confirm() */}
+      <DialogHost />
 
       {/* 1. Dynamic Island & Music System */}
       <Music 
@@ -309,7 +318,6 @@ export default function App() {
           <YouTubeWidget size={desktop.layout.youtube.size} />
         </Suspense>
       </DesktopItem>
-      {/* Instagram Analytics is in development (ITEMS.instagram.inDevelopment): never placed. */}
 
       {/* Task Notes on the desktop: above the widgets, under app windows. */}
       {hasStickies && (

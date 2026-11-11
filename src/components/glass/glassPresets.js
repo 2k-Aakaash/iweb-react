@@ -179,3 +179,23 @@ export const STATIC_PRESETS = {
     lift: 0.04,
   },
 }
+
+// Control Center's tiles: the widgets' clear glass in Dark, milky in Light.
+GLASS_PRESETS.tile = GLASS_PRESETS.card
+STATIC_PRESETS.tile = STATIC_PRESETS.card
+
+// Light appearance (Settings → Appearance). Presets not listed here look the same in both.
+// One light glass for every surface, the Control Center tiles' look: frosted, see-through to
+// the wallpaper, a little lift for dark text. Spotlight floats over everything: a touch denser.
+export const LIGHT_GLASS_PRESETS = {
+  window: { ...GLASS_PRESETS.window, brightness: 0.18 },
+  spotlight: { ...GLASS_PRESETS.spotlight, brightness: 0.16 },
+  tile: { ...GLASS_PRESETS.card, brightness: 0.12 },
+}
+
+export const LIGHT_STATIC_PRESETS = {
+  // Windows hold the most text: a little more frost than the tiles, the same look.
+  window: { ...STATIC_PRESETS.window, tint: [250, 250, 252, 0.38], lift: 0.05 },
+  spotlight: { ...STATIC_PRESETS.spotlight, tint: [250, 250, 252, 0.38], lift: 0.05 },
+  tile: { ...STATIC_PRESETS.card, tint: [250, 250, 252, 0.3], lift: 0.04 },
+}
