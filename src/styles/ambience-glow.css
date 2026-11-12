@@ -1,0 +1,128 @@
+/* Atmosphere's edge glow (components/ambience/AmbienceGlow.jsx): a soft Siri-like light along
+   the edges of the screen while ambience plays.
+   - One fixed element, no pointer events, no layout: it can't block or move anything.
+   - A static mask leaves only a band along the edges (strongest at the very edge, gone by
+     --band), so nothing in the middle is covered.
+   - Behind the mask, two large conic gradients in the environment's three colours (--glow-a,
+     --glow-b, --glow-c: low saturation, set per environment) turn slowly in opposite
+     directions: transform and opacity only, done by the compositor, with no canvas and no
+     JavaScript loop. The colours are registered properties, so a new environment's light
+     cross-fades in rather than jumping.
+   - --ambience-energy (0–1, the real output level at ~10 Hz while playing, when "follows the
+     sound" is on) lifts the opacity a little; without it the glow still breathes on its own. */
+
+@property --glow-a {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #62c6ee;
+}
+
+@property --glow-b {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #6f8cf2;
+}
+
+@property --glow-c {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8f9cf0;
+}
+
+.ambience-glow {
+  --band: 30px;
+  --energy: var(--ambience-energy, 0);
+  position: fixed;
+  inset: 0;
+  z-index: 100550; /* over windows and the menu bar, under Control Center and menus */
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  contain: strict;
+  transition:
+    opacity 1.4s ease,
+    --glow-a 2.5s ease,
+    --glow-b 2.5s ease,
+    --glow-c 2.5s ease;
+  -webkit-mask-image:
+    linear-gradient(to right, #000, rgba(0, 0, 0, 0.35) calc(var(--band) * 0.45), transparent var(--band), transparent calc(100% - var(--band)), rgba(0, 0, 0, 0.35) calc(100% - var(--band) * 0.45), #000),
+    linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.35) calc(var(--band) * 0.45), transparent var(--band), transparent calc(100% - var(--band)), rgba(0, 0, 0, 0.35) calc(100% - var(--band) * 0.45), #000);
+  mask-image:
+    linear-gradient(to right, #000, rgba(0, 0, 0, 0.35) calc(var(--band) * 0.45), transparent var(--band), transparent calc(100% - var(--band)), rgba(0, 0, 0, 0.35) calc(100% - var(--band) * 0.45), #000),
+    linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.35) calc(var(--band) * 0.45), transparent var(--band), transparent calc(100% - var(--band)), rgba(0, 0, 0, 0.35) calc(100% - var(--band) * 0.45), #000);
+}
+
+.ambience-glow.is-on {
+  opacity: calc(0.5 + var(--energy) * 0.32);
+  animation: ambience-glow-in 1.6s ease both;
+}
+
+@keyframes ambience-glow-in {
+  from { opacity: 0; }
+}
+
+.ambience-glow::before,
+.ambience-glow::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150vmax;
+  height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.ambience-glow::before {
+  background: conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--glow-a) 95%, transparent),
+    color-mix(in srgb, var(--glow-b) 85%, transparent) 18%,
+    color-mix(in srgb, var(--glow-c) 85%, transparent) 36%,
+    color-mix(in srgb, var(--glow-c) 60%, #ffb3d9 10%) 50%,
+    color-mix(in srgb, var(--glow-b) 85%, transparent) 66%,
+    color-mix(in srgb, var(--glow-a) 90%, transparent) 84%,
+    color-mix(in srgb, var(--glow-a) 95%, transparent)
+  );
+  animation: ambience-turn 32s linear infinite;
+}
+
+/* A second light, turning the other way and breathing, so the colours drift organically. */
+.ambience-glow::after {
+  background: conic-gradient(
+    from 140deg,
+    transparent,
+    color-mix(in srgb, var(--glow-a) 75%, transparent) 12%,
+    transparent 30%,
+    color-mix(in srgb, var(--glow-c) 70%, transparent) 55%,
+    transparent 72%,
+    color-mix(in srgb, var(--glow-b) 55%, transparent) 86%,
+    transparent
+  );
+  animation:
+    ambience-turn 47s linear infinite reverse,
+    ambience-breathe 9s ease-in-out infinite alternate;
+}
+
+@keyframes ambience-turn {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ambience-breathe {
+  from { opacity: 0.35; }
+  to { opacity: 0.9; }
+}
+
+/* On light wallpapers and windows, a little more presence. */
+:root[data-appearance='light'] .ambience-glow.is-on {
+  opacity: calc(0.62 + var(--energy) * 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambience-glow::before,
+  .ambience-glow::after,
+  .ambience-glow.is-on {
+    animation: none;
+  }
+}

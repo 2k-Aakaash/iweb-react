@@ -17,6 +17,7 @@ export const APP_TITLES = Object.freeze({
   settings: 'Settings',
   markets: 'Markets',
   news: 'News',
+  atmosphere: 'Atmosphere',
 });
 
 const entries = new Map();

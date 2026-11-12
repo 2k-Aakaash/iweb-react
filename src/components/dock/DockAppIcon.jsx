@@ -84,6 +84,18 @@ const ICONS = {
     </Tile>
   ),
 
+  // Atmosphere: soft waves of light on deep blue-violet.
+  atmosphere: (
+    <Tile id="atmosphere" from="#3a46d6" to="#8b3fd1">
+      <circle cx="32" cy="32" r="17" fill="#7fd6ff" fillOpacity="0.18" />
+      <g fill="none" strokeLinecap="round" strokeWidth="3.6">
+        <path d="M12 34c5-7 9-7 13 0s8 7 13 0 9-7 14 0" stroke="#bfefff" />
+        <path d="M14 26c4-5 8-5 11 0s8 5 12 0 8-5 12 0" stroke="#d9c8ff" strokeOpacity="0.85" />
+        <path d="M14 42c4 5 8 5 11 0s8-5 12 0 8 5 12 0" stroke="#ffc2e6" strokeOpacity="0.8" />
+      </g>
+    </Tile>
+  ),
+
   // Settings: a machined gear on graphite.
   settings: (
     <Tile id="settings" from="#c3c7ce" to="#6b7079">

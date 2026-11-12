@@ -24,6 +24,7 @@ export const APPS = {
   music: { name: 'Music', icon: 'music' },
   backup: { name: 'Backup', icon: 'backup' },
   iweb: { name: 'iWeb', icon: 'iweb' },
+  atmosphere: { name: 'Atmosphere', icon: 'atmosphere' },
 };
 
 function normalize(list, now = Date.now()) {

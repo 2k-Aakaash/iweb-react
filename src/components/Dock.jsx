@@ -8,6 +8,7 @@ import { restoreMarkets } from "../libs/markets/marketService";
 import { openNews } from "../libs/news/newsEvents";
 import { addBookmark, moveBookmark, removeBookmark, saveBookmarks } from "../libs/dock/bookmarks";
 import { notify } from "../libs/notifications/notifications";
+import { openAtmosphere } from "../libs/ambience/store.js";
 import PopupMenu from "./notes/PopupMenu";
 import AddAppSheet from "./dock/AddAppSheet";
 import { appMenu, bookmarkMenu, dockMenu } from "./dock/dockMenu";
@@ -84,7 +85,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
   const magnification = usePref(dockMagnificationPref);
   const viewportWidth = useSyncExternalStore(subscribeWidth, getWidth, () => 1440);
   const magPx = magnificationPx(chosenSize, magnification);
-  const transientCount = ["markets", "news"].filter((app) => running[app] && running[app] !== "closed").length;
+  const transientCount = ["markets", "news", "atmosphere"].filter((app) => running[app] && running[app] !== "closed").length;
   const iconSize = fitIconSize({
     size: chosenSize,
     count: bookmarks.length + BUILT_IN_APPS + transientCount,
@@ -303,7 +304,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
       items = bookmarkMenu({ bookmark: bookmarks[index], index, count: bookmarks.length, move: moveAt, remove: removeAt });
     } else if (li?.dataset.action) {
       const app = li.dataset.action;
-      const opens = { notes: onOpenNotes, music: onOpenMusicLibrary, settings: onOpenSettings, markets: restoreMarkets, news: openNews };
+      const opens = { notes: onOpenNotes, music: onOpenMusicLibrary, settings: onOpenSettings, markets: restoreMarkets, news: openNews, atmosphere: openAtmosphere };
       label = app;
       items = appMenu({
         app,
@@ -526,6 +527,19 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               >
                 <DockAppIcon name="markets" className={styles.appIcon} />
                 {label("markets", "Markets")}
+              </button>
+            </li>
+          )}
+          {/* ── Atmosphere: likewise, while its window runs. ── */}
+          {runningProps("atmosphere")["data-running"] && (
+            <li className={`${styles.app} ${styles.action} ${styles.transient}`} data-action="atmosphere" {...runningProps("atmosphere")} onMouseMove={handleAppHover} {...labelProps("atmosphere")}>
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={openAtmosphere}
+              >
+                <DockAppIcon name="atmosphere" className={styles.appIcon} />
+                {label("atmosphere", "Atmosphere")}
               </button>
             </li>
           )}

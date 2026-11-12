@@ -1,0 +1,240 @@
+/* Atmosphere in the always-loaded part of iWeb: the orb glyph, the level bars and ambience in
+   the Dynamic Island (components/ambience: AtmosphereGlyph, LevelBars, AmbienceIsland). The
+   window's styles (atmosphere.css) load with the window. The island is dark in both
+   appearances, so this file is not in the Light appearance's scope. */
+
+/* The orb's colours and the environment accent are registered, so changing environment
+   cross-fades them instead of jumping. */
+@property --atm-a {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #5b8cff;
+}
+
+@property --atm-b {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #b16cea;
+}
+
+@property --atm-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #86b4dc;
+}
+
+@property --env-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #86b4dc;
+}
+
+.atm-orb {
+  transition: --atm-a 1.2s ease, --atm-b 1.2s ease;
+}
+
+/* ── The orb glyph ────────────────────────────────────────────────────────── */
+
+.atm-orb {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.55), transparent 42%),
+    conic-gradient(from 210deg, var(--atm-a), var(--atm-b), #ff8ac2, var(--atm-a));
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.atm-orb svg {
+  position: relative;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+/* Playing: the light inside turns slowly (a compositor-only animation; still when paused). */
+.atm-orb::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.35), transparent 40%);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.atm-orb.is-live::before {
+  opacity: 1;
+  animation: atm-orb-turn 6s linear infinite;
+}
+
+@keyframes atm-orb-turn {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Level bars (LevelBars.jsx): the real output, in the environment's accent ── */
+
+.atm-levels.atm-levels .wave-bar {
+  animation: none;
+  background-color: var(--atm-accent, var(--env-accent, #86b4dc));
+  transform: scaleY(calc(0.22 + var(--l, 0) * 0.78));
+  transition: transform 0.12s linear, background-color 1.2s ease;
+}
+
+.atm-levels .wave-bar:nth-child(1) { --l: var(--l0, 0); }
+.atm-levels .wave-bar:nth-child(2) { --l: var(--l1, 0); }
+.atm-levels .wave-bar:nth-child(3) { --l: var(--l2, 0); }
+.atm-levels .wave-bar:nth-child(4) { --l: var(--l3, 0); }
+.atm-levels .wave-bar:nth-child(5) { --l: var(--l4, 0); }
+
+/* ── Ambience in the Dynamic Island (Music.jsx keeps the island) ─────────── */
+
+.island-ambience .atm-orb.island-art {
+  border: 0;
+  border-radius: 50%;
+}
+
+.island-ambience-name {
+  max-width: 120px;
+  overflow: hidden;
+  font-weight: 600 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-ambience-focus {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--atm-accent, #fff);
+  white-space: nowrap;
+}
+
+.island-ambience .atm-orb.island-art-large {
+  border: 0;
+  border-radius: 50%;
+}
+
+.island-ambience-open {
+  display: grid;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.island-ambience-open:focus-visible,
+.island-evolution:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+/* Evolution, at a glance and one click to change. */
+.island-evolution {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--atm-accent, #86b4dc) 22%, rgba(255, 255, 255, 0.06));
+  color: #fff;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.island-evolution svg {
+  width: 12px;
+  height: 12px;
+  color: var(--atm-accent, #86b4dc);
+}
+
+.island-evolution.is-off {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.island-evolution.is-off svg {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Volume (a real slider with its value) and the live level: not a progress bar. */
+.island-ambience-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.island-ambience-volume .mac-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.island-ambience-value {
+  min-width: 30px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.island-ambience-volume .expanded-waveform {
+  width: 22px;
+  height: 14px;
+  gap: 2px;
+}
+
+.island-ambience-volume .expanded-waveform .wave-bar {
+  width: 2.5px;
+  height: 14px;
+}
+
+.island-ambience .expanded-controls-row {
+  margin-top: 2px;
+}
+
+/* Atmosphere's expanded island has a volume-and-level row where music has its progress: a
+   little taller, so the controls below it are never clipped. */
+.dynamic-island-pill.expanded.is-ambience {
+  height: 150px;
+}
+
+/* The island's quiet sign that ambience is live: a faint rim in the environment's accent,
+   cross-fading when the environment changes. */
+.dynamic-island-pill.is-ambience {
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.6),
+    0 0 1px 1px rgba(255, 255, 255, 0.05),
+    0 0 18px -4px color-mix(in srgb, var(--atm-accent, #7890ff) 60%, transparent);
+  transition:
+    min-width var(--island-duration) var(--island-ease-spring),
+    height var(--island-duration) var(--island-ease-spring),
+    border-radius var(--island-duration) var(--island-ease-spring),
+    background var(--island-duration) var(--island-ease),
+    --atm-accent 1.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atm-orb.is-live::before {
+    animation: none;
+  }
+
+  .atm-levels.atm-levels .wave-bar {
+    transition: none;
+  }
+}
+
+/* The Atmosphere button in the music island's expanded controls. */
+.btn-atmosphere .atm-orb {
+  box-shadow: none;
+}

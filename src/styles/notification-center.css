@@ -256,6 +256,7 @@
 .nc-app-icon.is-dock { background: linear-gradient(180deg, #5e5ce6, #3d3ab8); }
 .nc-app-icon.is-backup { background: linear-gradient(180deg, #30d158, #1f9e40); }
 .nc-app-icon.is-iweb { background: linear-gradient(180deg, #0a84ff, #0060d0); }
+.nc-app-icon.is-atmosphere { background: linear-gradient(160deg, #6f8cf2, #a77ee0 60%, #e48fc0); }
 
 /* ── Banner ─────────────────────────────────────────────────────────────── */
 

@@ -1,0 +1,969 @@
+/* Atmosphere (components/ambience): the window, the orb glyph, and ambience in the Dynamic
+   Island. Its Light look is generated (scripts/postcss-light-appearance.mjs). */
+
+/* ── The window ──────────────────────────────────────────────────────────── */
+
+.atm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  text-align: left;
+  animation: atm-fade 0.25s ease both;
+}
+
+@keyframes atm-fade {
+  from { opacity: 0; }
+}
+
+.atm-window {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  height: min(680px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 24px;
+  outline: none;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.atm-window .glass-surface {
+  border-radius: inherit;
+}
+
+.atm-window button {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.atm-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 44px 22px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.atm-heading h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.atm-status {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.atm-status.is-error {
+  color: #ff6961;
+}
+
+.atm-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Environments: small cards, each with its own light. */
+.atm-envs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.atm-env {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 11px !important;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  text-align: left;
+  cursor: default;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.atm-env:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.atm-env.is-selected {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(10, 132, 255, 0.9);
+}
+
+.atm-env-swatch {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--env-a), var(--env-b));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 0 0 0.5px rgba(255, 255, 255, 0.35);
+}
+
+.atm-env-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.atm-env-sub {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.6);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Transport: play, stop, shuffle and the volume. */
+.atm-transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.atm-play,
+.atm-round {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 50%;
+  cursor: default;
+  transition: filter 0.12s ease, transform 0.12s ease;
+}
+
+.atm-play {
+  width: 44px;
+  height: 44px;
+  background: #0a84ff;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(10, 132, 255, 0.35);
+}
+
+.atm-play svg {
+  width: 22px;
+  height: 22px;
+}
+
+.atm-round {
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.atm-round svg {
+  width: 16px;
+  height: 16px;
+}
+
+.atm-play:active,
+.atm-round:active {
+  transform: scale(0.94);
+}
+
+.atm-round:disabled {
+  opacity: 0.4;
+}
+
+.atm-volume {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  margin-left: 6px;
+}
+
+.atm-vol-icon {
+  display: grid;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.atm-vol-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Sections: the mix and the character. */
+.atm-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.atm-slider-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.atm-slider-row.is-character {
+  grid-template-columns: 76px 56px minmax(0, 1fr) 62px;
+}
+
+.atm-slider-label {
+  font-size: 12.5px;
+}
+
+.atm-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.atm-end {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.atm-end:first-of-type {
+  text-align: right;
+}
+
+.atm-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 !important;
+  border: 0;
+  background: none;
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  cursor: default;
+}
+
+.atm-disclosure svg {
+  width: 11px;
+  height: 11px;
+  transition: transform 0.2s ease;
+}
+
+.atm-disclosure[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+
+.atm-more {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+
+.atm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.atm-row-label {
+  font-size: 12.5px;
+}
+
+.atm-hint {
+  width: 100%;
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.atm-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.atm-seg-btn {
+  padding: 3px 9px !important;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 11.5px !important;
+  cursor: default;
+}
+
+.atm-seg-btn.is-on {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.atm-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atm-preset-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atm-preset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atm-preset-apply {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 8px !important;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: default;
+}
+
+.atm-preset-apply:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.atm-preset-name {
+  font-size: 12.5px;
+}
+
+.atm-preset-env {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.atm-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: default;
+}
+
+.atm-icon-btn svg {
+  width: 10px;
+  height: 10px;
+}
+
+.atm-preset-save {
+  display: flex;
+  gap: 6px;
+}
+
+.atm-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.atm-input:focus {
+  border-color: rgba(10, 132, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+}
+
+.atm-btn {
+  padding: 0 12px !important;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px !important;
+  cursor: default;
+}
+
+.atm-btn:disabled {
+  opacity: 0.45;
+}
+
+.atm-window :is(button, input):focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .atm-envs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .atm-slider-row.is-character {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+
+  .atm-slider-row.is-character .atm-end {
+    display: none;
+  }
+}
+
+/* ── 2.0: tabs, scenes, evolution, stereo, experience ───────────────────── */
+
+.atm-window {
+  transition: --env-accent 1.2s ease, --atm-accent 1.2s ease;
+}
+
+.atm-header,
+.atm-transport,
+.atm-tabs,
+.atm-body {
+  position: relative; /* over the scenery */
+}
+
+.atm-header-focus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.atm-header-focus svg {
+  width: 12px;
+  height: 12px;
+  color: var(--env-accent);
+}
+
+.atm-transport {
+  padding: 12px 22px 4px;
+}
+
+/* The live level beside the volume: the real output, never a position. */
+.atm-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.atm-meter .wave-bar {
+  width: 3px;
+  height: 18px;
+  border-radius: 1.5px;
+}
+
+/* The tabs: a segmented control. */
+.atm-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 10px 22px 0;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.atm-tab {
+  flex: 1;
+  padding: 4px 8px !important;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-size: 12px !important;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75) !important;
+  cursor: default;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.atm-tab.is-on {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.atm-body {
+  padding-top: 14px;
+}
+
+/* Scenes: two columns of cards, each lit by its environment. */
+.atm-scenes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.atm-scene {
+  position: relative;
+  min-width: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  transition: background-color 0.15s ease, box-shadow 0.25s ease;
+}
+
+.atm-scene:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.atm-scene.is-active {
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 0 0 1.5px var(--env-accent);
+}
+
+.atm-scene-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 34px 10px 10px !important;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  text-align: left;
+  cursor: default;
+}
+
+.atm-scene-swatch {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--env-a), var(--env-b));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 0 0 0.5px rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.atm-scene-swatch svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.atm-scene:hover .atm-scene-swatch svg,
+.atm-scene.is-active .atm-scene-swatch svg,
+.atm-scene-main:focus-visible .atm-scene-swatch svg {
+  opacity: 1;
+}
+
+.atm-scene-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.atm-scene-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.atm-scene-desc {
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.6);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.atm-star {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgba(255, 255, 255, 0.4);
+  opacity: 0;
+  cursor: default;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.atm-star svg,
+.atm-star-sm svg {
+  width: 14px;
+  height: 14px;
+}
+
+.atm-scene:hover .atm-star,
+.atm-star:focus-visible,
+.atm-star.is-on {
+  opacity: 1;
+}
+
+.atm-star.is-on,
+.atm-star-sm.is-on {
+  color: #ffd60a;
+}
+
+.atm-star:hover {
+  color: #fff;
+}
+
+.atm-star.is-on:hover {
+  color: #ffe35a;
+}
+
+.atm-env.is-selected {
+  box-shadow: inset 0 0 0 1.5px var(--env-accent);
+}
+
+.atm-suggest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px 9px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--env-accent) 16%, rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+}
+
+.atm-preset.is-active .atm-preset-name {
+  font-weight: 600;
+}
+
+.atm-preset .atm-preset-save {
+  flex: 1;
+}
+
+.atm-text-btn {
+  padding: 2px 6px !important;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 11.5px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  cursor: default;
+}
+
+.atm-text-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff !important;
+}
+
+.atm-icon-btn.atm-star-sm {
+  background: none;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.atm-icon-btn.atm-star-sm svg {
+  width: 13px;
+  height: 13px;
+}
+
+.atm-seg.is-small .atm-seg-btn {
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+}
+
+.atm-row-label.is-secondary {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+}
+
+.atm-row-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.atm-row-sub {
+  max-width: 220px;
+  overflow: hidden;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atm-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atm-btn {
+  min-height: 24px;
+}
+
+.atm-btn.is-primary {
+  background: var(--accent, #0a84ff);
+  color: #fff !important;
+}
+
+.atm-focus-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.atm-focus-time.is-running {
+  color: #fff;
+}
+
+.atm-custom-min {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.atm-custom-min .atm-input {
+  width: 58px;
+  flex: none;
+}
+
+.atm-select {
+  max-width: 200px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.atm-select option,
+.atm-select optgroup {
+  color: #1d1d1f;
+  background: #fff;
+}
+
+.atm-select:focus-visible {
+  border-color: rgba(10, 132, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+}
+
+.atm-window :is(button, input, select):focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.9);
+  outline-offset: 2px;
+}
+
+/* The environment's scenery behind the header: a few slow points of light, in CSS only
+   (transform and opacity on two layers), only while playing with Sound visuals on. */
+.atm-scenery {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 150px;
+  overflow: hidden;
+  border-radius: 24px 24px 0 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+
+.atm-scenery.is-on {
+  opacity: 1;
+}
+
+.atm-scenery::before,
+.atm-scenery::after {
+  content: '';
+  position: absolute;
+  inset: -40px;
+  background-repeat: repeat;
+  will-change: transform;
+}
+
+.atm-scenery:not(.is-on)::before,
+.atm-scenery:not(.is-on)::after {
+  animation-play-state: paused;
+}
+
+/* Deep Space: sparse, slow stars. */
+.atm-scenery[data-env='deep-space']::before {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 90px 80px, rgba(200, 210, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 150px 20px, rgba(255, 255, 255, 0.6), transparent);
+  background-size: 190px 110px;
+  animation: atm-drift-x 90s linear infinite;
+}
+
+.atm-scenery[data-env='deep-space']::after {
+  background: radial-gradient(60% 80% at 70% 0%, rgba(122, 98, 232, 0.22), transparent 70%);
+  animation: atm-breathe 14s ease-in-out infinite alternate;
+}
+
+/* Ocean: a slow, soft swell of light. */
+.atm-scenery[data-env='ocean']::before {
+  background: radial-gradient(50% 60% at 30% 20%, rgba(69, 194, 196, 0.25), transparent 70%), radial-gradient(40% 50% at 80% 10%, rgba(75, 147, 207, 0.22), transparent 70%);
+  animation: atm-sway 18s ease-in-out infinite alternate;
+}
+
+/* Dreamscape: faint floating lights. */
+.atm-scenery[data-env='dreamscape']::before {
+  background-image:
+    radial-gradient(2px 2px at 30px 60px, rgba(255, 200, 235, 0.55), transparent),
+    radial-gradient(2.5px 2.5px at 120px 20px, rgba(200, 180, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 170px 90px, rgba(255, 255, 255, 0.5), transparent);
+  background-size: 210px 120px;
+  animation: atm-rise 60s linear infinite;
+}
+
+.atm-scenery[data-env='dreamscape']::after {
+  background: radial-gradient(55% 70% at 25% 0%, rgba(179, 156, 245, 0.2), transparent 70%);
+  animation: atm-breathe 12s ease-in-out infinite alternate;
+}
+
+/* Forest: drifting specks of dust. */
+.atm-scenery[data-env='forest']::before {
+  background-image:
+    radial-gradient(1.5px 1.5px at 40px 40px, rgba(220, 240, 190, 0.5), transparent),
+    radial-gradient(1px 1px at 130px 90px, rgba(255, 255, 230, 0.45), transparent);
+  background-size: 170px 120px;
+  animation: atm-drift-diag 70s linear infinite;
+}
+
+.atm-scenery[data-env='forest']::after {
+  background: radial-gradient(50% 70% at 60% 0%, rgba(111, 191, 142, 0.18), transparent 70%);
+  animation: atm-breathe 16s ease-in-out infinite alternate;
+}
+
+/* Rainy Mood: faint, slow streaks. */
+.atm-scenery[data-env='rainy-mood']::before {
+  background-image: linear-gradient(to bottom, transparent, rgba(180, 210, 255, 0.18) 50%, transparent);
+  background-size: 37px 70px;
+  -webkit-mask-image: repeating-linear-gradient(to right, #000 0 1px, transparent 1px 37px);
+  mask-image: repeating-linear-gradient(to right, #000 0 1px, transparent 1px 37px);
+  animation: atm-fall 4s linear infinite;
+}
+
+.atm-scenery[data-env='rainy-mood']::after {
+  background: radial-gradient(60% 80% at 40% 0%, rgba(98, 198, 238, 0.16), transparent 70%);
+}
+
+/* Fireplace: embers rising. */
+.atm-scenery[data-env='fireplace']::before {
+  background-image:
+    radial-gradient(1.5px 1.5px at 50px 90px, rgba(255, 190, 110, 0.65), transparent),
+    radial-gradient(1px 1px at 140px 40px, rgba(255, 150, 90, 0.55), transparent);
+  background-size: 180px 120px;
+  animation: atm-rise 30s linear infinite;
+}
+
+.atm-scenery[data-env='fireplace']::after {
+  background: radial-gradient(60% 70% at 50% 0%, rgba(238, 180, 90, 0.2), transparent 70%);
+  animation: atm-breathe 6s ease-in-out infinite alternate;
+}
+
+@keyframes atm-drift-x {
+  to { transform: translateX(-190px); }
+}
+
+@keyframes atm-drift-diag {
+  to { transform: translate(-170px, 120px); }
+}
+
+@keyframes atm-rise {
+  to { transform: translateY(-120px); }
+}
+
+@keyframes atm-fall {
+  to { transform: translateY(70px); }
+}
+
+@keyframes atm-sway {
+  from { transform: translateX(-20px); }
+  to { transform: translateX(20px); }
+}
+
+@keyframes atm-breathe {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 560px) {
+  .atm-scenes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .atm-transport {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atm-orb.is-live::before {
+    animation: none;
+  }
+
+  .atm-overlay {
+    animation: none;
+  }
+
+  .atm-scenery::before,
+  .atm-scenery::after {
+    animation: none;
+  }
+
+  .atm-levels.atm-levels .wave-bar {
+    transition: none;
+  }
+}

@@ -20,7 +20,7 @@ const FORCE_DARK = ':where(:not([data-force-dark], [data-force-dark] *))';
 
 // Which files are themed, and optionally which of their rules (by selector).
 const SCOPES = [
-  { file: /styles[\\/](mac-window|update|settings-[a-z]+|wallpaper-settings|notes-(workspace|sidebar|markdown|tasks)|markets|mac-controls|notification-center|mac-alert)\.css$/ },
+  { file: /styles[\\/](mac-window|update|settings-[a-z]+|wallpaper-settings|notes-(workspace|sidebar|markdown|tasks)|markets|mac-controls|notification-center|mac-alert|atmosphere)\.css$/ },
   // The Dock's Add App dialog, not the Dock.
   { file: /Dock\.module\.css$/, include: /dialog/i },
   // The News app, not the News widget on the desktop.

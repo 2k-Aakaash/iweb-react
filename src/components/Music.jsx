@@ -4,6 +4,10 @@ import { directoryOpen } from 'browser-fs-access';
 import GlassSurface from './glass/GlassSurface';
 import { useMacWindow } from '../libs/window/useMacWindow';
 import MacSlider from './ui/MacSlider';
+import AmbienceIsland from './ambience/AmbienceIsland';
+import AtmosphereGlyph from './ambience/AtmosphereGlyph';
+import { getAmbience, openAtmosphere, useAmbience } from '../libs/ambience/store.js';
+import { environmentById } from '../libs/ambience/environments/index.js';
 import { publishPlayer, registerPlayerController } from '../libs/music/playerStore';
 import { parseSearchIntent } from '../libs/intentParser';
 import { showAlert, showConfirm } from '../libs/dialogs/dialogs';
@@ -107,6 +111,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   const menusRef = useRef(null); // menu-bar menus, set below once the handlers exist
   const libraryWindow = useMacWindow({ app: 'music', open: showModal, setOpen: setShowModal, windowRef: libraryWindowRef, overlayRef: libraryOverlayRef, menus: menusRef });
   const [islandState, setIslandState] = useState('collapsed'); // 'collapsed', 'hovered', 'expanded'
+  const ambience = useAmbience(); // Atmosphere (libs/ambience): it can take the island too
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [contextMenuTrackId, setContextMenuTrackId] = useState(null);
@@ -1504,6 +1509,18 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
     if (e.target.closest('.expanded-control-btn') || e.target.closest('.expanded-slider')) {
       return;
     }
+    // Atmosphere's own buttons and volume handle their clicks.
+    if (e.target.closest('.island-ambience-volume, .island-evolution, .island-ambience-open')) return;
+    // Atmosphere on the island (AmbienceIsland): the orb plays / pauses when collapsed; the
+    // orb or the name opens the Atmosphere window when hovered or expanded.
+    if (ambienceOnIsland) {
+      const onOrb = Boolean(e.target.closest('.atm-orb'));
+      const onName = Boolean(e.target.closest('.island-title, .expanded-title'));
+      if (islandState === 'collapsed' && onOrb) getAmbience().toggle();
+      else if (islandState !== 'collapsed' && (onOrb || onName)) openAtmosphere();
+      else if (islandState !== 'expanded') setIslandState('expanded');
+      return;
+    }
     
     const isArtwork = e.target.classList.contains('island-art') || e.target.classList.contains('island-art-large');
     const isText = e.target.id === 'island-hovered-title' || e.target.id === 'island-expanded-title' || e.target.classList.contains('island-title') || e.target.classList.contains('expanded-title');
@@ -1540,25 +1557,30 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
   };
 
   const activeTrack = currentTrack || (library.length > 0 ? library[0] : null);
+  // Atmosphere shares the island: it shows while it has a session, unless a song is playing.
+  const ambienceOnIsland = ambience.session && (!isPlaying || library.length === 0);
 
   return (
     <>
       {/* ── Apple-Style Dynamic Island Music Player ── */}
-      {library.length > 0 && (
-        <div 
+      {(library.length > 0 || ambience.session) && (
+        <div
           className={`dynamic-island-container active`} 
           id="dynamic-island"
           onMouseEnter={() => { if (enableHoverExpand && islandState === 'collapsed') setIslandState('hovered'); }}
           onMouseLeave={() => { setIslandState('collapsed'); }}
         >
           <div 
-            className={`dynamic-island-pill glass-host ${islandState}`} 
+            className={`dynamic-island-pill glass-host ${islandState}${ambienceOnIsland ? ' is-ambience' : ''}`}
             id="island-pill"
+            // The environment's accent: a faint rim, and the level bars (atmosphere.css).
+            style={ambienceOnIsland ? { '--atm-accent': environmentById(ambience.environmentId)?.accent } : undefined}
             onClick={handleIslandClick}
           >
             <GlassSurface preset="pill" />
+            {ambienceOnIsland && <AmbienceIsland state={ambience} expanded={islandState === 'expanded'} />}
             {/* 1. Collapsed State Content */}
-            {activeTrack && (
+            {!ambienceOnIsland && activeTrack && (
               <div className="island-collapsed-content">
                 <img 
                   className="island-art" 
@@ -1580,7 +1602,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
             )}
 
             {/* 2. Hovered State Content */}
-            {activeTrack && (
+            {!ambienceOnIsland && activeTrack && (
               <div className="island-hovered-content">
                 <img 
                   className="island-art" 
@@ -1607,7 +1629,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
             )}
 
             {/* 3. Clicked/Expanded State Content */}
-            {islandState === 'expanded' && activeTrack && (
+            {!ambienceOnIsland && islandState === 'expanded' && activeTrack && (
               <div className="island-expanded-content">
                 <div className="expanded-top-row">
                   <img 
@@ -1659,7 +1681,10 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
                   </span>
                 </div>
                 <div className="expanded-controls-row">
-                  <div className="controls-spacer"></div>
+                  {/* Atmosphere, from the music island too (its quick entry). */}
+                  <button className="expanded-control-btn btn-atmosphere" title="Atmosphere" aria-label="Open Atmosphere" onClick={openAtmosphere}>
+                    <AtmosphereGlyph size={20} />
+                  </button>
 
                   <div className="controls-center">
                     <button className="expanded-control-btn btn-prev" title="Previous" onClick={handlePrev}>

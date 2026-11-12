@@ -29,6 +29,7 @@ Most new tab pages are a search box and a grid of shortcuts. iWeb gives you a wh
 - **Smart Stack:** several widgets in one space; swipe or scroll to flip between them.
 - **Edit Widgets:** drag, resize and snap widgets into place, or add new ones from the widget gallery.
 - **Creator Widgets:** keep an eye on a YouTube channel's subscribers and views, or connect your own channel for 28-day analytics and estimated revenue. Official YouTube APIs only.
+- **Atmosphere:** living ambient soundscapes generated in the browser (Rainy Mood, Deep Space, Forest, Ocean, Fireplace, Dreamscape) that slowly evolve as they play. Ready-made Scenes and your own, a layer mixer, stereo Width and Movement, focus sessions and a sleep timer. Control it from the Dynamic Island; a soft light in the environment's colours runs along the screen edges while it plays.
 
 ### Control Center
 

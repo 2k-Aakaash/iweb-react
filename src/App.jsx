@@ -12,6 +12,9 @@ import Music from './components/Music';
 import { SearchBar } from './search/components/SearchBar';
 import UpdateNotice from './components/update/UpdateNotice';
 import NotificationCenter from './components/notifications/NotificationCenter';
+import AmbienceGlow from './components/ambience/AmbienceGlow';
+import AtmosphereServices from './components/ambience/AtmosphereServices';
+import { ATMOSPHERE_OPEN_EVENT } from './libs/ambience/store.js';
 import AppsLauncher from './components/apps/AppsLauncher';
 import DialogHost from './components/dialogs/DialogHost';
 import { openIwebDB } from './libs/wallpaper/db';
@@ -38,6 +41,11 @@ const MarketsModal = React.lazy(() => import('./components/markets/MarketsModal'
 }));
 const NewsModal = React.lazy(() => import('./components/news/NewsModal').catch((err) => {
   console.error('Failed to load the News app:', err);
+  return { default: AppUnavailable };
+}));
+// Atmosphere's window, likewise. (Its engine makes no sound, and no AudioContext, until Play.)
+const AtmosphereWindow = React.lazy(() => import('./components/ambience/AtmosphereWindow').catch((err) => {
+  console.error('Failed to load Atmosphere:', err);
   return { default: AppUnavailable };
 }));
 
@@ -114,6 +122,9 @@ export default function App() {
   const [marketsLoaded, setMarketsLoaded] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [newsLoaded, setNewsLoaded] = useState(false);
+  const [atmosphereOpen, setAtmosphereOpen] = useState(false);
+  const [atmosphereLoaded, setAtmosphereLoaded] = useState(false);
+  const [atmosphereTab, setAtmosphereTab] = useState(null);
   const [marketsSymbol, setMarketsSymbol] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesRequest, setNotesRequest] = useState(undefined); // set on first open: then mounted
@@ -271,6 +282,17 @@ export default function App() {
     return () => window.removeEventListener(NEWS_OPEN_EVENT, handleOpenNews);
   }, []);
 
+  // The island, Apps and the Dock open Atmosphere.
+  useEffect(() => {
+    const handleOpenAtmosphere = (e) => {
+      setAtmosphereTab(e.detail?.tab ? { tab: e.detail.tab } : null); // a new request each time
+      setAtmosphereLoaded(true);
+      setAtmosphereOpen(true);
+    };
+    window.addEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
+    return () => window.removeEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
+  }, []);
+
 
   const handleClockColorChange = (color) => {
     setClockColor(color);
@@ -405,6 +427,15 @@ export default function App() {
           <NewsModal open={newsOpen} setOpen={setNewsOpen} />
         </Suspense>
       )}
+
+      {atmosphereLoaded && (
+        <Suspense fallback={null}>
+          <AtmosphereWindow open={atmosphereOpen} setOpen={setAtmosphereOpen} tab={atmosphereTab} />
+        </Suspense>
+      )}
+      {/* Atmosphere's edge glow while it plays */}
+      <AmbienceGlow />
+      <AtmosphereServices />
 
       <style>{`
         #clock {

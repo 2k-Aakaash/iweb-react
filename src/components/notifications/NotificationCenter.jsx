@@ -43,6 +43,7 @@ function AppIcon({ app }) {
     dock: <><rect x="3" y="14" width="18" height="6" rx="2" /><path d="M7 11h2M11 11h2M15 11h2" /></>,
     backup: <><path d="M12 4a8 8 0 1 1-7.4 5" /><path d="M4 4v5h5" /></>,
     iweb: <><circle cx="12" cy="12" r="8" /><path d="M8 12h8M12 8v8" /></>,
+    atmosphere: <><path d="M3 13c2-3 3.6-3 5.3 0s3.4 3 5.4 0 3.6-3 5.3 0" /><path d="M5 8.5c1.6-2 3-2 4.4 0s2.8 2 4.4 0 2.8-2 4.2 0" opacity="0.6" /></>,
   }[kind];
   return (
     <span className={`nc-app-icon is-${kind}`} aria-hidden="true">
