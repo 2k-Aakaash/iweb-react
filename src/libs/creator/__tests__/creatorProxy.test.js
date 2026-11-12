@@ -84,7 +84,7 @@ describe('sealed grants', () => {
     expect(openGrant(sealed, 'youtube', KEY).rt).toBe('secret-refresh');
     expect(openGrant(sealed, 'other', KEY)).toBeNull();
     expect(openGrant(sealed, 'youtube', 'x'.repeat(40))).toBeNull();
-    const flipped = sealed.slice(0, -2) + (sealed.endsWith('A') ? 'B' : 'A') + sealed.slice(-1);
+    const flipped = sealed.slice(0, -2) + (sealed.at(-2) === 'A' ? 'B' : 'A') + sealed.slice(-1);
     expect(openGrant(flipped, 'youtube', KEY)).toBeNull();
     expect(openGrant('nonsense', 'youtube', KEY)).toBeNull();
   });
