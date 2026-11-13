@@ -68,7 +68,7 @@
   position: fixed;
   top: max(16px, calc(var(--menubar-space, 0px) + 12px));
   left: 16px;
-  z-index: 50;
+  z-index: 1010; /* above desktop widgets and their edit layers (desktop.css, ≤ 1005), under app windows */
   display: flex;
   align-items: center;
   gap: 10px;
