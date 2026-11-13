@@ -2,7 +2,7 @@
 
 Atmosphere generates continuous ambient sound in the browser with the Web Audio API. There are no recordings, no streaming and no downloads.
 
-Its soundscapes evolve slowly while they play, and come as ready-made Scenes. Each one sits in a stereo field. The Atmosphere window is the main control surface and the Dynamic Island is the quick one. While it plays, a soft light runs along the edges of the screen.
+Its soundscapes evolve slowly while they play, and come as ready-made Scenes. Each one sits in a stereo field. **Frontier World** adds an original landscape to explore by ear: five regions, 25 places, each with its own hour, weather, wildlife and generated music. The Atmosphere window is the main control surface and the Dynamic Island is the quick one. While it plays, a soft light runs along the edges of the screen.
 
 ## Where things are
 
@@ -14,10 +14,12 @@ Its soundscapes evolve slowly while they play, and come as ready-made Scenes. Ea
 | Synthesis kit (layers, stereo, noise, tones, pads, bursts, chirps) | `src/libs/ambience/voices.js` |
 | Seeded randomness and scales | `src/libs/ambience/random.js` |
 | Environments | `src/libs/ambience/environments/` |
+| Frontier World: catalogue, time and weather, world clock, sound library, events, music, environments, reserved recordings | `src/libs/ambience/frontier/` (`catalogue.js`, `conditions.js`, `world.js`, `sounds.js`, `events.js`, `music.js`, `environments.js`, `assets.js`) |
+| Frontier World's window, its way in and its artwork | `FrontierWindow.jsx`, `FrontierWorld.jsx`, `FrontierScenery.jsx` in `src/components/ambience/`, `src/styles/frontier.css` ([FRONTIER_WORLD.md](FRONTIER_WORLD.md)) |
 | Saved settings and scenes (iWebDB, in backups) | `src/libs/ambience/prefs.js` |
 | The page's engine, the shared meter, hooks | `src/libs/ambience/store.js` |
 | Wallpaper and time-of-day suggestions | `src/libs/ambience/suggestions.js`, `src/components/ambience/AtmosphereServices.jsx` |
-| Window (Explore, Customize, Experience) | `src/components/ambience/AtmosphereWindow.jsx`, `src/styles/atmosphere.css` |
+| Window (Explore, Frontier (the way in), Customize, Experience) | `src/components/ambience/AtmosphereWindow.jsx`, `src/styles/atmosphere.css` |
 | Island content, level bars, focus time | `AmbienceIsland.jsx`, `LevelBars.jsx`, `FocusTime.jsx` in `src/components/ambience/`, `src/styles/ambience-island.css` |
 | Edge glow | `src/components/ambience/AmbienceGlow.jsx`, `src/styles/ambience-glow.css` |
 | Tests | `src/libs/ambience/__tests__/` (a small fake Web Audio API; the UI is server-rendered) |
@@ -151,23 +153,30 @@ Suggestions only ever post a notification, using the existing banner and Notific
   - It's checked when it's switched on, when iWeb comes back into view, and by one timer at the next boundary. There's no polling.
   - Nothing is suggested during a focus session.
 
+## Frontier World
+
+An original frontier landscape to explore by ear, in its own window: five destinations and 25 places. Each has its own hour, weather (simulated or chosen), living-world events and generated music, in three experience modes (Environmental, Cinematic, Frontier Radio). It runs on this engine and store: each place is an environment, so everything above applies to it.
+
+Its full description, from the catalogue to the world clock, sound, events, music, interface, settings and tests, is in **[FRONTIER_WORLD.md](FRONTIER_WORLD.md)**.
+
 ## Persistence
 
-Saved in iWebDB, through `storedPref`, so it's in backups. **Settings v2** holds:
+Saved in iWebDB, through `storedPref`, so it's in backups. **Settings v4** holds:
 
 - the environment and master volume;
-- each environment's layers and character;
+- each environment's layers, muted layers and character (the classic six and the 25 Frontier places);
 - the scene;
 - evolution and stereo;
 - the glow and Sound visuals switches;
 - the sleep timer and focus preferences;
 - favourites;
 - the suggestion switches;
-- the wallpaper links.
+- the wallpaper links;
+- Frontier World's own section: the place, experience mode, time and weather and how they move, intensities, ambience and music volumes, and mood (see [FRONTIER_WORLD.md](FRONTIER_WORLD.md#settings)).
 
-**Scenes v2** holds the user's scenes, under the same key as Atmosphere 1's presets.
+**Scenes v2** holds the user's scenes, under the same key as Atmosphere 1's presets. A scene at a Frontier place also keeps its time and weather.
 
-**Migration:** Atmosphere 1 settings keep every value and gain the new fields with defaults; damaged values fall back to defaults. Nothing ever plays after a reload. Three small conveniences live in localStorage:
+**Migration:** Atmosphere 1, v2 and v3 settings keep every value and gain the new fields with defaults (v3's Frontier fields are converted). Damaged values (an unknown place, time, weather or mood, a level out of range) fall back to defaults. Nothing ever plays after a reload. Three small conveniences live in localStorage:
 
 - the focus session (`iweb:ambienceFocus`);
 - the suggestion log;
@@ -199,6 +208,35 @@ Saved in iWebDB, through `storedPref`, so it's in backups. **Settings v2** holds
 - **Headless:** headless Chrome may composite in software; a real GPU should make the glow and scenery cheaper, but that wasn't measured.
 - **Not compared:** the Atmosphere 1 figures were measured in a different session, so these aren't compared with them.
 
+### Frontier World
+
+**Conditions:** a later session on the same machine, which was busier. Each figure is 15 seconds after 3 seconds to settle, with the window closed and everything on (Gentle evolution, stereo, level bars, glow following the sound). The four were measured in turn, four rounds, and averaged.
+
+| State | CPU (% of one core), mean of 4 | Audio nodes |
+| --- | --- | --- |
+| Rainy Mood (classic), for comparison | 34.2 | 45 |
+| Open Prairie, afternoon, clear | 38.9 | 114 |
+| Cypress Swamp, night (frogs and insects) | 37.4 | 98 |
+| Open Prairie, thunderstorm, with music | 45.4 | 127 |
+| Paused / stopped | 0.6–1.1 / 0.6–0.8 | — |
+
+- **Relative cost:** a Frontier place in clear weather costs about 10–15% more CPU than a classic environment; a storm with music about a third more.
+- **Lazy beds:** the weather's rain, snow and grit, and the insects' day and night choruses, exist only while their conditions need them, and are freed after they fade. That cut a place in clear weather from about 135 nodes to 98–114.
+- **Classic environments unchanged:** in this session Rainy Mood measured 32.4% on the released v3.0 code and 33.6% on this one, side by side, within noise. The figures above are higher than the 2.0 table only because the machine was busier.
+- **Memory:** the JS heap stays at about 11–12 MB.
+- **Bounded:** after switching through ten places quickly, one instance remains. After Stop: no instances, no nodes, no voices, no ticker.
+- **Loudness:** every place was measured in Chrome at its defaults: −41 to −30 dB RMS, peaks at −17 dBFS or lower, in line with the classic six (−44 to −30). Light rain sits just above clear weather; heavy rain and storms are 3–6 dB louder.
+- **Frontier Radio** costs more than the place alone. The extra notes measured about 25% more CPU (Longhorn Meadow: 29.4% alone, 36.9% in Radio, same run), after giving the music one stereo position instead of a panner per note and shortening the inner notes (19 simultaneous voices down to 12).
+- **Soak test, 30 minutes** (Chrome, a dev build). It changed place every minute (all 25 in turn), set the time and weather every 90 s, changed the experience mode every 3 minutes, switched the world clock on and off every 5 minutes, and paused for 10 s every 7 minutes. Each minute it took a sample after a forced garbage collection:
+  - the JS heap stayed between 12.0 and 13.1 MB, ending at 12.8 MB after Stop;
+  - never more than two places at once (one fading out), then one;
+  - pending timers 0–1;
+  - the three noise buffers never remade;
+  - no errors.
+
+  After Stop there were no instances, nodes, voices, timers or ticker.
+- **Bundle:** the Frontier code loads with the engine (the main bundle grew from 834.5 to 922.5 KB, before compression). The window (15 KB, 4.7 KB compressed) and the artwork load when it's first opened.
+
 ## Known limitations
 
 - **Background tabs:** browsers may throttle or suspend audio in background tabs. Atmosphere schedules further ahead while hidden; if the browser suspends the context, it says so and needs Play.
@@ -206,4 +244,5 @@ Saved in iWebDB, through `storedPref`, so it's in backups. **Settings v2** holds
 - **Autoplay:** the first Play must be a user gesture. A suggestion's notification click counts; nothing else starts sound.
 - **Stereo, not 3D:** there's no Distance control, because Depth already covers space and reverb.
 - **Not built:** Evolution has no separate intensity control (the four modes cover it), and there's no "Recently used" list.
+- **Frontier World** has its own limitations, listed in [FRONTIER_WORLD.md](FRONTIER_WORLD.md#known-limitations).
 - **Test coverage:** tests run in Node with a fake Web Audio API. Sound quality, interaction and the visuals were checked in Chrome; the UI's markup is covered by server-rendered tests.

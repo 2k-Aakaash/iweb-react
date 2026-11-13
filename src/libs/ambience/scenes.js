@@ -6,13 +6,16 @@
 //
 //   scene  { id, name, description, environmentId, version: 2, builtIn,
 //            parameters: { mood, variation, depth, evolutionMode, spatialWidth, movement },
-//            layers: { [layerId]: 0–1 }, seed: integer | null }
+//            layers: { [layerId]: 0–1 }, seed: integer | null,
+//            conditions: { time, weather } | null }   a Frontier location's hour and weather
 //
 // Version 1 records were the old presets: { id, name, environmentId, masterVolume, params,
 // layers, seed }. They're read as scenes with Gentle evolution and the default stereo image;
 // their volume is no longer applied (scenes keep the volume you've set).
 import { environmentById } from './environments/index.js';
 import { validMode } from './evolution.js';
+import { currentTime, WEATHER_IDS } from './frontier/conditions.js';
+import { currentLocationId } from './frontier/catalogue.js';
 
 export const SCENE_VERSION = 2;
 export const MAX_CUSTOM_SCENES = 24;
@@ -25,7 +28,8 @@ const ID = /^[a-z0-9-]{1,40}$/;
 /** A scene from anything (a built-in definition, a saved record, an old preset), or null. */
 export function normalizeScene(raw, { builtIn = false } = {}) {
   if (!raw || typeof raw !== 'object') return null;
-  const env = environmentById(raw.environmentId);
+  // A place renamed before release is found under its new id.
+  const env = environmentById(currentLocationId(raw.environmentId));
   if (!env) return null;
   const name = typeof raw.name === 'string' ? raw.name.trim().slice(0, 40) : '';
   if (!name) return null;
@@ -49,6 +53,10 @@ export function normalizeScene(raw, { builtIn = false } = {}) {
     },
     layers,
     seed: Number.isInteger(raw.seed) && raw.seed >= 0 ? raw.seed : null,
+    // A Frontier location's time and weather (each an id, or null for the location's own).
+    conditions: env.frontier && raw.conditions && typeof raw.conditions === 'object'
+      ? { time: currentTime(raw.conditions.time), weather: WEATHER_IDS.includes(raw.conditions.weather) ? raw.conditions.weather : null }
+      : null,
   };
 }
 

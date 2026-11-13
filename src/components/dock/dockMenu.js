@@ -13,6 +13,7 @@ import { getPlayer, nextTrack, playPause, previousTrack } from '../../libs/music
 import { openNotes } from '../../libs/notes/notesEvents';
 import { requestBookmarkEdit } from '../../libs/dock/bookmarks';
 import { getAmbience } from '../../libs/ambience/store.js';
+import { environmentById } from '../../libs/ambience/environments/index.js';
 import { DOCK_SIZE_PRESETS, dockMagnificationPref, dockSizePref } from '../../libs/dock/dockPrefs';
 
 const SEP = { type: 'separator' };
@@ -39,7 +40,7 @@ export function bookmarkMenu({ bookmark, index, count, move, remove }) {
   ];
 }
 
-const APP_NAMES = { notes: 'Notes', music: 'Music', settings: 'Settings', markets: 'Markets', news: 'News', atmosphere: 'Atmosphere' };
+const APP_NAMES = { notes: 'Notes', music: 'Music', settings: 'Settings', markets: 'Markets', news: 'News', atmosphere: 'Atmosphere', frontier: 'Frontier World' };
 
 export function appMenu({ app, state, open, actions }) {
   if (app === 'apps') {
@@ -78,12 +79,22 @@ export function appMenu({ app, state, open, actions }) {
       );
     }
   }
+  if (app === 'frontier') {
+    const ambience = getAmbience();
+    const s = ambience.getState();
+    const onPlace = Boolean(environmentById(s.environmentId)?.frontier);
+    items.push(
+      { label: onPlace && s.status === 'playing' ? 'Pause' : 'Play', disabled: !onPlace, onSelect: () => ambience.toggle() },
+      { label: 'Next Place in Destination', disabled: !onPlace, onSelect: () => ambience.nextEnvironment() },
+      SEP,
+    );
+  }
   if (app === 'atmosphere') {
     const ambience = getAmbience();
     const playing = ambience.getState().status === 'playing';
     items.push(
       { label: playing ? 'Pause' : 'Play', onSelect: () => ambience.toggle() },
-      { label: 'Next Environment', onSelect: () => ambience.nextEnvironment() },
+      { label: environmentById(ambience.getState().environmentId)?.frontier ? 'Next Place in Destination' : 'Next Environment', onSelect: () => ambience.nextEnvironment() },
       { label: 'Shuffle', onSelect: () => ambience.randomize() },
       SEP,
     );

@@ -1,0 +1,840 @@
+/* Frontier World in the Atmosphere window (components/ambience/FrontierWorld.jsx and
+   FrontierScenery.jsx). Text laid over artwork is marked data-force-dark in the markup, so the
+   generated Light look (scripts/postcss-light-appearance.mjs) leaves it white on the picture. */
+
+.fr {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Artwork ────────────────────────────────────────────────────────────── */
+
+.frontier-scenery {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: fr-in 0.6s ease both;
+}
+
+@keyframes fr-in {
+  from { opacity: 0; }
+}
+
+/* ── Hero: a landscape with its words over the lower part ──────────────── */
+
+.fr-hero {
+  position: relative;
+  display: grid;
+  min-height: 188px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #1c2230;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14), 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.fr-hero > .frontier-scenery {
+  position: absolute;
+  inset: 0;
+}
+
+.fr-hero-text {
+  position: relative;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 40px 16px 14px;
+  background: linear-gradient(to bottom, transparent, rgba(8, 10, 16, 0.55) 45%, rgba(8, 10, 16, 0.78));
+  color: #fff;
+}
+
+.fr-hero-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fr-accent, rgba(255, 255, 255, 0.75));
+}
+
+.fr-hero-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+.fr-hero-desc {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.fr-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.fr-hero.is-now {
+  min-height: 212px;
+}
+
+.fr-chip {
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+.fr-play {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #10131a !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  cursor: default;
+  transition: transform 0.12s ease;
+}
+
+.fr-play svg {
+  width: 20px;
+  height: 20px;
+}
+
+.fr-play:active {
+  transform: scale(0.94);
+}
+
+.fr-play:focus-visible,
+.fr-region:focus-visible,
+.fr-place-main:focus-visible,
+.fr-crumb-btn:focus-visible,
+.atm-mute:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 2px;
+}
+
+.fr-status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.fr-status.is-error {
+  color: #ff8a80;
+}
+
+/* ── Breadcrumbs ────────────────────────────────────────────────────────── */
+
+.fr-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: -6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.fr-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fr-crumb [aria-current] {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.fr-crumb-btn {
+  padding: 2px 4px !important;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: #0a84ff !important;
+  cursor: default;
+}
+
+.fr-crumb-btn:hover {
+  background: rgba(10, 132, 255, 0.12);
+}
+
+.fr-crumb-sep {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* ── Region and place cards ─────────────────────────────────────────────── */
+
+.fr-regions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fr-region {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  text-align: left;
+  cursor: default;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fr-region:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.fr-region.is-active {
+  box-shadow: inset 0 0 0 1.5px var(--fr-accent, #0a84ff);
+}
+
+.fr-card-art {
+  height: 84px;
+  flex-shrink: 0;
+}
+
+.fr-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px 11px;
+}
+
+.fr-card-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fr-card-desc {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.62);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fr-card-meta {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.fr-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(10, 132, 255, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.fr-places {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fr-place-main {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 34px;
+  align-items: center;
+  width: 100%;
+  padding: 0 10px 0 0 !important;
+  overflow: hidden;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  text-align: left;
+  cursor: default;
+  transition: background-color 0.15s ease;
+}
+
+.fr-place-main:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.fr-place.is-active .fr-place-main {
+  box-shadow: inset 0 0 0 1.5px #0a84ff;
+}
+
+.fr-place-art {
+  align-self: stretch;
+  height: 100%;
+  min-height: 86px;
+}
+
+.fr-place-play {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.fr-place-play svg {
+  width: 15px;
+  height: 15px;
+}
+
+.fr-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.fr-tag {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Now Playing controls ───────────────────────────────────────────────── */
+
+.fr-cond {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+
+.fr-seg {
+  flex-wrap: wrap;
+}
+
+.atm-actions .atm-btn:disabled,
+.fr-cond .atm-select:disabled {
+  opacity: 0.45;
+}
+
+/* A layer: mute, name, level, value (also in Customize). */
+.atm-slider-row.atm-layer-row {
+  grid-template-columns: 26px 112px minmax(0, 1fr) 30px;
+}
+
+.atm-mute {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: rgba(255, 255, 255, 0.75) !important;
+  cursor: default;
+}
+
+.atm-mute:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.atm-mute svg {
+  width: 15px;
+  height: 15px;
+}
+
+.atm-layer-row.is-muted .atm-mute {
+  color: #ff9f0a !important;
+}
+
+.atm-layer-row.is-muted .atm-slider-label,
+.atm-layer-row.is-muted .mac-slider {
+  opacity: 0.45;
+}
+
+.atm-layer-note {
+  display: block;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Explore: the way in. */
+.fr-entry {
+  position: relative;
+  display: grid;
+  min-height: 132px;
+  width: 100%;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: #1c2230;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  text-align: left;
+  cursor: default;
+}
+
+.fr-entry > .frontier-scenery {
+  position: absolute;
+  inset: 0;
+}
+
+.fr-entry:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: 2px;
+}
+
+.fr-entry .fr-hero-text {
+  padding-top: 30px;
+}
+
+@media (max-width: 600px) {
+  .fr-regions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fr-place-main {
+    grid-template-columns: 92px minmax(0, 1fr) 30px;
+  }
+
+  .atm-slider-row.atm-layer-row {
+    grid-template-columns: 26px 86px minmax(0, 1fr) 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frontier-scenery {
+    animation: none;
+  }
+}
+
+/* ── The Frontier World window (FrontierWindow.jsx) ─────────────────────────
+   Three columns (places · scene · controls) over a Now Playing strip. The window is a size
+   container: narrower, the controls and then the places become sheets over the scene. */
+
+.atm-window.fw-window {
+  width: min(1180px, 100%);
+  height: min(780px, 100%);
+  container: fw / inline-size;
+}
+
+.fw-toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 8px 16px 8px 92px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fw-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fw-sheet-btns {
+  display: none;
+  gap: 6px;
+}
+
+.fw-body {
+  position: relative;
+  display: grid;
+  overflow: hidden; /* the sheets wait just outside, never scrollable */
+  flex: 1;
+  grid-template-columns: 236px minmax(0, 1fr) 336px;
+  min-height: 0;
+}
+
+.fw-col {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.fw-left {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fw-right {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fw-sheet-close {
+  display: none !important;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.fw-col-title,
+.fw-section h3 {
+  display: flex;
+  align-items: baseline;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Destinations and places. */
+.fw-dest-list,
+.fw-place-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fw-dest + .fw-dest {
+  margin-top: 4px;
+}
+
+.fw-dest-btn {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px 5px 5px !important;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  text-align: left;
+  cursor: default;
+}
+
+.fw-dest-btn:hover,
+.fw-place:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fw-dest.is-current > .fw-dest-btn {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fw-dest-art {
+  width: 44px;
+  height: 30px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+}
+
+.fw-dest-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fw-chevron {
+  display: grid;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.fw-chevron svg {
+  width: 11px;
+  height: 11px;
+}
+
+.fw-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.fw-place-list {
+  margin: 2px 0 6px;
+}
+
+.fw-place {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px 4px 59px !important;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 12.5px;
+  cursor: default;
+}
+
+.fw-place.is-active {
+  background: color-mix(in srgb, var(--fr-accent, #0a84ff) 26%, transparent);
+  font-weight: 600;
+}
+
+/* The scene. */
+.fw-scene {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: #1c2230;
+}
+
+.fr-blend,
+.fr-blend-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.fr-blend .frontier-scenery {
+  animation: none;
+}
+
+.fr-blend-layer.is-in {
+  animation: fr-in 1.6s ease both;
+}
+
+.fw-scene-top {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px;
+}
+
+.fw-cond-chip,
+.fw-front-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fw-front-chip {
+  background: rgba(20, 24, 34, 0.55);
+}
+
+.fw-scene-text {
+  align-self: stretch;
+  margin-top: auto;
+  padding: 60px 20px 18px;
+}
+
+.fw-scene-text .fr-hero-title {
+  font-size: 26px;
+}
+
+.fw-character {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* The controls. */
+.fw-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fw-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fw-section .atm-hint {
+  margin: 0;
+}
+
+.fw-clock {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--fr-accent, rgba(255, 255, 255, 0.85));
+}
+
+.atm-slider-row.fw-range {
+  grid-template-columns: 92px minmax(0, 1fr) 30px;
+}
+
+.fw-controls .atm-slider-row.atm-layer-row {
+  grid-template-columns: 26px 92px minmax(0, 1fr) 30px;
+}
+
+.fw-seg-disabled,
+.fr-seg[aria-disabled='true'] {
+  opacity: 0.45;
+}
+
+/* The Now Playing strip. */
+.fw-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.atm-play.fw-play {
+  width: 38px;
+  height: 38px;
+}
+
+.atm-play.fw-play svg {
+  width: 19px;
+  height: 19px;
+}
+
+.fw-strip-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fw-strip-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fw-strip-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.atm-volume.fw-volume {
+  flex: 0 1 180px;
+  min-width: 90px;
+}
+
+.fr-weather-icon {
+  flex-shrink: 0;
+}
+
+/* Narrower: the controls become a sheet over the scene… */
+@container fw (max-width: 1000px) {
+  .fw-body {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .fw-sheet-btns {
+    display: flex;
+  }
+
+  .fw-sheet-btn:first-child {
+    display: none;
+  }
+
+  .fw-right {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 3;
+    width: min(360px, 100%);
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(28, 30, 38, 0.97);
+    box-shadow: -12px 0 30px rgba(0, 0, 0, 0.35);
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0.25s;
+  }
+
+  .fw-right.is-open {
+    transform: none;
+    visibility: visible;
+  }
+
+  .fw-right .fw-sheet-close {
+    display: grid !important;
+  }
+
+  .fw-right .fw-controls {
+    padding-top: 26px;
+  }
+}
+
+/* …and narrower still, the places too. */
+@container fw (max-width: 700px) {
+  .fw-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fw-sheet-btn:first-child {
+    display: inline-flex;
+  }
+
+  .fw-left {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 3;
+    width: min(300px, 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(28, 30, 38, 0.97);
+    box-shadow: 12px 0 30px rgba(0, 0, 0, 0.35);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0.25s;
+  }
+
+  .fw-left.is-open {
+    transform: none;
+    visibility: visible;
+  }
+
+  .fw-left .fw-sheet-close {
+    display: grid !important;
+  }
+
+  .fw-scene-text .fr-hero-title {
+    font-size: 21px;
+  }
+
+  .atm-volume.fw-volume,
+  .fw-mode-badge {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-blend-layer.is-in {
+    animation: none;
+  }
+
+  .fw-left,
+  .fw-right {
+    transition: none !important;
+  }
+}

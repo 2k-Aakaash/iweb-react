@@ -426,7 +426,7 @@ describe('Settings v2', () => {
     };
     const v2 = normalizeSettings(v1);
     expect(v2).toMatchObject({
-      v: 2,
+      v: 4,
       environmentId: 'ocean',
       masterVolume: 0.3,
       glow: { enabled: false, reactive: true },

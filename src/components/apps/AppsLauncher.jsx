@@ -5,7 +5,7 @@ import { useFavicons } from '../../libs/favicons/useFavicons';
 import { domainOf } from '../../libs/dock/bookmarks';
 import { openNotes } from '../../libs/notes/notesEvents';
 import { openNews } from '../../libs/news/newsEvents';
-import { openAtmosphere } from '../../libs/ambience/store.js';
+import { openAtmosphere, openFrontier } from '../../libs/ambience/store.js';
 import '../../styles/apps-launcher.css';
 
 // Apps, as in macOS 26 (it took Launchpad's place): every app and bookmark in a full-screen
@@ -24,6 +24,7 @@ const BUILT_IN = [
   { id: 'markets', name: 'Markets', icon: <DockAppIcon name="markets" />, open: () => window.dispatchEvent(new CustomEvent('markets:open')), keywords: 'stocks nifty sensex gold' },
   { id: 'news', name: 'News', icon: <DockAppIcon name="news" />, open: () => openNews(), keywords: 'headlines' },
   { id: 'atmosphere', name: 'Atmosphere', icon: <DockAppIcon name="atmosphere" />, open: () => openAtmosphere(), keywords: 'ambience ambient sound rain focus sleep relax music' },
+  { id: 'frontier', name: 'Frontier World', icon: <DockAppIcon name="frontier" />, open: () => openFrontier(), keywords: 'frontier world ambience landscape prairie desert swamp mountains weather radio soundscape' },
   { id: 'spotlight', name: 'Spotlight', icon: <MacAppIcon name="spotlight" />, open: (a) => a.openSpotlight(), keywords: 'search' },
   { id: 'wallpaper', name: 'Wallpapers', icon: <DockAppIcon name="bg" />, open: () => settings('wallpaper'), keywords: 'background unsplash' },
   { id: 'widgets', name: 'Widgets', icon: <MacAppIcon name="clock" />, open: () => settings('widgets'), keywords: 'gallery desktop' },

@@ -14,7 +14,7 @@ import UpdateNotice from './components/update/UpdateNotice';
 import NotificationCenter from './components/notifications/NotificationCenter';
 import AmbienceGlow from './components/ambience/AmbienceGlow';
 import AtmosphereServices from './components/ambience/AtmosphereServices';
-import { ATMOSPHERE_OPEN_EVENT } from './libs/ambience/store.js';
+import { ATMOSPHERE_OPEN_EVENT, FRONTIER_OPEN_EVENT } from './libs/ambience/store.js';
 import AppsLauncher from './components/apps/AppsLauncher';
 import DialogHost from './components/dialogs/DialogHost';
 import { openIwebDB } from './libs/wallpaper/db';
@@ -46,6 +46,11 @@ const NewsModal = React.lazy(() => import('./components/news/NewsModal').catch((
 // Atmosphere's window, likewise. (Its engine makes no sound, and no AudioContext, until Play.)
 const AtmosphereWindow = React.lazy(() => import('./components/ambience/AtmosphereWindow').catch((err) => {
   console.error('Failed to load Atmosphere:', err);
+  return { default: AppUnavailable };
+}));
+// Frontier World's window: on the same Atmosphere engine, loaded on first open.
+const FrontierWindow = React.lazy(() => import('./components/ambience/FrontierWindow').catch((err) => {
+  console.error('Failed to load Frontier World:', err);
   return { default: AppUnavailable };
 }));
 
@@ -125,6 +130,8 @@ export default function App() {
   const [atmosphereOpen, setAtmosphereOpen] = useState(false);
   const [atmosphereLoaded, setAtmosphereLoaded] = useState(false);
   const [atmosphereTab, setAtmosphereTab] = useState(null);
+  const [frontierOpen, setFrontierOpen] = useState(false);
+  const [frontierLoaded, setFrontierLoaded] = useState(false);
   const [marketsSymbol, setMarketsSymbol] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesRequest, setNotesRequest] = useState(undefined); // set on first open: then mounted
@@ -289,8 +296,16 @@ export default function App() {
       setAtmosphereLoaded(true);
       setAtmosphereOpen(true);
     };
+    const handleOpenFrontier = () => {
+      setFrontierLoaded(true);
+      setFrontierOpen(true);
+    };
     window.addEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
-    return () => window.removeEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
+    window.addEventListener(FRONTIER_OPEN_EVENT, handleOpenFrontier);
+    return () => {
+      window.removeEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
+      window.removeEventListener(FRONTIER_OPEN_EVENT, handleOpenFrontier);
+    };
   }, []);
 
 
@@ -431,6 +446,11 @@ export default function App() {
       {atmosphereLoaded && (
         <Suspense fallback={null}>
           <AtmosphereWindow open={atmosphereOpen} setOpen={setAtmosphereOpen} tab={atmosphereTab} />
+        </Suspense>
+      )}
+      {frontierLoaded && (
+        <Suspense fallback={null}>
+          <FrontierWindow open={frontierOpen} setOpen={setFrontierOpen} />
         </Suspense>
       )}
       {/* Atmosphere's edge glow while it plays */}

@@ -111,6 +111,11 @@ export const openAtmosphere = (tab) => window.dispatchEvent(new CustomEvent(ATMO
 // A suggestion's action (a notification click: a user gesture, so it may start the sound).
 export const ATMOSPHERE_SCENE_EVENT = 'atmosphere:scene';
 
+// Opening the Frontier World window (App.jsx listens): the island, Apps, the Dock and
+// Atmosphere's Frontier tab.
+export const FRONTIER_OPEN_EVENT = 'frontier:open';
+export const openFrontier = () => window.dispatchEvent(new CustomEvent(FRONTIER_OPEN_EVENT));
+
 /** For tests: forget the engine. */
 export function _resetAmbience() {
   engine?.dispose();

@@ -238,3 +238,9 @@
 .btn-atmosphere .atm-orb {
   box-shadow: none;
 }
+
+/* A Frontier place: the weather's icon before the region, hour and weather. */
+.island-weather {
+  margin-right: 4px;
+  vertical-align: -2px;
+}

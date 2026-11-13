@@ -6,7 +6,7 @@ import { useMacWindow } from '../libs/window/useMacWindow';
 import MacSlider from './ui/MacSlider';
 import AmbienceIsland from './ambience/AmbienceIsland';
 import AtmosphereGlyph from './ambience/AtmosphereGlyph';
-import { getAmbience, openAtmosphere, useAmbience } from '../libs/ambience/store.js';
+import { getAmbience, openAtmosphere, openFrontier, useAmbience } from '../libs/ambience/store.js';
 import { environmentById } from '../libs/ambience/environments/index.js';
 import { publishPlayer, registerPlayerController } from '../libs/music/playerStore';
 import { parseSearchIntent } from '../libs/intentParser';
@@ -1517,7 +1517,7 @@ export default function Music({ showModal: propShowModal, setShowModal: propSetS
       const onOrb = Boolean(e.target.closest('.atm-orb'));
       const onName = Boolean(e.target.closest('.island-title, .expanded-title'));
       if (islandState === 'collapsed' && onOrb) getAmbience().toggle();
-      else if (islandState !== 'collapsed' && (onOrb || onName)) openAtmosphere();
+      else if (islandState !== 'collapsed' && (onOrb || onName)) (environmentById(ambience.environmentId)?.frontier ? openFrontier() : openAtmosphere());
       else if (islandState !== 'expanded') setIslandState('expanded');
       return;
     }

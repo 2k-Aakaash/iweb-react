@@ -78,9 +78,32 @@ export function createKit({ ctx, out, sends, buffers, rng, maxVoices = 12 }) {
   const stereo = typeof ctx.createStereoPanner === 'function';
   let disposed = false;
 
+  let collecting = null; // nodes made inside collect(), so they can be freed together
   const own = (node) => {
     owned.add(node);
+    collecting?.push(node);
     return node;
+  };
+
+  /** Runs `make` and returns { result, nodes }: every continuous node it made. */
+  const collect = (make) => {
+    const prev = collecting;
+    collecting = [];
+    try {
+      const result = make();
+      return { result, nodes: collecting };
+    } finally {
+      collecting = prev;
+    }
+  };
+
+  /** Stops and disconnects continuous nodes made earlier (a sound no longer needed). */
+  const free = (nodes) => {
+    for (const node of nodes) {
+      try { if (typeof node.stop === 'function') node.stop(); } catch { /* not started */ }
+      try { node.disconnect(); } catch { /* already gone */ }
+      owned.delete(node);
+    }
   };
   const gain = (value = 1) => {
     const g = own(ctx.createGain());
@@ -122,22 +145,30 @@ export function createKit({ ctx, out, sends, buffers, rng, maxVoices = 12 }) {
    * A layer: its level gain (the mix slider), then its evolution gain and stereo panner, into
    * the instance output and (optionally) the shared sends. Events go to `.gain`.
    */
-  const layer = (level, { reverb = 0, delay = 0 } = {}) => {
+  const layer = (level, { reverb = 0, delay = 0, tone = false } = {}) => {
     const g = gain(level);
     const evo = gain(1);
     g.connect(evo);
+    // `tone`: a low-pass after the evolution gain, open by default (fog and distance close it).
+    let post = evo;
+    let toneFilter = null;
+    if (tone) {
+      toneFilter = filter('lowpass', 18000, 0.5);
+      evo.connect(toneFilter);
+      post = toneFilter;
+    }
     let panner = null;
     if (stereo) {
       panner = own(ctx.createStereoPanner());
-      evo.connect(panner).connect(out);
+      post.connect(panner).connect(out);
     } else {
-      evo.connect(out);
+      post.connect(out);
     }
     const r = gain(reverb);
     evo.connect(r).connect(sends.reverb);
     const d = gain(delay);
     evo.connect(d).connect(sends.delay);
-    const rec = { gain: g, evo, panner, reverb: r, delay: d, space: null, drift: null };
+    const rec = { gain: g, evo, panner, tone: toneFilter, reverb: r, delay: d, space: null, drift: null };
     layers.set(g, rec);
     return rec;
   };
@@ -344,6 +375,161 @@ export function createKit({ ctx, out, sends, buffers, rng, maxVoices = 12 }) {
     return true;
   };
 
+  /**
+   * A gliding tone (a call, a whistle, a howl, a creak): one oscillator following `points`
+   * ([seconds from `time`, Hz], …), with an optional octave above it, a vibrato and a filter.
+   */
+  const whistle = (time, points, { dest, level = 0.04, type = 'sine', attack = 0.04, release = 0.15, vibrato = null, filter = null, harmonic = 0 } = {}) => {
+    if (!canVoice() || !points?.length) return false;
+    const end = time + points[points.length - 1][0];
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(level, time + attack);
+    g.gain.setValueAtTime(level, Math.max(time + attack, end - release));
+    g.gain.linearRampToValueAtTime(0, end);
+    let into = g;
+    const nodes = [];
+    if (filter) {
+      const f = ctx.createBiquadFilter();
+      f.type = filter.type || 'bandpass';
+      f.frequency.value = filter.frequency || 1000;
+      f.Q.value = filter.Q ?? 1;
+      f.connect(g);
+      into = f;
+      nodes.push(f);
+    }
+    const voice = (mult, lvl) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(points[0][1] * mult, time);
+      for (const [dt, hz] of points.slice(1)) o.frequency.exponentialRampToValueAtTime(Math.max(20, hz * mult), time + Math.max(0.005, dt));
+      if (lvl === 1) o.connect(into);
+      else {
+        const hg = ctx.createGain();
+        hg.gain.value = lvl;
+        o.connect(hg).connect(into);
+        nodes.push(hg);
+      }
+      o.start(time);
+      o.stop(end + 0.02);
+      nodes.unshift(o);
+      return o;
+    };
+    const main = voice(1, 1);
+    if (harmonic > 0) voice(2, harmonic);
+    if (vibrato) {
+      const v = ctx.createOscillator();
+      v.frequency.value = vibrato.rate;
+      const vg = ctx.createGain();
+      vg.gain.value = vibrato.depth;
+      v.connect(vg).connect(main.frequency);
+      v.start(time);
+      v.stop(end + 0.02);
+      nodes.push(v, vg);
+    }
+    const p = route(g, dest, placeFor(dest));
+    nodes.push(g);
+    if (p) nodes.push(p);
+    track(nodes, end + 0.02);
+    return true;
+  };
+
+  /**
+   * A pulsed tone (a croak, a rattle, a trill): one oscillator gated into `pulses` pulses at
+   * `rate` per second, each with a short ramp so it never clicks.
+   */
+  const trill = (time, frequency, { dest, level = 0.04, type = 'sawtooth', pulses = 3, rate = 8, duty = 0.5, drop = 1, filter = null } = {}) => {
+    if (!canVoice()) return false;
+    const on = duty / rate;
+    const end = time + (pulses - 1) / rate + on;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(frequency, time);
+    if (drop !== 1) o.frequency.exponentialRampToValueAtTime(frequency * drop, end);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, time);
+    const ramp = Math.min(0.012, on * 0.3);
+    for (let i = 0; i < pulses; i += 1) {
+      const t0 = time + i / rate;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(level, t0 + ramp);
+      g.gain.setValueAtTime(level, t0 + on - ramp);
+      g.gain.linearRampToValueAtTime(0, t0 + on);
+    }
+    const nodes = [o, g];
+    if (filter) {
+      const f = ctx.createBiquadFilter();
+      f.type = filter.type || 'bandpass';
+      f.frequency.value = filter.frequency || frequency;
+      f.Q.value = filter.Q ?? 1;
+      o.connect(f).connect(g);
+      nodes.push(f);
+    } else {
+      o.connect(g);
+    }
+    const p = route(g, dest, placeFor(dest));
+    if (p) nodes.push(p);
+    o.start(time);
+    o.stop(end + 0.02);
+    track(nodes, end + 0.02);
+    return true;
+  };
+
+  /**
+   * A plucked string: a sawtooth and a triangle through a low-pass that closes quickly, with
+   * a fast attack and a long natural decay.
+   */
+  const pluck = (time, frequency, { dest, level = 0.08, decay = 2.2, bright = 3200 } = {}) => {
+    if (!canVoice()) return false;
+    const a = ctx.createOscillator();
+    a.type = 'sawtooth';
+    a.frequency.value = frequency;
+    const b = ctx.createOscillator();
+    b.type = 'triangle';
+    b.frequency.value = frequency;
+    b.detune.value = 4;
+    const bg = ctx.createGain();
+    bg.gain.value = 0.8;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 0.6;
+    lp.frequency.setValueAtTime(bright, time);
+    lp.frequency.setTargetAtTime(Math.max(frequency * 1.6, 280), time, decay / 7);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(level, time + 0.004);
+    g.gain.setTargetAtTime(0, time + 0.004, decay / 5);
+    a.connect(lp);
+    b.connect(bg).connect(lp);
+    lp.connect(g);
+    const p = route(g, dest, placeFor(dest));
+    const stopAt = time + decay * 1.2;
+    a.start(time);
+    b.start(time);
+    a.stop(stopAt);
+    b.stop(stopAt);
+    track(p ? [a, b, bg, lp, g, p] : [a, b, bg, lp, g], stopAt);
+    return true;
+  };
+
+  /** A noise buffer of `type` ('white' | 'pink' | 'brown'), shared by the context. */
+  const noise = (type) => noiseBuffer(ctx, type, buffers);
+
+  /**
+   * An event built from its own nodes (a passing train): they're stopped and disconnected at
+   * `stopAt`, or when the instance is disposed.
+   */
+  const custom = (nodes, stopAt) => {
+    if (disposed) {
+      nodes.forEach((n) => {
+        try { n.disconnect(); } catch { /* not connected */ }
+      });
+      return false;
+    }
+    track(nodes, stopAt);
+    return true;
+  };
+
   /** Stops and disconnects everything this instance made. */
   const dispose = () => {
     disposed = true;
@@ -364,6 +550,7 @@ export function createKit({ ctx, out, sends, buffers, rng, maxVoices = 12 }) {
 
   return {
     ctx, rng, gain, filter, loop, osc, lfo, layer, tone, pad, burst, chirp, canVoice, dispose,
+    whistle, trill, pluck, noise, custom, route, placeFor, collect, free,
     configureLayer, setSpace, layerOf,
     /** The current Width and Movement. */
     space: () => ({ ...space }),

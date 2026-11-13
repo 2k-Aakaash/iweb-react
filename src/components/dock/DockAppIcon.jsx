@@ -96,6 +96,16 @@ const ICONS = {
     </Tile>
   ),
 
+  // Frontier World: a low sun over layered ridges and a mesa, in dusk colours.
+  frontier: (
+    <Tile id="frontier" from="#f0a25e" to="#5b3a6e">
+      <circle cx="40" cy="27" r="7" fill="#ffe2a8" />
+      <path d="M6 42 L18 30 L26 36 L36 26 L48 38 L58 32 V58 H6 Z" fill="#7a4a5e" />
+      <path d="M6 48 H22 L25 40 H37 L40 48 H58 V58 H6 Z" fill="#4a2f45" />
+      <path d="M6 53 C18 50 30 54 42 51 S58 52 58 52 V58 H6 Z" fill="#2c1f33" />
+    </Tile>
+  ),
+
   // Settings: a machined gear on graphite.
   settings: (
     <Tile id="settings" from="#c3c7ce" to="#6b7079">

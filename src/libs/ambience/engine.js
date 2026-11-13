@@ -14,14 +14,23 @@
 //             slow down). Continuous layers need no scheduling at all. Evolution steps
 //             (evolution.js) ride the same ticker: one at most per tick, minutes apart, so a
 //             hidden or suspended tab never builds up a backlog.
+//   frontier  a Frontier World location (frontier/) is an environment like any other, plus
+//             its time of day, weather and music: set here, applied to the playing instance,
+//             and its world clock (frontier/world.js: the hour and weather moving by
+//             themselves) on the same ticker, only while playing; its experience mode, ambience
+//             and music volumes, and how busy and how strong it is
 //   safety    repeated clicks share one pending start; only one iWeb tab plays at a time; every
 //             gain change is a ramp (no clicks); a limiter keeps peaks down.
 import { environmentById, nextEnvironmentId, validEnvironment } from './environments/index.js';
+import { locationById } from './frontier/catalogue.js';
+import { currentTime, effectiveConditions, regionWeather, WEATHER_IDS } from './frontier/conditions.js';
+import { createWorld, localMinutes, phaseAt, phaseProgress, stepWorld } from './frontier/world.js';
+import { autoMood, validMood } from './frontier/music.js';
 import { createKit, glide, impulseResponse } from './voices.js';
 import { newSeed, seeded } from './random.js';
 import { EVOLUTION_MODES, effectiveParams, evolutionStep, firstWait, profileOf, startLevels } from './evolution.js';
 import { findScene, normalizeScene } from './scenes.js';
-import { ambienceScenesPref, ambienceSettingsPref, normalizeSettings, PARAMS, SLEEP_OPTIONS, validFocusMinutes } from './prefs.js';
+import { ambienceScenesPref, ambienceSettingsPref, FRONTIER_MODES, normalizeSettings, PARAMS, SLEEP_OPTIONS, SPEEDS, TIME_MODES, validFocusMinutes, WEATHER_MODES } from './prefs.js';
 
 const TICK_MS = 250;
 const LOOKAHEAD = 0.9; // seconds scheduled ahead while visible
@@ -35,6 +44,15 @@ const FOCUS_KEY = 'iweb:ambienceFocus';
 const FOCUS_MAX_AGE = 12 * 60 * 60 * 1000; // a session older than this isn't restored
 const BANDS_HZ = [[50, 160], [160, 450], [450, 1300], [1300, 3800], [3800, 11000]];
 const BAND_TILT = [0, 10, 35, 60, 75];
+const CONDITION_TC = 3; // a chosen time or weather settles over ≈ 9 s
+const PHASE_TC = { accelerated: 12, local: 30 }; // the hour moving on by itself: ≈ 40 s / 90 s
+const WEATHER_TC = 15; // the weather changing by itself: ≈ 45 s
+const PROGRESS_STEP = 0.1; // re-send the conditions as a phase goes on (dawn chorus, dusk crickets)
+const WORLD_STEP = 1; // seconds of playing between world clock steps
+const MODE_TC = 0.8; // an experience-mode change crossfades over ≈ 2.5 s
+const RADIO_AMBIENCE = 0.35; // Frontier Radio: the ambience steps back behind the music
+const LITE_HIDDEN_MS = 60000; // hidden this long: fewer events (lite)
+const LITE_SLOW_TICK_MS = 700; // ticks this late on average while visible: the device is struggling
 
 /** Perceptual volume: the slider's 0–1 to gain. */
 export const volumeGain = (v) => v * v * 0.9;
@@ -131,7 +149,15 @@ export class AmbienceEngine {
       sleep: null,
       focus: restoreFocus(sessionStore?.get(), now()),
       sceneModified: false,
+      world: null, // the world clock (frontier/world.js), while the hour or weather moves by itself
+      lite: false, // fewer events and lighter work: long hidden, or the device struggling
     };
+    this.worldAt = 0; // audio time of the last world step
+    this.worldRng = seeded(newSeed());
+    this.sentProgress = null;
+    this.hiddenSince = null;
+    this.tickAt = 0;
+    this.tickLate = 0;
     this.state = this.compose();
 
     // Another tab changed the saved settings: follow them (and never write them back here).
@@ -157,6 +183,8 @@ export class AmbienceEngine {
     if (typeof document !== 'undefined') {
       this.onVisibility = () => {
         this.lookahead = document.hidden ? LOOKAHEAD_HIDDEN : LOOKAHEAD;
+        this.hiddenSince = document.hidden ? this.now() : null;
+        if (!document.hidden) this.updateLite();
         // Back to a suspended context while "playing": the browser stopped it. Say so.
         if (!document.hidden && this.ctx && this.ctx.state !== 'running' && this.runtime.status === 'playing') {
           this.interrupted();
@@ -183,6 +211,7 @@ export class AmbienceEngine {
       environmentId: envId,
       masterVolume: s.masterVolume,
       layers: envSettings.layers,
+      muted: envSettings.muted,
       params: envSettings.params,
       sceneId: s.sceneId,
       evolution: s.evolution,
@@ -194,6 +223,10 @@ export class AmbienceEngine {
       favorites: s.favorites,
       suggest: s.suggest,
       links: s.links,
+      frontier: s.frontier,
+      conditions: this.conditions(envId),
+      musicMood: this.musicMood(envId),
+      lite: this.runtime.lite,
       seed: this.seed,
     };
   }
@@ -296,7 +329,7 @@ export class AmbienceEngine {
     const out = ctx.createGain();
     out.gain.value = 0;
     out.connect(graph.master);
-    const kit = createKit({ ctx, out, sends: { reverb: graph.reverbIn, delay: graph.delayIn }, buffers: this.buffers, rng: seeded(this.seed ?? newSeed()) });
+    const kit = createKit({ ctx, out, sends: { reverb: graph.reverbIn, delay: graph.delayIn }, buffers: this.buffers, rng: seeded(this.seed ?? newSeed()), maxVoices: env.maxVoices || 12 });
     try {
       const envSettings = this.settings.environments[envId];
       const inst = env.create(kit, { params: envSettings.params });
@@ -306,13 +339,19 @@ export class AmbienceEngine {
       for (const layer of env.layers) {
         const node = inst.levels[layer.id];
         if (!node) continue;
-        node.gain.value = (envSettings.layers[layer.id] ?? layer.level) * layer.scale;
+        node.gain.value = this.layerTarget(envId, layer);
         kit.configureLayer(node, layer.space);
         const rec = kit.layerOf(node);
         if (rec) rec.evo.gain.value = mults[layer.id] ?? 1;
       }
       kit.setSpace(this.settings.spatial.width, this.settings.spatial.movement, 0.05);
       if (this.seed !== null) inst.randomize(seeded(this.seed));
+      if (env.frontier) {
+        const f = this.settings.frontier;
+        inst.setTune?.({ eventIntensity: f.eventIntensity, weatherIntensity: f.weatherIntensity, lite: this.runtime.lite });
+        inst.setConditions?.(this.conditions(envId), 0.05);
+        inst.setMusic?.(this.musicSettings(envId), 0.05);
+      }
       const rng = seeded(((this.seed ?? newSeed()) ^ 0x5bd1e995) >>> 0);
       const evolution = {
         profile,
@@ -375,6 +414,8 @@ export class AmbienceEngine {
       cur.nextFrom = to;
     }
     this.evolve(cur, now);
+    this.worldTick(cur, now);
+    this.watchLoad();
   };
 
   startTicker() {
@@ -564,9 +605,17 @@ export class AmbienceEngine {
 
   changeEnvironment(envId, { keepScene = false } = {}) {
     if (!environmentById(envId) || envId === this.settings.environmentId) return;
-    this.settings = { ...this.settings, environmentId: envId, sceneId: keepScene ? this.settings.sceneId : null };
+    const place = environmentById(envId).frontier;
+    this.settings = {
+      ...this.settings,
+      environmentId: envId,
+      sceneId: keepScene ? this.settings.sceneId : null,
+      ...(place ? { frontier: { ...this.settings.frontier, regionId: place.regionId, locationId: place.locationId } } : {}),
+    };
     if (!keepScene) this.runtime = { ...this.runtime, sceneModified: false };
-    if (this.current && this.ctx) {
+    // Playing, a new environment comes in, even when the last one couldn't start (then there's
+    // nothing to fade out, and the notice about it is cleared once this one is playing).
+    if (this.ctx && (this.current || this.runtime.status === 'playing')) {
       if (this.runtime.status === 'playing') {
         // Crossfade: the new one comes up while the old one fades and is then disposed.
         const old = this.current;
@@ -574,13 +623,14 @@ export class AmbienceEngine {
           this.current = this.createInstance(envId);
           this.current.nextFrom = this.ctx.currentTime + 0.05;
           glide(this.current.out.gain, 1, this.ctx, ENV_FADE_TC);
+          if (!old && this.runtime.notice) this.runtime = { ...this.runtime, notice: null };
         } catch (err) {
           console.warn('[ambience] environment failed:', err?.message);
           this.current = null;
           this.setRuntime({ notice: 'That environment couldn’t start.' });
         }
-        this.retire(old);
-      } else {
+        if (old) this.retire(old);
+      } else if (this.current) {
         this.disposeInstance(this.current); // made fresh on Play
       }
     }
@@ -603,16 +653,62 @@ export class AmbienceEngine {
     this.settings = { ...this.settings, environments: { ...envs, [envId]: { ...envs[envId], ...patch } } };
   }
 
+  /**
+   * A layer's level gain: its mix level × scale, 0 when muted, and for a Frontier place × the
+   * ambience volume (less in Frontier Radio, where the music leads).
+   */
+  layerTarget(envId, layer) {
+    const e = this.settings.environments[envId];
+    if (e.muted?.[layer.id]) return 0;
+    return (e.layers[layer.id] ?? layer.level) * layer.scale * this.ambienceFactor(envId);
+  }
+
+  ambienceFactor(envId = this.settings.environmentId) {
+    if (!environmentById(envId)?.frontier) return 1;
+    const f = this.settings.frontier;
+    return f.ambienceVolume * (f.mode === 'radio' ? RADIO_AMBIENCE : 1);
+  }
+
+  /** Moves every layer of the playing place to its target (ambience volume, mode). */
+  glideLayers(tc) {
+    const cur = this.current;
+    if (!cur || !this.ctx) return;
+    for (const layer of cur.env.layers) {
+      const node = cur.inst.levels[layer.id];
+      if (node) glide(node.gain, this.layerTarget(cur.env.id, layer), this.ctx, tc);
+    }
+  }
+
   setLayerVolume(layerId, value) {
     const envId = this.settings.environmentId;
     const env = environmentById(envId);
     const layer = env.layers.find((l) => l.id === layerId);
     if (!layer) return;
     const v = Math.min(1, Math.max(0, Number(value) || 0));
-    this.updateEnv(envId, { layers: { ...this.settings.environments[envId].layers, [layerId]: v } });
+    // Moving a muted layer's slider brings it back.
+    const muted = { ...(this.settings.environments[envId].muted || {}) };
+    delete muted[layerId];
+    this.updateEnv(envId, { layers: { ...this.settings.environments[envId].layers, [layerId]: v }, muted });
     this.runtime = { ...this.runtime, sceneModified: Boolean(this.settings.sceneId) };
     const node = this.current?.env.id === envId ? this.current.inst.levels[layerId] : null;
-    if (node && this.ctx) glide(node.gain, v * layer.scale, this.ctx, 0.2);
+    if (node && this.ctx) glide(node.gain, this.layerTarget(envId, layer), this.ctx, 0.2);
+    this.saveSettings();
+  }
+
+  /** Mutes or unmutes a layer, keeping its level for when it comes back. */
+  setLayerMuted(layerId, muted) {
+    const envId = this.settings.environmentId;
+    const env = environmentById(envId);
+    const layer = env.layers.find((l) => l.id === layerId);
+    if (!layer) return;
+    const envSettings = this.settings.environments[envId];
+    const next = { ...(envSettings.muted || {}) };
+    if (muted) next[layerId] = true;
+    else delete next[layerId];
+    this.updateEnv(envId, { muted: next });
+    this.runtime = { ...this.runtime, sceneModified: Boolean(this.settings.sceneId) };
+    const node = this.current?.env.id === envId ? this.current.inst.levels[layerId] : null;
+    if (node && this.ctx) glide(node.gain, this.layerTarget(envId, layer), this.ctx, 0.25);
     this.saveSettings();
   }
 
@@ -654,7 +750,11 @@ export class AmbienceEngine {
     if (!scene) return Promise.resolve(false);
     const envId = scene.environmentId;
     const { mood, variation, depth, evolutionMode, spatialWidth, movement } = scene.parameters;
-    this.updateEnv(envId, { layers: scene.layers, params: { mood, variation, depth } });
+    this.updateEnv(envId, { layers: scene.layers, muted: {}, params: { mood, variation, depth } });
+    if (scene.conditions && environmentById(envId)?.frontier) {
+      this.settings = { ...this.settings, frontier: { ...this.settings.frontier, ...scene.conditions } };
+      this.runtime = { ...this.runtime, world: null };
+    }
     const evolutionChanged = evolutionMode !== this.settings.evolution;
     this.settings = {
       ...this.settings,
@@ -671,7 +771,7 @@ export class AmbienceEngine {
       const cur = this.current;
       for (const layer of cur.env.layers) {
         const node = cur.inst.levels[layer.id];
-        if (node) glide(node.gain, scene.layers[layer.id] * layer.scale, this.ctx, SCENE_TC);
+        if (node) glide(node.gain, this.layerTarget(envId, layer), this.ctx, SCENE_TC);
       }
       if (scene.seed !== null) cur.inst.randomize(seeded(scene.seed));
       cur.kit.setSpace(spatialWidth, movement, SCENE_TC);
@@ -690,6 +790,7 @@ export class AmbienceEngine {
         }
       }
       cur.inst.apply(this.effective(envId));
+      this.applyConditions(CONDITION_TC);
       this.saveSettings();
     } else {
       this.disposeInstance(this.current); // made fresh, with the scene, on Play
@@ -713,6 +814,7 @@ export class AmbienceEngine {
       },
       layers: s.environments[envId].layers,
       seed: this.seed,
+      conditions: environmentById(envId)?.frontier ? { time: s.frontier.time, weather: s.frontier.weather } : null,
     });
     if (!scene) return null;
     const rest = this.customScenes().filter((p) => p.name.toLowerCase() !== scene.name.toLowerCase());
@@ -780,6 +882,282 @@ export class AmbienceEngine {
     else delete links[key];
     this.settings = normalizeSettings({ ...this.settings, links }) || this.settings;
     this.saveSettings();
+  }
+
+  // ---- Frontier World -------------------------------------------------------------------
+
+  /** Whether the hour and the weather move by themselves. */
+  moving() {
+    const f = this.settings.frontier;
+    return { time: f.timeMode !== 'fixed', weather: f.weatherMode === 'simulated' };
+  }
+
+  /**
+   * The location's conditions now: { time, weather, source, isDefault, clock, progress, front } (null
+   * for an environment that isn't a location). `clock` is the world's minute of the day while
+   * the hour moves by itself (else null); `progress` how far into its phase it is (0–1).
+   */
+  conditions(envId = this.settings.environmentId) {
+    const location = locationById(envId);
+    if (!location) return null;
+    const f = this.settings.frontier;
+    const w = this.runtime.world;
+    let clock = null;
+    if (f.timeMode === 'local') clock = localMinutes(new Date(this.now()));
+    else if (f.timeMode === 'accelerated' && w) clock = w.clock;
+    const moving = this.moving();
+    const drift = clock !== null || (moving.weather && w)
+      ? { time: clock !== null ? phaseAt(clock) : undefined, weather: moving.weather && w ? w.weather : undefined }
+      : null;
+    const c = effectiveConditions(location, f, drift);
+    // A front on its way (simulated weather): the weather it brings, for the window to show.
+    const front = moving.weather && w?.front ? w.front.weather : null;
+    return { ...c, clock, progress: clock === null ? 0.5 : phaseProgress(clock), front };
+  }
+
+  /** The mood the music plays in now: the chosen one, or Auto's choice for the conditions. */
+  musicMood(envId = this.settings.environmentId) {
+    const location = locationById(envId);
+    if (!location) return null;
+    const chosen = validMood(this.settings.frontier.music.mood);
+    return chosen === 'auto' ? autoMood(location, this.conditions(envId)) : chosen;
+  }
+
+  /** What the music plays: on in Cinematic and Frontier Radio, at that mode's own volume. */
+  musicSettings(envId) {
+    const f = this.settings.frontier;
+    return {
+      enabled: f.mode !== 'environmental',
+      radio: f.mode === 'radio',
+      volume: f.mode === 'radio' ? f.music.radioVolume : f.music.cinematicVolume,
+      mood: this.musicMood(envId),
+    };
+  }
+
+  /** Sends the conditions and music to the playing location (a slow move: `tc` seconds). */
+  applyConditions(tc = CONDITION_TC) {
+    const cur = this.current;
+    if (!cur?.env.frontier || !this.ctx) return;
+    const c = this.conditions(cur.env.id);
+    this.sentProgress = c.progress;
+    cur.inst.setConditions?.(c, tc);
+    cur.inst.setMusic?.(this.musicSettings(cur.env.id), Math.max(1.5, tc / 2));
+  }
+
+  updateFrontier(patch) {
+    this.settings = { ...this.settings, frontier: { ...this.settings.frontier, ...patch } };
+  }
+
+  /** Restarts the world clock from the conditions as they are now (a choice made by hand). */
+  resetWorld() {
+    this.runtime = { ...this.runtime, world: null };
+    this.worldAt = 0;
+  }
+
+  /**
+   * Goes to a Frontier location (a crossfade when playing); `play` starts playback (from a
+   * user gesture).
+   */
+  openLocation(locationId, { play = false } = {}) {
+    const location = locationById(locationId);
+    if (!location) return Promise.resolve(false);
+    if (location.id !== this.settings.environmentId) this.changeEnvironment(location.id);
+    else this.emit();
+    return play ? this.play().then(() => this.runtime.status === 'playing') : Promise.resolve(true);
+  }
+
+  /**
+   * The time of day and weather: an id, or null for the location's own; undefined: unchanged.
+   * Choosing an hour while it follows the device's clock locks it there (Fixed); while it's
+   * accelerated, the clock carries on from the chosen hour. A chosen weather while simulated
+   * carries on from there.
+   */
+  setConditions({ time, weather } = {}) {
+    const f = this.settings.frontier;
+    this.updateFrontier({
+      time: time === undefined ? f.time : currentTime(time),
+      weather: weather === undefined ? f.weather : WEATHER_IDS.includes(weather) ? weather : null,
+      ...(time !== undefined && f.timeMode === 'local' ? { timeMode: 'fixed' } : {}),
+    });
+    this.resetWorld();
+    this.runtime = { ...this.runtime, sceneModified: Boolean(this.settings.sceneId) };
+    this.applyConditions(CONDITION_TC);
+    this.saveSettings();
+  }
+
+  /** Back to the location's own time and weather. */
+  resetConditions() {
+    this.setConditions({ time: null, weather: null });
+  }
+
+  /** Changes how time or weather moves, keeping what's heard now where a mode holds it. */
+  setWorldModes({ timeMode, weatherMode }) {
+    const f = this.settings.frontier;
+    const now = this.conditions();
+    const patch = {};
+    if (TIME_MODES.includes(timeMode) && timeMode !== f.timeMode) {
+      patch.timeMode = timeMode;
+      // Fixed keeps the hour that was showing.
+      if (timeMode === 'fixed' && now && f.timeMode !== 'fixed') patch.time = now.time;
+    }
+    if (WEATHER_MODES.includes(weatherMode) && weatherMode !== f.weatherMode) {
+      patch.weatherMode = weatherMode;
+      if (weatherMode === 'locked' && now && f.weatherMode === 'simulated') patch.weather = now.weather;
+    }
+    if (!Object.keys(patch).length) return;
+    this.updateFrontier(patch);
+    this.resetWorld();
+    this.applyConditions(CONDITION_TC);
+    this.saveSettings();
+  }
+
+  /** The hour: 'fixed', 'local' (this device's clock) or 'accelerated'. */
+  setTimeMode(mode) {
+    this.setWorldModes({ timeMode: mode });
+  }
+
+  /** The weather: 'locked' or 'simulated'. */
+  setWeatherMode(mode) {
+    this.setWorldModes({ weatherMode: mode });
+  }
+
+  /** How fast the accelerated clock runs: simulated minutes per real minute (2, 6, 12, 24). */
+  setSpeed(speed) {
+    if (!SPEEDS.includes(speed) || speed === this.settings.frontier.speed) return;
+    this.updateFrontier({ speed });
+    this.saveSettings();
+  }
+
+  /**
+   * The hour and the weather both moving by themselves, or both held (the earlier single
+   * switch, kept for anything still calling it).
+   */
+  setDynamicAtmosphere(on) {
+    this.setWorldModes({ timeMode: on ? 'accelerated' : 'fixed', weatherMode: on ? 'simulated' : 'locked' });
+  }
+
+  setTuning(key, value) {
+    const v = Math.min(1, Math.max(0, Number(value)));
+    if (!Number.isFinite(v) || v === this.settings.frontier[key]) return;
+    this.updateFrontier({ [key]: v });
+    const cur = this.current;
+    if (cur?.env.frontier && this.ctx) cur.inst.setTune?.({ [key]: v });
+    this.saveSettings();
+  }
+
+  /** How often living-world events and distant life happen (0–1; 0.5 as designed). */
+  setEventIntensity(v) {
+    this.setTuning('eventIntensity', v);
+  }
+
+  /** How much rain, snow and grit, and how often it thunders (0–1; 0.5 as designed). */
+  setWeatherIntensity(v) {
+    this.setTuning('weatherIntensity', v);
+  }
+
+  /** The ambience's own volume under the master (0–1). */
+  setAmbienceVolume(v) {
+    const value = Math.min(1, Math.max(0, Number(v)));
+    if (!Number.isFinite(value) || value === this.settings.frontier.ambienceVolume) return;
+    this.updateFrontier({ ambienceVolume: value });
+    this.glideLayers(0.15);
+    this.saveSettings();
+  }
+
+  /**
+   * The experience: 'environmental' (ambience only), 'cinematic' (ambience and music under
+   * it) or 'radio' (music leading, the ambience stepped back). A crossfade, never a cut.
+   */
+  setMode(mode) {
+    if (!FRONTIER_MODES.includes(mode) || mode === this.settings.frontier.mode) return;
+    this.updateFrontier({ mode });
+    const cur = this.current;
+    if (cur?.env.frontier && this.ctx) {
+      this.glideLayers(MODE_TC);
+      cur.inst.setMusic?.(this.musicSettings(cur.env.id), MODE_TC * 2);
+    }
+    this.saveSettings();
+  }
+
+  /**
+   * The music: { enabled?, volume?, mood? }. `enabled` turns Cinematic on or off (from
+   * Environmental); `volume` is the current music mode's own; `mood` 'auto' or a mood id.
+   */
+  setMusic(patch = {}) {
+    const f = this.settings.frontier;
+    if (patch.enabled === true && f.mode === 'environmental') this.setMode('cinematic');
+    if (patch.enabled === false) this.setMode('environmental');
+    const { mode } = this.settings.frontier;
+    const volume = typeof patch.volume === 'number' && Number.isFinite(patch.volume) ? Math.min(1, Math.max(0, patch.volume)) : null;
+    const key = mode === 'radio' ? 'radioVolume' : 'cinematicVolume';
+    const music = {
+      ...this.settings.frontier.music,
+      ...(volume === null ? {} : { [key]: volume }),
+      mood: patch.mood === undefined ? this.settings.frontier.music.mood : validMood(patch.mood),
+    };
+    this.updateFrontier({ music });
+    const cur = this.current;
+    if (cur?.env.frontier && this.ctx) cur.inst.setMusic?.(this.musicSettings(cur.env.id), volume !== null ? 0.15 : 1.5);
+    this.saveSettings();
+  }
+
+  /** The world clock, on the ticker (never while paused): the hour and weather moving on. */
+  worldTick(cur, now) {
+    const moving = this.moving();
+    if (!cur.env.frontier || !(moving.time || moving.weather)) return;
+    const f = this.settings.frontier;
+    const location = locationById(cur.env.id);
+    const weather = regionWeather(location.regionId);
+    if (!this.runtime.world) {
+      this.runtime = { ...this.runtime, world: createWorld({ conditions: this.conditions(cur.env.id), timeMode: f.timeMode, regionWeather: weather, now: this.now(), rng: this.worldRng }) };
+      this.worldAt = now;
+      this.emit();
+      return;
+    }
+    // The audio clock only runs while playing; a long gap is a throttled tab catching up.
+    const seconds = Math.min(120, now - this.worldAt);
+    if (seconds < WORLD_STEP) return;
+    this.worldAt = now;
+    const before = this.runtime.world;
+    const step = stepWorld(before, {
+      seconds, timeMode: f.timeMode, speed: f.speed, weatherMode: f.weatherMode,
+      regionId: location.regionId, regionWeather: weather, location, now: this.now(), rng: this.worldRng,
+    });
+    this.runtime = { ...this.runtime, world: step.world };
+    for (const c of step.cues) cur.inst.cue?.(c);
+    const progress = this.conditions(cur.env.id).progress;
+    if (step.time || step.weather) {
+      this.applyConditions(step.weather ? WEATHER_TC : PHASE_TC[f.timeMode] || CONDITION_TC);
+      this.emit();
+    } else if (moving.time && Math.abs(progress - (this.sentProgress ?? progress)) >= PROGRESS_STEP) {
+      this.applyConditions(20);
+    }
+    // The clock on screen moves a minute at a time.
+    if (Math.floor(step.world.clock) !== Math.floor(before.clock) || step.cues.length) this.emit();
+  }
+
+  /**
+   * Lite: fewer events and lighter work while iWeb has been hidden for a while, or while the
+   * ticks arrive late (the device is struggling). The sound itself never stops for it.
+   */
+  watchLoad() {
+    const t = this.now();
+    if (this.tickAt && typeof document !== 'undefined' && !document.hidden) {
+      const gap = t - this.tickAt;
+      this.tickLate = this.tickLate * 0.9 + gap * 0.1;
+    }
+    this.tickAt = t;
+    this.updateLite();
+  }
+
+  updateLite() {
+    const hidden = this.hiddenSince !== null && this.now() - this.hiddenSince > LITE_HIDDEN_MS;
+    const struggling = this.tickLate > LITE_SLOW_TICK_MS;
+    const lite = hidden || struggling;
+    if (lite === this.runtime.lite) return;
+    this.runtime = { ...this.runtime, lite };
+    if (this.current?.env.frontier) this.current.inst.setTune?.({ lite });
+    this.emit();
   }
 
   // ---- sleep timer ----------------------------------------------------------------------
@@ -1028,6 +1406,7 @@ export class AmbienceEngine {
       buffers: this.buffers.size,
       evolution: evo ? { mode: this.settings.evolution, steps: evo.steps, nextAt: evo.nextAt, mults: { ...evo.mults }, offsets: { ...evo.offsets } } : null,
       focusTimers: this.focusTimers.length,
+      frontier: this.current?.inst.info ? { ...this.current.inst.info(), world: this.runtime.world, lite: this.runtime.lite } : null,
     };
   }
 

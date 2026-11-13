@@ -4,13 +4,18 @@ import MacSlider from '../ui/MacSlider';
 import AtmosphereGlyph from './AtmosphereGlyph';
 import LevelBars from './LevelBars';
 import FocusTime from './FocusTime';
+import FrontierWorld from './FrontierWorld';
+import LayerRow from './LayerRow';
+import FrontierScenery from './FrontierScenery';
 import { useMacWindow } from '../../libs/window/useMacWindow';
 import { ENVIRONMENTS, environmentById } from '../../libs/ambience/environments/index.js';
+import { LOCATIONS, WORLD, locationById } from '../../libs/ambience/frontier/catalogue.js';
+import { effectiveConditions } from '../../libs/ambience/frontier/conditions.js';
 import { EVOLUTION_LABELS, EVOLUTION_MODES } from '../../libs/ambience/evolution.js';
 import { FOCUS_OPTIONS, SLEEP_OPTIONS } from '../../libs/ambience/prefs.js';
 import { BUILT_IN_SCENES } from '../../libs/ambience/scenes.js';
 import { TIME_SLOTS, sceneForTime, timeSlot, wallpaperKey } from '../../libs/ambience/suggestions.js';
-import { currentScene, getAmbience, useAmbience, useAmbienceScenes } from '../../libs/ambience/store.js';
+import { currentScene, getAmbience, openFrontier, useAmbience, useAmbienceScenes } from '../../libs/ambience/store.js';
 import { useTicker } from '../../libs/controlcenter/timer';
 import { getActiveWallpaper } from '../../libs/wallpaper/settings.js';
 import { subscribe as subscribeWallpaper } from '../../libs/wallpaper/sync.js';
@@ -19,15 +24,17 @@ import '../../styles/atmosphere.css';
 
 // Atmosphere: the main control surface for the ambience engine (libs/ambience), as an iWeb
 // window (useMacWindow: genie into its Dock icon, move, resize, snap). The island is the quick
-// control and the edge glow the decoration; this is where everything is chosen, in three
+// control and the edge glow the decoration; this is where everything is chosen, in four
 // parts:
 //   Explore     scenes (favourites first, then the built-in ones and yours) and environments
+//   Frontier    the way into Frontier World's own window (FrontierWorld, FrontierWindow)
 //   Customize   the mix, character, evolution and stereo image; save as a scene
 //   Experience  focus sessions, the sleep timer, visual effects and suggestions
 // Every control calls the engine; the engine's state is what's shown.
 
 const TABS = [
   { id: 'explore', label: 'Explore' },
+  { id: 'frontier', label: 'Frontier' },
   { id: 'customize', label: 'Customize' },
   { id: 'experience', label: 'Experience' },
 ];
@@ -67,7 +74,8 @@ function statusLine(state, env, scene) {
   if (state.status === 'error') return state.error;
   if (state.notice) return state.notice;
   if (state.status === 'starting') return 'Starting…';
-  const what = scene ? `${scene.name}${state.sceneModified ? ' (edited)' : ''} · ${env.name}` : env.name;
+  const place = env.frontier ? `${env.name}, ${env.subtitle}` : env.name;
+  const what = scene ? `${scene.name}${state.sceneModified ? ' (edited)' : ''} · ${place}` : place;
   if (state.status === 'playing') return `${what} · generated live`;
   if (state.status === 'paused') return `${what} · paused`;
   return 'Generated live in your browser. Nothing is downloaded.';
@@ -203,7 +211,23 @@ function CustomScene({ scene, state }) {
 
 // ---- Explore ---------------------------------------------------------------------------
 
-function Explore({ state, playing, ids }) {
+/** The way into Frontier World, at the top of Explore. */
+function FrontierEntry({ state, onOpen }) {
+  const last = locationById(state.frontier.locationId) || LOCATIONS[0];
+  const cond = state.environmentId === last.id && state.conditions ? state.conditions : effectiveConditions(last, state.frontier);
+  return (
+    <button type="button" className="fr-entry" onClick={onOpen} aria-label={`${WORLD.name}: explore five regions and ${LOCATIONS.length} places`}>
+      <FrontierScenery regionId={last.regionId} locationId={last.id} time={cond.time} weather={cond.weather} />
+      <span className="fr-hero-text" data-force-dark>
+        <span className="fr-hero-kicker">Frontier World</span>
+        <span className="fr-hero-title">{WORLD.name}</span>
+        <span className="fr-hero-desc">Five regions and {LOCATIONS.length} places to listen to, each with its own hour, weather and life.</span>
+      </span>
+    </button>
+  );
+}
+
+function Explore({ state, playing, ids, onFrontier }) {
   const engine = getAmbience();
   const custom = useAmbienceScenes();
   const all = [...BUILT_IN_SCENES, ...custom];
@@ -215,6 +239,8 @@ function Explore({ state, playing, ids }) {
 
   return (
     <>
+      <FrontierEntry state={state} onOpen={onFrontier} />
+
       {suggested && state.sceneId !== suggested.id && (
         <section className="atm-suggest" aria-label="Suggestion">
           <span className="atm-suggest-text">Suggested for {slot.label}: <strong>{suggested.name}</strong></span>
@@ -308,16 +334,9 @@ function Customize({ state, env, ids }) {
     <>
       <section className="atm-section" aria-labelledby={`${ids}-mix`}>
         <h3 id={`${ids}-mix`}>Mix · {env.name}</h3>
-        {env.layers.map((layer) => {
-          const v = Math.round((state.layers[layer.id] ?? 0) * 100);
-          return (
-            <label key={layer.id} className="atm-slider-row">
-              <span className="atm-slider-label">{layer.label}</span>
-              <MacSlider aria-valuetext={`${v}%`} min={0} max={100} value={v} onChange={(x) => engine.setLayerVolume(layer.id, x / 100)} />
-              <span className="atm-value">{v}</span>
-            </label>
-          );
-        })}
+        {env.layers.map((layer) => (
+          <LayerRow key={layer.id} layer={layer} value={state.layers[layer.id] ?? 0} muted={Boolean(state.muted?.[layer.id])} />
+        ))}
       </section>
 
       <section className="atm-section" aria-labelledby={`${ids}-char`}>
@@ -540,7 +559,7 @@ export default function AtmosphereWindow({ open, setOpen, tab: request = null })
         { label: playing ? 'Pause' : 'Play', onSelect: () => engine.toggle() },
         { label: 'Stop', disabled: !state.session, onSelect: () => engine.stop() },
         { type: 'separator' },
-        { label: 'Next Environment', onSelect: () => engine.nextEnvironment() },
+        { label: env.frontier ? 'Next Place in Destination' : 'Next Environment', onSelect: () => engine.nextEnvironment() },
         { label: 'Shuffle', onSelect: () => engine.randomize() },
         { type: 'separator' },
         ...EVOLUTION_MODES.map((m) => ({ label: `Evolution: ${EVOLUTION_LABELS[m].label}`, checked: state.evolution === m, onSelect: () => engine.setEvolution(m) })),
@@ -640,7 +659,8 @@ export default function AtmosphereWindow({ open, setOpen, tab: request = null })
         </div>
 
         <div className="atm-body" role="tabpanel" id={`${titleId}-panel`} aria-labelledby={`${titleId}-tab-${tab}`}>
-          {tab === 'explore' && <Explore state={state} playing={playing} ids={titleId} />}
+          {tab === 'explore' && <Explore state={state} playing={playing} ids={titleId} onFrontier={() => openFrontier()} />}
+          {tab === 'frontier' && <FrontierWorld state={state} ids={titleId} />}
           {tab === 'customize' && <Customize state={state} env={env} ids={titleId} />}
           {tab === 'experience' && <Experience state={state} ids={titleId} />}
         </div>

@@ -4,7 +4,12 @@ import FocusTime from './FocusTime';
 import MacSlider from '../ui/MacSlider';
 import { environmentById } from '../../libs/ambience/environments/index.js';
 import { EVOLUTION_LABELS, EVOLUTION_MODES } from '../../libs/ambience/evolution.js';
-import { currentScene, getAmbience, openAtmosphere, useAmbienceScenes } from '../../libs/ambience/store.js';
+import { timeLabel, weatherLabel } from '../../libs/ambience/frontier/conditions.js';
+import { currentScene, getAmbience, openAtmosphere, openFrontier, useAmbienceScenes } from '../../libs/ambience/store.js';
+import WeatherIcon from './WeatherIcon';
+
+const MODE_NAMES = { environmental: 'Ambience', cinematic: 'Cinematic', radio: 'Radio' };
+const MODE_ORDER = ['environmental', 'cinematic', 'radio'];
 
 // Atmosphere in the existing Dynamic Island (Music.jsx keeps the island: its container, its
 // collapsed / hovered / expanded states, transitions and click-outside). These are the island's
@@ -34,7 +39,15 @@ export default function AmbienceIsland({ state, expanded }) {
   const name = scene?.name || env.name;
   const focus = state.focus;
   const status = state.status === 'error' ? 'Couldn’t start' : playing ? 'Live' : 'Paused';
-  const statusText = scene ? `${env.name} · ${status}` : `Atmosphere · ${status}`;
+  // A Frontier place: its region, the hour and the weather (and the place's name above).
+  const frontier = env.frontier && state.conditions;
+  const statusText = frontier
+    ? `${env.subtitle} · ${timeLabel(state.conditions.time)}, ${weatherLabel(state.conditions.weather).toLowerCase()}${playing ? '' : ` · ${status}`}`
+    : scene ? `${env.name} · ${status}` : `Atmosphere · ${status}`;
+  const open = () => (frontier ? openFrontier() : openAtmosphere());
+  const icon = frontier ? <WeatherIcon weather={state.conditions.weather} night={state.conditions.time === 'night'} size={12} className="island-weather" /> : null;
+  const mode = state.frontier?.mode || 'environmental';
+  const nextExperience = MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length];
   const volume = Math.round(state.masterVolume * 100);
   const evolution = EVOLUTION_LABELS[state.evolution];
   const nextMode = EVOLUTION_MODES[(EVOLUTION_MODES.indexOf(state.evolution) + 1) % EVOLUTION_MODES.length];
@@ -54,7 +67,7 @@ export default function AmbienceIsland({ state, expanded }) {
         <div className="island-info">
           <span className="island-title">{name}</span>
           <span className="island-artist">
-            {focus ? <>Focus · <FocusTime focus={focus} compact /> left</> : statusText}
+            {focus ? <>Focus · <FocusTime focus={focus} compact /> left</> : <>{icon}{statusText}</>}
           </span>
         </div>
         <LevelBars live={live} />
@@ -63,15 +76,27 @@ export default function AmbienceIsland({ state, expanded }) {
       {expanded && (
         <div className="island-expanded-content island-ambience">
           <div className="expanded-top-row">
-            <button type="button" className="island-ambience-open" aria-label="Open Atmosphere" title="Open Atmosphere" onClick={() => openAtmosphere()}>
+            <button type="button" className="island-ambience-open" aria-label="Open Atmosphere" title="Open Atmosphere" onClick={open}>
               <AtmosphereGlyph size={40} live={playing} palette={env.palette} className="island-art-large" />
             </button>
             <div className="expanded-info">
               <span className="expanded-title">{name}</span>
               <span className="expanded-artist" role="status">
-                {state.notice || (focus ? <>Focus · <FocusTime focus={focus} compact /> left{focus.status === 'paused' ? ' · paused' : ''}</> : statusText)}
+                {state.notice || (focus ? <>Focus · <FocusTime focus={focus} compact /> left{focus.status === 'paused' ? ' · paused' : ''}</> : <>{icon}{statusText}</>)}
               </span>
             </div>
+            {frontier ? (
+              <button
+                type="button"
+                className={`island-evolution island-mode${mode === 'environmental' ? ' is-off' : ''}`}
+                title={`Experience: ${MODE_NAMES[mode]}. Click for ${MODE_NAMES[nextExperience]}.`}
+                aria-label={`Experience: ${MODE_NAMES[mode]}. Change to ${MODE_NAMES[nextExperience]}`}
+                onClick={() => engine.setMode(nextExperience)}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 12V4l8-1.5v8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><circle cx="3.6" cy="12" r="1.6" fill="currentColor" /><circle cx="11.6" cy="10.5" r="1.6" fill="currentColor" /></svg>
+                {MODE_NAMES[mode]}
+              </button>
+            ) : (
             <button
               type="button"
               className={`island-evolution${state.evolution === 'off' ? ' is-off' : ''}`}
@@ -82,6 +107,7 @@ export default function AmbienceIsland({ state, expanded }) {
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 10c2-4 3.5-4 5 0s3 4 5 0 2-2 2-2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
               {evolution.label}
             </button>
+            )}
           </div>
           {/* Volume (a real control, with its value) and the live level: not a timeline. */}
           <div className="island-ambience-volume" data-force-dark>
@@ -105,9 +131,9 @@ export default function AmbienceIsland({ state, expanded }) {
               {btn(playing ? 'Pause' : 'Play', () => engine.toggle(), playing
                 ? <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
                 : <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>, 'btn-play')}
-              {btn('Next environment', () => engine.nextEnvironment(), <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6v12l8.5-6L12 6zM3.5 6v12L12 12 3.5 6z" /></svg>)}
+              {btn(frontier ? 'Next place in this region' : 'Next environment', () => engine.nextEnvironment(), <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6v12l8.5-6L12 6zM3.5 6v12L12 12 3.5 6z" /></svg>)}
             </div>
-            {btn('Open Atmosphere', () => openAtmosphere(), <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>)}
+            {btn('Open Atmosphere', open, <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>)}
           </div>
         </div>
       )}
