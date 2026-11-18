@@ -1,7 +1,8 @@
 // The Dock's right-click menus, as in macOS 26 (Dock.jsx shows them with PopupMenu):
 //
-//   a bookmark          Open, Open in New Window, Copy Link · Edit in Settings…, Move Left /
-//                       Right · Remove from Dock
+//   a bookmark          Open, Open in New Window, Open in Incognito Window (the
+//                       extension) · Copy Link, Copy Name · Edit in Settings…,
+//                       Move Left / Right · Remove from Dock
 //   a built-in app      Show / Open, the app's own items (Notes: New Note, New Task; Music:
 //                       playback), Quit while it runs
 //   the divider / Dock  Magnification on or off, Small / Medium / Large, Dock Settings…
@@ -9,6 +10,7 @@
 // Items: { label, onSelect, checked?, disabled?, danger? }, { type: 'separator' } or
 // { type: 'header', label }.
 import { getController } from '../../libs/window/windowRegistry';
+import { canOfferIncognito, copyText, openInIncognito, openInNewTab, openInNewWindow } from '../../libs/browser/browserActions';
 import { getPlayer, nextTrack, playPause, previousTrack } from '../../libs/music/playerStore';
 import { openNotes } from '../../libs/notes/notesEvents';
 import { requestBookmarkEdit } from '../../libs/dock/bookmarks';
@@ -22,9 +24,13 @@ const settings = (tab) => window.dispatchEvent(new CustomEvent('settings:open', 
 export function bookmarkMenu({ bookmark, index, count, move, remove }) {
   return [
     { type: 'header', label: bookmark.websiteName },
-    { label: 'Open', onSelect: () => window.open(bookmark.url, '_blank', 'noopener,noreferrer') },
-    { label: 'Open in New Window', onSelect: () => window.open(bookmark.url, '_blank', 'noopener,noreferrer,popup') },
-    { label: 'Copy Link', onSelect: () => navigator.clipboard?.writeText(bookmark.url).catch(() => {}) },
+    { label: 'Open', onSelect: () => openInNewTab(bookmark.url) },
+    { label: 'Open in New Window', onSelect: () => openInNewWindow(bookmark.url) },
+    // Always listed; only the Chrome extension can open one (a web page can't).
+    { label: 'Open in Incognito Window', disabled: !canOfferIncognito(), onSelect: () => openInIncognito(bookmark.url) },
+    SEP,
+    { label: 'Copy Link', onSelect: () => copyText(bookmark.url) },
+    { label: 'Copy Name', onSelect: () => copyText(bookmark.websiteName) },
     SEP,
     {
       label: 'Edit in Settings…',

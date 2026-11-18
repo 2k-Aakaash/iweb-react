@@ -3,6 +3,7 @@ import { ITEMS, addableItems, sizeLabel } from '../../libs/desktop/layout';
 import { getDesktopState, moveToStack, setEditing, showOnDesktop, updateItem } from '../../libs/desktop/layoutStore';
 import { openNews } from '../../libs/news/newsEvents';
 import { CLOCK_STYLES, getClockStyle, setClockStyle } from '../../libs/clock/clockStyle';
+import { linkItems } from '../../libs/browser/browserActions';
 import '../../styles/desktop.css';
 
 // iWeb's right-click menu, in place of the browser's, styled after macOS 26 menus (plain
@@ -27,10 +28,7 @@ function buildMenu(target, actions) {
   const { layout } = getDesktopState();
   const link = target.closest('a[href]');
   if (link && /^https?:/i.test(link.href)) {
-    return [
-      { label: 'Open Link', onSelect: () => window.open(link.href, '_blank', 'noopener,noreferrer') },
-      { label: 'Copy Link Address', onSelect: () => navigator.clipboard?.writeText(link.href).catch(() => {}) },
-    ];
+    return linkItems(link.href);
   }
 
   const itemEl = target.closest('[data-desktop-item]');
@@ -81,6 +79,10 @@ function buildMenu(target, actions) {
     { label: 'Next Wallpaper', onSelect: actions.nextWallpaper },
     { type: 'separator' },
     { label: 'Spotlight Search', shortcut: 'Ctrl K', onSelect: actions.openSpotlight },
+    { type: 'separator' },
+    // As on Windows' desktop and Chrome's page menu.
+    { label: 'Refresh', shortcut: 'Ctrl R', onSelect: () => window.location.reload() },
+    { label: 'Personalize…', onSelect: () => actions.openSettings('appearance') },
     { label: 'Settings…', onSelect: () => actions.openSettings('general') },
     ...(hidden.length
       ? [{ type: 'separator' }, ...hidden.map((id) => ({ label: `Add ${ITEMS[id].label}`, onSelect: () => showOnDesktop(id) }))]
