@@ -262,7 +262,7 @@
   outline: none;
   background: rgba(0, 0, 0, 0.2);
   color: #fff;
-  font-family: 'sf_pro_displaysemibold', sans-serif;
+  font-family: var(--iw-font-ui);
   font-size: 13px;
   line-height: 18px;
   text-align: right;

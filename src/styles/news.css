@@ -19,11 +19,11 @@
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 18px;
   color: #fff;
-  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--iw-font-medium);
   text-align: left;
   cursor: pointer;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.38), 0 2px 8px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+  transition: transform 0.2s var(--iw-ease-standard), border-color 0.2s ease;
 }
 
 /* A dark tint under the text, like the Smart Stack widgets, for any wallpaper. */
@@ -70,7 +70,7 @@
 }
 
 .news-widget-app {
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   color: #ff6b6f;
 }
 
@@ -106,7 +106,7 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 15px;
   line-height: 1.27;
   letter-spacing: -0.005em;
@@ -135,7 +135,7 @@
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.92);
   color: #1c1c1e;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 9px;
 }
 
@@ -263,10 +263,10 @@
   padding: 24px;
   background: rgba(0, 0, 0, 0.32);
   color: #fff;
-  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--iw-font-medium);
   font-size: 13px;
   text-align: left;
-  animation: news-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: news-fade-in 0.25s var(--iw-ease-out);
 }
 
 .news-overlay :where(*) {
@@ -312,7 +312,7 @@
   height: min(680px, 100%);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 24px;
+  border-radius: var(--iw-radius-window);
   outline: none;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   animation: news-window-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
@@ -378,9 +378,9 @@
   outline-offset: 2px;
 }
 
-.news-light-close { background: #ff5f57; color: rgba(90, 0, 0, 0.8); }
-.news-light-minimize { background: #febc2e; color: rgba(120, 70, 0, 0.85); }
-.news-light-zoom { background: #28c840; color: rgba(0, 80, 0, 0.85); }
+.news-light-close { background: var(--iw-light-close); color: rgba(90, 0, 0, 0.8); }
+.news-light-minimize { background: var(--iw-light-minimize); color: rgba(120, 70, 0, 0.85); }
+.news-light-zoom { background: var(--iw-light-zoom); color: rgba(0, 80, 0, 0.85); }
 
 .news-title {
   display: flex;
@@ -403,7 +403,7 @@
 }
 
 .news-title h2 {
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 20px;
   line-height: 1.1;
 }
@@ -576,7 +576,7 @@
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
 }
 
 /* Body */
@@ -590,7 +590,7 @@
 
 .news-section-title {
   margin: 14px 2px 10px !important;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 17px;
 }
 
@@ -629,7 +629,7 @@
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   color: #1c1c1e;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 14px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
@@ -698,7 +698,7 @@
 }
 
 .news-featured-title {
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 24px;
   line-height: 1.22;
   letter-spacing: -0.01em;
@@ -870,7 +870,7 @@
 
 .news-detail-title {
   margin: 12px 0 10px !important;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 28px;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -888,7 +888,7 @@
 
 .news-related h3 {
   margin-bottom: 8px !important;
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 14px;
   color: rgba(235, 235, 245, 0.85);
 }
@@ -943,7 +943,7 @@
 }
 
 .news-empty h3 {
-  font-family: 'sf_pro_displaybold', -apple-system, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 16px;
 }
 

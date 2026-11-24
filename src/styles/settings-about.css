@@ -48,7 +48,7 @@
 
 .about-name {
   margin: 16px 0 0;
-  font-family: "SFProDisplay-Heavy", system-ui, sans-serif;
+  font-family: var(--iw-font-heavy);
   font-size: 22px;
   color: #fff;
 }

@@ -13,6 +13,9 @@ import PopupMenu from "./notes/PopupMenu";
 import AddAppSheet from "./dock/AddAppSheet";
 import { appMenu, bookmarkMenu, dockMenu } from "./dock/dockMenu";
 import { usePref } from "../libs/prefs/storedPref";
+import { IWEB_LOGO } from '../libs/theme/brand';
+import { useAppName } from '../libs/theme/names';
+import { openThemeStore } from '../libs/theme/storeEvents';
 import {
   dockMagnificationPref,
   dockSizePref,
@@ -21,7 +24,7 @@ import {
   normalizeDockSize,
 } from "../libs/dock/dockPrefs";
 
-const defaultFavicon = "https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100";
+const defaultFavicon = IWEB_LOGO;
 // Room kept clear on each side of the Dock when it shrinks to fit the window.
 const DOCK_MARGIN = 16;
 // Built-in apps always in the Dock: Add, Change BG, Notes, Music, Settings.
@@ -40,6 +43,7 @@ const scaleValue = (value, from, to) => {
 };
 
 export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenNotes, onOpenSettings, onOpenMusicLibrary }) {
+  const appLabel = useAppName(); // app names (a theme can rename them)
   const [isJiggling, setIsJiggling] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -85,7 +89,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
   const magnification = usePref(dockMagnificationPref);
   const viewportWidth = useSyncExternalStore(subscribeWidth, getWidth, () => 1440);
   const magPx = magnificationPx(chosenSize, magnification);
-  const transientCount = ["markets", "news", "atmosphere", "frontier"].filter((app) => running[app] && running[app] !== "closed").length;
+  const transientCount = ["markets", "news", "atmosphere", "frontier", "themes"].filter((app) => running[app] && running[app] !== "closed").length;
   const iconSize = fitIconSize({
     size: chosenSize,
     count: bookmarks.length + BUILT_IN_APPS + transientCount,
@@ -304,7 +308,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
       items = bookmarkMenu({ bookmark: bookmarks[index], index, count: bookmarks.length, move: moveAt, remove: removeAt });
     } else if (li?.dataset.action) {
       const app = li.dataset.action;
-      const opens = { notes: onOpenNotes, music: onOpenMusicLibrary, settings: onOpenSettings, markets: restoreMarkets, news: openNews, atmosphere: openAtmosphere, frontier: openFrontier };
+      const opens = { notes: onOpenNotes, music: onOpenMusicLibrary, settings: onOpenSettings, markets: restoreMarkets, news: openNews, atmosphere: openAtmosphere, frontier: openFrontier, themes: () => openThemeStore() };
       label = app;
       items = appMenu({
         app,
@@ -345,6 +349,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
     <>
       <nav
         ref={dockRef}
+        data-iw="dock"
         className={styles.dock}
         data-glass="dock"
         data-hover-off={hoverOff || resizing || undefined}
@@ -468,7 +473,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               onClick={() => window.dispatchEvent(new Event("apps:toggle"))}
             >
               <DockAppIcon name="add" className={styles.appIcon} />
-              {label("apps", "Apps")}
+              {label("apps", appLabel("apps", "dock"))}
             </button>
           </li>
 
@@ -480,7 +485,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               onClick={onChangeBg}
             >
               <DockAppIcon name="bg" className={styles.appIcon} />
-              {label("bg", "Change BG")}
+              {label("bg", appLabel("wallpaper", "dock"))}
             </button>
           </li>
           {/* ── Notes Button ── */}
@@ -491,7 +496,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               onClick={onOpenNotes}
             >
               <DockAppIcon name="notes" className={styles.appIcon} />
-              {label("notes", "Notes")}
+              {label("notes", appLabel("notes", "dock"))}
             </button>
           </li>
           {/* ── Music Library Button ── */}
@@ -502,7 +507,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               onClick={onOpenMusicLibrary}
             >
               <DockAppIcon name="music" className={styles.appIcon} />
-              {label("music", "Music Library")}
+              {label("music", appLabel("music", "dock"))}
             </button>
           </li>
           {/* ── Settings Button ── */}
@@ -513,7 +518,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
               onClick={onOpenSettings}
             >
               <DockAppIcon name="settings" className={styles.appIcon} />
-              {label("settings", "Settings")}
+              {label("settings", appLabel("settings", "dock"))}
             </button>
           </li>
           {/* ── Markets: in the Dock only while it runs (open or minimized), like a macOS app
@@ -526,7 +531,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                 onClick={restoreMarkets}
               >
                 <DockAppIcon name="markets" className={styles.appIcon} />
-                {label("markets", "Markets")}
+                {label("markets", appLabel("markets", "dock"))}
               </button>
             </li>
           )}
@@ -539,7 +544,20 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                 onClick={openAtmosphere}
               >
                 <DockAppIcon name="atmosphere" className={styles.appIcon} />
-                {label("atmosphere", "Atmosphere")}
+                {label("atmosphere", appLabel("atmosphere", "dock"))}
+              </button>
+            </li>
+          )}
+          {/* ── Theme Store: likewise, while its window runs. ── */}
+          {runningProps("themes")["data-running"] && (
+            <li className={`${styles.app} ${styles.action} ${styles.transient}`} data-action="themes" {...runningProps("themes")} onMouseMove={handleAppHover} {...labelProps("themes")}>
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={() => openThemeStore()}
+              >
+                <DockAppIcon name="themes" className={styles.appIcon} />
+                {label("themes", appLabel("themes", "dock"))}
               </button>
             </li>
           )}
@@ -552,7 +570,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                 onClick={openFrontier}
               >
                 <DockAppIcon name="frontier" className={styles.appIcon} />
-                {label("frontier", "Frontier World")}
+                {label("frontier", appLabel("frontier", "dock"))}
               </button>
             </li>
           )}
@@ -565,7 +583,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
                 onClick={openNews}
               >
                 <DockAppIcon name="news" className={styles.appIcon} />
-                {label("news", "News")}
+                {label("news", appLabel("news", "dock"))}
               </button>
             </li>
           )}

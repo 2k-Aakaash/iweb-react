@@ -5,6 +5,7 @@ import { setGuides } from '../../libs/desktop/guides';
 import { landingFor, occupiedRects } from '../../libs/desktop/placement';
 import { focusPref, widgetsHiddenPref } from '../../libs/controlcenter/ccPrefs';
 import { usePref } from '../../libs/prefs/storedPref';
+import { easing } from '../../libs/theme/motion';
 import '../../styles/desktop.css';
 
 // A movable item on the iWeb desktop (clock, search bar, widgets). Positioned by its anchors
@@ -22,7 +23,6 @@ const HOLD_MS = 550;
 const HOLD_SLOP = 8; // px the pointer may wander during the hold
 // Holding in these keeps its usual meaning (selecting text, editing a field).
 const NO_HOLD_SELECTOR = 'input, textarea, select, [contenteditable="true"], .dt-menu';
-const SETTLE_EASE = 'cubic-bezier(0.34, 1.32, 0.64, 1)'; // a gentle spring overshoot
 
 function prefersReducedMotion() {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -154,7 +154,7 @@ export default function DesktopItem({ id, children, className = '' }) {
     }
     el.animate(
       [{ transform: transformFor(dx, dy) }, { transform: transformFor() }],
-      { duration: SETTLE_MS, easing: SETTLE_EASE },
+      { duration: SETTLE_MS, easing: easing('ease-spring-soft') },
     ).finished.then(done, () => {});
   }, [item.ax, item.ay, item.x, item.y, item.size]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -303,7 +303,7 @@ export default function DesktopItem({ id, children, className = '' }) {
         const dx = (drag.rect?.left ?? drag.start.left) - drag.start.left;
         const dy = (drag.rect?.top ?? drag.start.top) - drag.start.top;
         if ((dx || dy) && !prefersReducedMotion()) {
-          el.animate([{ transform: transformFor(dx, dy) }, { transform: transformFor() }], { duration: SETTLE_MS, easing: SETTLE_EASE });
+          el.animate([{ transform: transformFor(dx, dy) }, { transform: transformFor() }], { duration: SETTLE_MS, easing: easing('ease-spring-soft') });
         }
       }
     } else {
@@ -360,6 +360,7 @@ export default function DesktopItem({ id, children, className = '' }) {
       ref={ref}
       className={classes}
       data-desktop-item={id}
+      data-iw={def.kind === 'widget' ? 'widget' : 'desktop-item'}
       data-size={item.size}
       style={{ ...style, transform: transformFor() }}
       onPointerDown={editing ? undefined : onHoldStart}

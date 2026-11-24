@@ -174,9 +174,9 @@
   --mk-text-2: rgba(255, 255, 255, 0.72);
   --mk-text-3: rgba(255, 255, 255, 0.56);
   --mk-hairline: rgba(255, 255, 255, 0.09);
-  --mk-font: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --mk-font-semibold: 'sf_pro_displaysemibold', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --mk-font-bold: 'sf_pro_displaybold', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mk-font: var(--iw-font-medium);
+  --mk-font-semibold: var(--iw-font-ui);
+  --mk-font-bold: var(--iw-font-bold);
 
   position: fixed;
   inset: 0;
@@ -196,7 +196,7 @@
   font-synthesis: none;
   text-align: left;
   -webkit-font-smoothing: antialiased;
-  animation: mk-overlay-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: mk-overlay-in 0.25s var(--iw-ease-out);
 }
 
 /* Zero-specificity resets (via :where) so component rules below always win. */
@@ -247,14 +247,14 @@
   grid-template-rows: minmax(0, 1fr) auto;
   /* Frost and refraction: <GlassSurface preset="window"> in MarketsModal.jsx. */
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 18px;
+  border-radius: var(--iw-radius-window-compact);
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.45),
     0 4px 16px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
   outline: none;
   transform-origin: center;
-  animation: mk-window-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: mk-window-in 0.3s var(--iw-ease-spring);
 }
 
 
@@ -338,17 +338,17 @@
 }
 
 .mk-light-close {
-  background: #ff5f57;
+  background: var(--iw-light-close);
   color: rgba(90, 0, 0, 0.8);
 }
 
 .mk-light-minimize {
-  background: #febc2e;
+  background: var(--iw-light-minimize);
   color: rgba(120, 70, 0, 0.85);
 }
 
 .mk-light-zoom {
-  background: #28c840;
+  background: var(--iw-light-zoom);
   color: rgba(0, 80, 0, 0.85);
 }
 

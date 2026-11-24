@@ -26,7 +26,7 @@
   border-radius: 7px;
   background: transparent;
   color: rgba(255, 255, 255, 0.7);
-  font: 600 12.5px "SFRounded-Semibold", system-ui, sans-serif;
+  font: 600 12.5px var(--iw-font-rounded);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -63,7 +63,7 @@
   border-radius: 6px;
   background: transparent;
   color: rgba(255, 255, 255, 0.78);
-  font: 600 13px "SFRounded-Semibold", system-ui, sans-serif;
+  font: 600 13px var(--iw-font-rounded);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -113,7 +113,7 @@
   text-align: left;
   color: rgba(255, 255, 255, 0.9);
   /* A regular-weight face, so **bold** stands out (the Notes font is already semibold). */
-  font: 400 15.5px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: 400 15.5px/1.65 var(--iw-font-system);
   word-wrap: break-word;
   cursor: text;
   /* The page is unselectable (`body { user-select: none }`); the note text can be copied. */
@@ -134,7 +134,7 @@
   margin: 1.2em 0 0.45em;
   line-height: 1.25;
   color: #fff;
-  font-family: "SFProDisplay-Heavy", system-ui, sans-serif;
+  font-family: var(--iw-font-heavy);
 }
 
 .notes-md-preview h1 { font-size: 1.75em; padding-bottom: 0.25em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
@@ -144,18 +144,18 @@
 
 .notes-md-preview p { margin: 0 0 0.85em; }
 
-/* The app sets `* { font-family: sf_pro_displaysemibold }`; in the Preview, body text uses
+/* The app sets `* { font-family: var(--iw-font-ui) }`; in the Preview, body text uses
    the medium face and **bold** the bold face, so emphasis is visible. Headings and code
    have their own (more specific) rules. */
 .notes-md-preview,
 .notes-md-preview * {
-  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: var(--iw-font-medium);
 }
 
 .notes-md-preview strong,
 .notes-md-preview b,
 .notes-md-preview th {
-  font-family: 'sf_pro_displaybold', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: var(--iw-font-bold);
   font-weight: 700;
   color: #fff;
 }

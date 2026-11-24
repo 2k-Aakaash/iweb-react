@@ -50,7 +50,7 @@
   height: 100%;
   background: linear-gradient(180deg, #a9adb5, #6f747c);
   color: #fff;
-  font-family: "SFRounded-Semibold", system-ui, sans-serif;
+  font-family: var(--iw-font-rounded);
   font-size: 17px;
   letter-spacing: 0.02em;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
@@ -120,7 +120,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 14px;
   color: #fff;
 }

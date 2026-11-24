@@ -17,6 +17,7 @@ import { requestBookmarkEdit } from '../../libs/dock/bookmarks';
 import { getAmbience } from '../../libs/ambience/store.js';
 import { environmentById } from '../../libs/ambience/environments/index.js';
 import { DOCK_SIZE_PRESETS, dockMagnificationPref, dockSizePref } from '../../libs/dock/dockPrefs';
+import { appName } from '../../libs/theme/names';
 
 const SEP = { type: 'separator' };
 const settings = (tab) => window.dispatchEvent(new CustomEvent('settings:open', { detail: { tab } }));
@@ -46,7 +47,6 @@ export function bookmarkMenu({ bookmark, index, count, move, remove }) {
   ];
 }
 
-const APP_NAMES = { notes: 'Notes', music: 'Music', settings: 'Settings', markets: 'Markets', news: 'News', atmosphere: 'Atmosphere', frontier: 'Frontier World' };
 
 export function appMenu({ app, state, open, actions }) {
   if (app === 'apps') {
@@ -65,7 +65,7 @@ export function appMenu({ app, state, open, actions }) {
   }
   const running = state === 'open' || state === 'minimized';
   const controller = getController(app);
-  const items = [{ type: 'header', label: APP_NAMES[app] || app }];
+  const items = [{ type: 'header', label: appName(app) }];
   if (app === 'notes') {
     items.push(
       { label: 'New Note', onSelect: () => openNotes({ create: 'note' }) },

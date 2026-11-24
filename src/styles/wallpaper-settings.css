@@ -17,7 +17,7 @@
   --wp-warning: #ffb340;
   --wp-success: #30d158;
   --wp-radius: 12px;
-  --wp-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --wp-ease: var(--iw-ease-standard);
   /* Never let wide content stretch the settings content column. */
   min-width: 0;
   max-width: 100%;

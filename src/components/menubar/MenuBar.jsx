@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
-import { APP_TITLES, focusWindow, getController, useWindows } from '../../libs/window/windowRegistry';
+import { focusWindow, getController, useWindows } from '../../libs/window/windowRegistry';
+import { appName } from '../../libs/theme/names';
+import { openThemeStore } from '../../libs/theme/storeEvents';
 import { setEditing } from '../../libs/desktop/layoutStore';
 import { openNews } from '../../libs/news/newsEvents';
 import { RELEASES_REPO } from '../../libs/updater/updater';
@@ -10,6 +12,7 @@ import { ControlCenterIcon } from '../controlcenter/ccIcons';
 import { OPEN_CONTROL_CENTER } from '../../libs/controlcenter/controls';
 import '../../styles/menubar.css';
 
+import { IWEB_LOGO } from '../../libs/theme/brand';
 // The macOS 26 menu bar across the top of iWeb. Left: the iWeb menu, the front app's name and
 // its menus (File, Edit, View, the app's own, Window, Help); right: battery, Wi-Fi, Spotlight,
 // Control Center (ControlCenter.jsx) and the clock. The front app comes from the window registry (useMacWindow); with no window
@@ -29,7 +32,7 @@ const REVEAL_EDGE_PX = 6; // how close to the top counts as "at the top edge"
 const HIDE_DELAY_MS = 350;
 const CC_OUT_MS = 220; // Control Center's closing animation (controlcenter.css, .is-closing)
 
-const IWEB_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const IWEB_ICON = IWEB_LOGO;
 const REPO_URL = `https://github.com/${RELEASES_REPO}`;
 const SEP = { type: 'separator' };
 
@@ -45,6 +48,7 @@ const OPENERS = {
   settings: () => openSettings('general'),
   markets: () => dispatch('markets:open'),
   news: () => openNews(),
+  themes: () => openThemeStore(),
 };
 
 function showApp(entry) {
@@ -163,7 +167,7 @@ function buildMenus(front, windows, actions) {
     items: front
       ? [...withSeparator(own.File), { label: 'Close Window', disabled: !controller, onSelect: () => controller.close() }]
       : Object.keys(OPENERS).filter((id) => id !== 'settings').map((id) => ({
-        label: `Open ${APP_TITLES[id]}`,
+        label: `Open ${appName(id)}`,
         onSelect: () => showApp(windows.find((w) => w.app === id) || { app: id, state: 'closed' }),
       })),
   };
@@ -239,7 +243,7 @@ function MenuPanel({ menu, left, active, setActive, onRun }) {
   }, [left, menu.id]);
 
   return (
-    <div ref={ref} className="mb-menu" role="menu" aria-label={menu.label || menu.title} style={{ left: left + shift }}>
+    <div ref={ref} className="mb-menu" data-iw="menu" role="menu" aria-label={menu.label || menu.title} style={{ left: left + shift }}>
       {menu.items.map((item, i) => {
         if (item.type === 'separator') return <div key={i} className="mb-menu-sep" role="separator" />;
         const radio = item.checked !== undefined;
@@ -554,6 +558,7 @@ export default function MenuBar({ actions }) {
       ref={barRef}
       className={`mb${menuIsOpen ? ' is-menu-open' : ''}${hidden ? ' is-autohide' : ''}${revealed ? ' is-revealed' : ''}`}
       aria-label="Menu bar"
+      data-iw="menubar"
       // Clicking the bar never moves focus out of a text field.
       onMouseDown={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}

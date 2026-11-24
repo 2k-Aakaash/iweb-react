@@ -99,7 +99,7 @@
 .ntn-heading {
   margin: 0;
   padding: 10px 10px 4px;
-  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 11.5px;
   font-weight: 700;
   color: rgba(235, 235, 245, 0.5);
@@ -350,7 +350,7 @@
   min-height: 0;
   overflow-y: auto;
   text-align: left;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--iw-font-system);
 }
 
 .ntc-summary {

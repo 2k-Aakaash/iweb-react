@@ -1,0 +1,299 @@
+/* The Theme Store window (components/themes/ThemeStoreWindow.jsx), on the Atmosphere window
+   frame (.atm-overlay / .atm-window in atmosphere.css). */
+
+.ts-window {
+  width: min(880px, 100%);
+  height: min(640px, 100%);
+}
+
+.ts-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px 12px 92px; /* clear of the window buttons */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ts-title {
+  margin: 0;
+  font-family: var(--iw-font-bold);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.ts-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ts-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ts-tab.is-active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ts-count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #0a84ff;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.ts-search {
+  min-width: 0;
+  flex: 1;
+  max-width: 220px;
+  margin-left: auto;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.ts-search:focus-visible {
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.45);
+}
+
+.ts-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px;
+}
+
+.ts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ts-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ts-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 8px 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ts-card-main:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: -2px;
+}
+
+.ts-card-name {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.ts-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px 10px;
+}
+
+.ts-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 9px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ts-preview-empty {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.ts-meta {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11.5px;
+}
+
+.ts-btn {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ts-btn.is-primary {
+  background: #0a84ff;
+  color: #fff;
+}
+
+.ts-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ts-inuse {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.ts-status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 48px 16px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+.ts-status p {
+  margin: 0;
+}
+
+.ts-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ts-window .ts-back {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #0a84ff;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+
+.ts-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ts-detail-name {
+  margin: 0 0 4px;
+  font-family: var(--iw-font-bold);
+  font-size: 20px;
+}
+
+.ts-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.ts-desc {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.5;
+}
+
+.ts-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ts-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.ts-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.ts-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.ts-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ts-footer-links {
+  display: flex;
+  flex-shrink: 0;
+  gap: 14px;
+}
+
+.ts-window .ts-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #0a84ff;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .ts-toolbar {
+    flex-wrap: wrap;
+    padding-left: 18px;
+    padding-top: 40px;
+  }
+
+  .ts-search {
+    max-width: none;
+  }
+
+  .ts-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.ts-search::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}

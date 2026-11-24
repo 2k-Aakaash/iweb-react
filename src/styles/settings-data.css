@@ -25,7 +25,7 @@
 
 .dc-hero-text h3 {
   margin: 0 0 3px;
-  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 15px;
   color: #fff;
 }

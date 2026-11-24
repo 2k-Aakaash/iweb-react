@@ -4,11 +4,12 @@ import { CURRENT_TAG, getUpdateMode, parseBuildNumber, parseVersion } from '../.
 import { formatBytes, getDeviceInfo } from '../../libs/about/deviceInfo';
 import '../../styles/settings-about.css';
 
+import { IWEB_LOGO } from '../../libs/theme/brand';
 // Settings → About, after macOS 26 Settings → General → About: a picture of the display (with
 // the current wallpaper on it) and the machine's name, then grouped rows of label and value,
 // and sections for iWeb, Displays, Storage and Software Update.
 
-const IWEB_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const IWEB_ICON = IWEB_LOGO;
 
 const EDITIONS = { web: 'Website', release: 'Chrome Extension', dev: 'Chrome Extension (local build)' };
 

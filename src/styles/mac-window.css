@@ -110,7 +110,7 @@ body.window-dragging iframe {
   pointer-events: none;
   opacity: 0;
   scale: 0.96;
-  transition: opacity 0.16s ease, scale 0.22s cubic-bezier(0.32, 0.72, 0, 1), inset 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 0.16s ease, scale 0.22s var(--iw-ease), inset 0.22s var(--iw-ease);
 }
 
 .window-snap-preview.is-shown {

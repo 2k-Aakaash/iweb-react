@@ -19,13 +19,13 @@
   height: var(--menubar-h);
   padding: 0 10px 0 8px;
   color: #fff;
-  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--iw-font-medium);
   font-size: 13.5px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   user-select: none;
   -webkit-user-select: none;
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.12) 70%, rgba(0, 0, 0, 0));
-  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.2s ease;
+  transition: transform 0.28s var(--iw-ease), background-color 0.2s ease;
 }
 
 /* Auto-hide (Settings → Appearance): off screen until the pointer reaches the top edge, then
@@ -37,14 +37,14 @@
   backdrop-filter: blur(24px) saturate(170%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(0, 0, 0, 0.25);
   opacity: 0; /* its shadow doesn't peek in at the top while it's away */
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease 0.1s;
+  transition: transform 0.32s var(--iw-ease), opacity 0.18s ease 0.1s;
 }
 
 .mb.is-autohide.is-revealed,
 .mb.is-autohide.is-menu-open {
   transform: none;
   opacity: 1;
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.12s ease;
+  transition: transform 0.32s var(--iw-ease), opacity 0.12s ease;
 }
 
 .mb button {
@@ -98,7 +98,7 @@
 }
 
 .mb-app {
-  font-family: 'sf_pro_displaybold', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--iw-font-bold);
 }
 
 /* ---- Status area ---- */
@@ -168,7 +168,7 @@
   overflow-y: auto;
   padding: 5px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
+  border-radius: var(--iw-radius-menu);
   background: rgba(40, 40, 44, 0.82);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
@@ -188,7 +188,7 @@
   height: 24px;
   padding: 0 10px 0 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--iw-radius-menu-item);
   background: transparent;
   text-align: left;
   white-space: nowrap;
@@ -255,9 +255,9 @@
   cursor: default;
 }
 
-.mb-light-close { background-color: #ff5f57; }
-.mb-light-minimize { background-color: #febc2e; }
-.mb-light-zoom { background-color: #28c840; }
+.mb-light-close { background-color: var(--iw-light-close); }
+.mb-light-minimize { background-color: var(--iw-light-minimize); }
+.mb-light-zoom { background-color: var(--iw-light-zoom); }
 
 /* Symbols on all three while the pointer is over the group, as in a window. */
 .mb-lights:hover .mb-light-close {

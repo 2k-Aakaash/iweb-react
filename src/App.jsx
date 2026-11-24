@@ -16,6 +16,7 @@ import NotificationCenter from './components/notifications/NotificationCenter';
 import AmbienceGlow from './components/ambience/AmbienceGlow';
 import AtmosphereServices from './components/ambience/AtmosphereServices';
 import { ATMOSPHERE_OPEN_EVENT, FRONTIER_OPEN_EVENT } from './libs/ambience/store.js';
+import { THEME_STORE_OPEN_EVENT } from './libs/theme/storeEvents';
 import AppsLauncher from './components/apps/AppsLauncher';
 import DialogHost from './components/dialogs/DialogHost';
 import { openIwebDB } from './libs/wallpaper/db';
@@ -52,6 +53,12 @@ const AtmosphereWindow = React.lazy(() => import('./components/ambience/Atmosphe
 // Frontier World's window: on the same Atmosphere engine, loaded on first open.
 const FrontierWindow = React.lazy(() => import('./components/ambience/FrontierWindow').catch((err) => {
   console.error('Failed to load Frontier World:', err);
+  return { default: AppUnavailable };
+}));
+
+// The Theme Store's window: loaded on first open.
+const ThemeStoreWindow = React.lazy(() => import('./components/themes/ThemeStoreWindow').catch((err) => {
+  console.error('Failed to load the Theme Store:', err);
   return { default: AppUnavailable };
 }));
 
@@ -142,6 +149,9 @@ export default function App() {
   const [atmosphereTab, setAtmosphereTab] = useState(null);
   const [frontierOpen, setFrontierOpen] = useState(false);
   const [frontierLoaded, setFrontierLoaded] = useState(false);
+  const [themeStoreOpen, setThemeStoreOpen] = useState(false);
+  const [themeStoreLoaded, setThemeStoreLoaded] = useState(false);
+  const [themeStoreFocus, setThemeStoreFocus] = useState(null);
   const [marketsSymbol, setMarketsSymbol] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesRequest, setNotesRequest] = useState(undefined); // set on first open: then mounted
@@ -309,11 +319,18 @@ export default function App() {
       setFrontierLoaded(true);
       setFrontierOpen(true);
     };
+    const handleOpenThemeStore = (e) => {
+      setThemeStoreFocus(e.detail?.themeId || null);
+      setThemeStoreLoaded(true);
+      setThemeStoreOpen(true);
+    };
     window.addEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
     window.addEventListener(FRONTIER_OPEN_EVENT, handleOpenFrontier);
+    window.addEventListener(THEME_STORE_OPEN_EVENT, handleOpenThemeStore);
     return () => {
       window.removeEventListener(ATMOSPHERE_OPEN_EVENT, handleOpenAtmosphere);
       window.removeEventListener(FRONTIER_OPEN_EVENT, handleOpenFrontier);
+      window.removeEventListener(THEME_STORE_OPEN_EVENT, handleOpenThemeStore);
     };
   }, []);
 
@@ -460,6 +477,11 @@ export default function App() {
       {frontierLoaded && (
         <Suspense fallback={null}>
           <FrontierWindow open={frontierOpen} setOpen={setFrontierOpen} />
+        </Suspense>
+      )}
+      {themeStoreLoaded && (
+        <Suspense fallback={null}>
+          <ThemeStoreWindow open={themeStoreOpen} setOpen={setThemeStoreOpen} focusId={themeStoreFocus} />
         </Suspense>
       )}
       {/* Atmosphere's edge glow while it plays */}

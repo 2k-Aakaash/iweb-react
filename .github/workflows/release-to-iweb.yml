@@ -10,6 +10,7 @@
 #
 # Versioning (scripts/next-version.mjs), from the latest iWeb release + pushed commits:
 #   "feat: …"  → minor (v2.3 → v2.4) · "[major]" → major (v3.0) · anything else → patch (v2.4.1)
+#   "[pre]" in the subject → published as a pre-release (see "Create the release in iWeb")
 #
 # Required setup in iweb-react → Settings → Secrets and variables → Actions:
 #   Secret   IWEB_DEPLOY_TOKEN     fine-grained PAT, repo 2k-Aakaash/iWeb, permission Contents: Read and write
@@ -147,11 +148,31 @@ jobs:
           node scripts/release-notes.mjs "${{ steps.version.outputs.tag }}" "${{ steps.version.outputs.kind }}" > release-notes.md
           cat release-notes.md
 
-      - name: Create Latest release in iWeb
+      # "[pre]" in the pushed commit's subject: a pre-release, not marked Latest, so the
+      # built-in updater (which reads the latest release) doesn't offer it. The next normal
+      # push releases the same version properly, replacing the pre-release.
+      - name: Create the release in iWeb
         env:
           GH_TOKEN: ${{ secrets.IWEB_DEPLOY_TOKEN }}
+          PRE: ${{ contains(github.event.head_commit.message, '[pre]') }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" iWeb.Extension.zip iWeb.Extension.zip.sha256             --repo "$TARGET_REPO"             --target "$BUILD_COMMIT"             --title "iWeb ${{ steps.version.outputs.tag }}"             --notes-file release-notes.md             --latest
+          set -euo pipefail
+          if [ "$PRE" = "true" ]; then
+            gh release create "$TAG" iWeb.Extension.zip iWeb.Extension.zip.sha256 \
+              --repo "$TARGET_REPO" --target "$BUILD_COMMIT" \
+              --title "iWeb $TAG (pre-release)" --notes-file release-notes.md \
+              --prerelease --latest=false
+          else
+            # A pre-release of this version: replaced by the release.
+            if [ "$(gh release view "$TAG" --repo "$TARGET_REPO" --json isPrerelease -q .isPrerelease 2>/dev/null || echo none)" = "true" ]; then
+              gh release delete "$TAG" --repo "$TARGET_REPO" --cleanup-tag -y
+            fi
+            gh release create "$TAG" iWeb.Extension.zip iWeb.Extension.zip.sha256 \
+              --repo "$TARGET_REPO" --target "$BUILD_COMMIT" \
+              --title "iWeb $TAG" --notes-file release-notes.md \
+              --latest
+          fi
 
       - name: Update notes of earlier releases
         env:

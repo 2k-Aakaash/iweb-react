@@ -105,7 +105,7 @@ export default function ControlCenter({ initialView = 'grid', closing = false, o
   return (
     <>
     <div ref={backdropRef} className={`cc-backdrop${closing ? ' is-closing' : ''}`} aria-hidden="true" />
-    <div ref={panelRef} className={`cc${editing ? ' is-editing' : ''}${closing ? ' is-closing' : ''}`} role="dialog" aria-label="Control Center" tabIndex={-1}>
+    <div ref={panelRef} className={`cc${editing ? ' is-editing' : ''}${closing ? ' is-closing' : ''}`} role="dialog" aria-label="Control Center" data-iw="control-center" tabIndex={-1}>
       {view !== 'grid' ? (
         <ControlView view={view} onBack={() => setView('grid')} />
       ) : (

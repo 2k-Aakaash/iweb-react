@@ -3,11 +3,12 @@ import GlassSurface from '../glass/GlassSurface';
 import { answer, useFrontDialog } from '../../libs/dialogs/dialogs';
 import '../../styles/mac-alert.css';
 
+import { IWEB_LOGO } from '../../libs/theme/brand';
 // The macOS 26 alert (libs/dialogs/dialogs.js): the app icon, a bold title, the message and
 // capsule buttons, centred over a light dim. Enter presses the main button, Escape cancels;
 // keys go to it before anything else on the page.
 
-const IWEB_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const IWEB_ICON = IWEB_LOGO;
 
 export default function DialogHost() {
   const dialog = useFrontDialog();
@@ -50,6 +51,7 @@ export default function DialogHost() {
       <div
         key={dialog.id}
         className="ma-card glass-host"
+        data-iw="dialog"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}

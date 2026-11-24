@@ -16,6 +16,7 @@ import {
   showSnapPreview,
   snapZoneAt,
 } from './windowFrame';
+import { easing } from '../theme/motion';
 import '../../styles/mac-window.css';
 
 // macOS-style window controls for iWeb's app windows (Settings, Notes, Music).
@@ -40,7 +41,6 @@ import '../../styles/mac-window.css';
 // each { label, onSelect, checked?, disabled?, shortcut? } or { type: 'separator' } (MenuBar.jsx).
 
 const ZOOM_MS = 460;
-const ZOOM_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft settle (macOS-like)
 
 export const WINDOW_EVENT = 'iweb:window';
 
@@ -74,6 +74,14 @@ export function useMacWindow({ app, open, setOpen, windowRef, overlayRef, menus 
     overlayRef,
     closeEffectRef,
   });
+
+  // Theme hooks (docs/THEMES.md): every app window is [data-iw="window"][data-iw-app="<app>"].
+  useLayoutEffect(() => {
+    const el = windowRef.current;
+    if (!mounted || !el) return;
+    el.dataset.iw = 'window';
+    el.dataset.iwApp = app;
+  }, [app, mounted, windowRef]);
 
   const close = useCallback(() => {
     closeEffectRef.current = 'fade';
@@ -133,7 +141,7 @@ export function useMacWindow({ app, open, setOpen, windowRef, overlayRef, menus 
         { transformOrigin: '0 0', transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
         { transformOrigin: '0 0', transform: 'none' },
       ],
-      { duration: ZOOM_MS, easing: ZOOM_EASE },
+      { duration: ZOOM_MS, easing: easing('ease') },
     );
     zoomAnim.current = anim;
     // Glass surfaces measure their box; re-measure once the window has settled.

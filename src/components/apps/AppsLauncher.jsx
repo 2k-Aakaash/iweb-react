@@ -8,6 +8,9 @@ import { openNews } from '../../libs/news/newsEvents';
 import { openAtmosphere, openFrontier } from '../../libs/ambience/store.js';
 import '../../styles/apps-launcher.css';
 
+import { useAppName } from '../../libs/theme/names';
+import { openThemeStore } from '../../libs/theme/storeEvents';
+import { IWEB_LOGO } from '../../libs/theme/brand';
 // Apps, as in macOS 26 (it took Launchpad's place): every app and bookmark in a full-screen
 // grid over the blurred desktop, with a search field and All / Apps / Bookmarks. Opened from
 // the Dock's Apps icon, F4 or iWeb → Apps (the `apps:toggle` event). Type to filter, arrows
@@ -15,7 +18,7 @@ import '../../styles/apps-launcher.css';
 
 export const APPS_TOGGLE = 'apps:toggle';
 const OUT_MS = 200;
-const FALLBACK_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const FALLBACK_ICON = IWEB_LOGO;
 const settings = (tab) => window.dispatchEvent(new CustomEvent('settings:open', tab ? { detail: { tab } } : undefined));
 
 const BUILT_IN = [
@@ -25,6 +28,7 @@ const BUILT_IN = [
   { id: 'news', name: 'News', icon: <DockAppIcon name="news" />, open: () => openNews(), keywords: 'headlines' },
   { id: 'atmosphere', name: 'Atmosphere', icon: <DockAppIcon name="atmosphere" />, open: () => openAtmosphere(), keywords: 'ambience ambient sound rain focus sleep relax music' },
   { id: 'frontier', name: 'Frontier World', icon: <DockAppIcon name="frontier" />, open: () => openFrontier(), keywords: 'frontier world ambience landscape prairie desert swamp mountains weather radio soundscape' },
+  { id: 'themes', name: 'Theme Store', icon: <DockAppIcon name="themes" />, open: () => openThemeStore(), keywords: 'themes theme store skins look style icons fonts appearance' },
   { id: 'spotlight', name: 'Spotlight', icon: <MacAppIcon name="spotlight" />, open: (a) => a.openSpotlight(), keywords: 'search' },
   { id: 'wallpaper', name: 'Wallpapers', icon: <DockAppIcon name="bg" />, open: () => settings('wallpaper'), keywords: 'background unsplash' },
   { id: 'widgets', name: 'Widgets', icon: <MacAppIcon name="clock" />, open: () => settings('widgets'), keywords: 'gallery desktop' },
@@ -54,11 +58,12 @@ function Launcher({ bookmarks, actions, closing, onClose }) {
   const inputRef = useRef(null);
   const gridRef = useRef(null);
   const cached = useFavicons(bookmarks.map((b) => domainOf(b.url)));
+  const appLabel = useAppName(); // a theme can rename apps
 
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (name, extra = '') => !q || name.toLowerCase().includes(q) || extra.toLowerCase().includes(q);
-    const apps = tab === 'bookmarks' ? [] : BUILT_IN.filter((a) => match(a.name, a.keywords)).map((a) => ({
+    const apps = tab === 'bookmarks' ? [] : BUILT_IN.map((a) => ({ ...a, name: appLabel(a.id) })).filter((a) => match(a.name, a.keywords)).map((a) => ({
       key: `app:${a.id}`, name: a.name, icon: a.icon, open: () => a.open(actions),
     }));
     const marks = tab === 'apps' ? [] : bookmarks.filter((b) => match(b.websiteName, domainOf(b.url))).map((b) => ({
@@ -71,7 +76,7 @@ function Launcher({ bookmarks, actions, closing, onClose }) {
       ? [{ key: 'add', name: 'Add App', icon: <span className="al-add" aria-hidden="true">+</span>, open: () => window.dispatchEvent(new Event('dock:add-app')) }]
       : [];
     return [...apps, ...marks, ...add];
-  }, [query, tab, bookmarks, cached, actions]);
+  }, [query, tab, bookmarks, cached, actions, appLabel]);
 
   // Keep the highlight on a real item as the list changes (adjusted while rendering).
   const [shownFor, setShownFor] = useState(items);
@@ -141,6 +146,7 @@ function Launcher({ bookmarks, actions, closing, onClose }) {
   return (
     <div
       className={`al${closing ? ' is-closing' : ''}`}
+      data-iw="apps"
       role="dialog"
       aria-modal="true"
       aria-label="Apps"

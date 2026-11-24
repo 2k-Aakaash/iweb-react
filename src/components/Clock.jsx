@@ -33,6 +33,7 @@ export default function Clock({ clockFont }) {
       <span
         ref={timeRef}
         id="clock"
+        data-iw="clock"
         className={`clock-time${glass ? ' is-glass' : ''}`}
         style={{ fontFamily: clockFont || 'inherit' }}
       >

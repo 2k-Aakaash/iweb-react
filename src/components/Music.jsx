@@ -13,9 +13,10 @@ import { parseSearchIntent } from '../libs/intentParser';
 import { showAlert, showConfirm } from '../libs/dialogs/dialogs';
 import { notify } from '../libs/notifications/notifications';
 
+import { IWEB_LOGO } from '../libs/theme/brand';
 // Supported formats
 const SUPPORTED_FORMATS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'alac', 'aiff', 'opus'];
-const defaultArtwork = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const defaultArtwork = IWEB_LOGO;
 const DB_NAME = 'iweb-music-player';
 const STORE_NAME = 'settings';
 const HANDLE_KEY = 'directory-handle';

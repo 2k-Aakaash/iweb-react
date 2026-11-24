@@ -10,7 +10,7 @@
 
 .ws-stack {
   --ws-duration: 280ms;
-  --ws-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ws-ease: var(--iw-ease);
   --ws-shift: 28px;
   position: relative;
   border-radius: 18px;
@@ -246,7 +246,7 @@
 /* Neutralise the legacy `button { margin-top: 20px }` */
 .cw-card button {
   margin: 0;
-  font-family: 'sf_pro_displaysemibold', sans-serif;
+  font-family: var(--iw-font-ui);
 }
 
 .cw-card:not(.cw-expanded) {
@@ -562,7 +562,7 @@
   outline: none;
   background: transparent;
   color: white;
-  font-family: 'sf_pro_displaysemibold', sans-serif;
+  font-family: var(--iw-font-ui);
   font-size: 16px;
   text-align: left;
 }
@@ -665,7 +665,7 @@
   color: #fff;
   cursor: pointer;
   transform: rotate(var(--cw-swap-turn));
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.2s ease;
+  transition: transform 0.32s var(--iw-ease), background-color 0.2s ease;
 }
 
 .cw-swap:hover {

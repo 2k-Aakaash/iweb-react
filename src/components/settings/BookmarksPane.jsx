@@ -12,11 +12,12 @@ import {
 } from '../../libs/dock/bookmarks';
 import '../../styles/settings-bookmarks.css';
 
+import { IWEB_LOGO } from '../../libs/theme/brand';
 // Settings → Bookmarks: the Dock's bookmarks as a macOS list. Select a row; double-click (or
 // Edit) to change its name and address; drag, or Alt+↑/↓, to reorder; + adds, − removes (with
 // Undo). Changes show in the Dock at once (App state) and are saved (libs/dock/bookmarks.js).
 
-const FALLBACK_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const FALLBACK_ICON = IWEB_LOGO;
 
 function Icon({ bookmark, cached }) {
   const [broken, setBroken] = useState(false);

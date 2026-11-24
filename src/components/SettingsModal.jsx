@@ -10,7 +10,8 @@ import GlassSurface from './glass/GlassSurface';
 import { MENUBAR_MODES, setMenubarMode, useMenubarMode } from '../libs/menubar/menubarPrefs';
 import { CLOCK_STYLES, setClockStyle, useClockStyle } from '../libs/clock/clockStyle';
 import { usePref } from '../libs/prefs/storedPref';
-import { APPEARANCES, appearancePref } from '../libs/appearance/appearance';
+import { APPEARANCES, appearancePref, useAppearanceLock } from '../libs/appearance/appearance';
+import ThemePicker from './settings/ThemePicker';
 import { ACCENTS, accentPref } from '../libs/appearance/accent';
 import {
   DOCK_SIZE_MAX,
@@ -63,6 +64,7 @@ export default function SettingsModal({
   const clockStyle = useClockStyle();
   const dockSize = usePref(dockSizePref);
   const appearance = usePref(appearancePref);
+  const appearanceLock = useAppearanceLock(); // a theme made for Dark or Light only
   const accent = usePref(accentPref);
   const dockMagnification = usePref(dockMagnificationPref);
   const windowGenie = usePref(windowGeniePref);
@@ -628,6 +630,9 @@ export default function SettingsModal({
             {/* 2. APPEARANCE TAB */}
             {activeTab === 'appearance' && (
               <div className="settings-tab-pane">
+                <ThemePicker />
+
+                <div className="settings-group-card-title">Appearance</div>
                 <div className="settings-group-card">
                   <div className="settings-row" style={{ alignItems: 'flex-start' }}>
                     <span className="settings-label" id="appearance-label" style={{ marginTop: '10px' }}>Appearance</span>
@@ -639,6 +644,7 @@ export default function SettingsModal({
                           role="radio"
                           aria-checked={appearance === option.id}
                           className={`settings-appearance-option${appearance === option.id ? ' active' : ''}`}
+                          disabled={Boolean(appearanceLock)}
                           onClick={() => appearancePref.set(option.id)}
                         >
                           <div className={`appearance-preview-${option.id}`}></div>
@@ -647,6 +653,11 @@ export default function SettingsModal({
                       ))}
                     </div>
                   </div>
+                  {appearanceLock && (
+                    <div className="settings-row-hint">
+                      The theme in use is made for {appearanceLock === 'dark' ? 'Dark' : 'Light'}, so iWeb stays {appearanceLock === 'dark' ? 'Dark' : 'Light'} while it's in use.
+                    </div>
+                  )}
                 </div>
 
                 <div className="settings-group-card-title">Theme Accent</div>

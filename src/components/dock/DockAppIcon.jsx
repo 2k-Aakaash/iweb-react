@@ -106,6 +106,16 @@ const ICONS = {
     </Tile>
   ),
 
+  // Theme Store: overlapping swatches, like a paint card.
+  themes: (
+    <Tile id="themes" from="#6a5cff" to="#ff6aa8">
+      <rect x="14" y="16" width="20" height="30" rx="5" fill="#ffd166" transform="rotate(-16 24 31)" />
+      <rect x="22" y="15" width="20" height="30" rx="5" fill="#06d6a0" transform="rotate(-2 32 30)" />
+      <rect x="30" y="16" width="20" height="30" rx="5" fill="#fff" transform="rotate(14 40 31)" />
+      <circle cx="40" cy="38" r="3.5" fill="#6a5cff" />
+    </Tile>
+  ),
+
   // Settings: a machined gear on graphite.
   settings: (
     <Tile id="settings" from="#c3c7ce" to="#6b7079">
@@ -127,5 +137,5 @@ const ICONS = {
 const MAC_ICON = { add: 'apps', bg: 'wallpaper', notes: 'notes', music: 'music', settings: 'settings', markets: 'stocks' };
 
 export default function DockAppIcon({ name, className }) {
-  return <MacAppIcon name={MAC_ICON[name]} className={className} fallback={ICONS[name]} />;
+  return <MacAppIcon name={MAC_ICON[name] ?? name} className={className} fallback={ICONS[name]} />;
 }

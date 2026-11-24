@@ -1,0 +1,164 @@
+/* Settings → Appearance → Theme (components/settings/ThemePicker.jsx). */
+
+.th-card {
+  padding: 12px;
+}
+
+.th-missing {
+  margin: 0 0 10px;
+  color: #ffb300;
+}
+
+.th-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+}
+
+.th-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.th-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.th-item.is-selected {
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 1px #0a84ff;
+}
+
+.th-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.5);
+}
+
+.th-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.th-preview-iweb {
+  background:
+    radial-gradient(120% 90% at 20% 10%, rgba(120, 160, 255, 0.55), transparent 60%),
+    radial-gradient(90% 80% at 85% 90%, rgba(255, 120, 190, 0.45), transparent 60%),
+    linear-gradient(160deg, #1d2440, #0f1220);
+}
+
+.th-preview-none {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 22px;
+}
+
+.th-name {
+  overflow: hidden;
+  padding: 0 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.th-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10px;
+}
+
+.th-details {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.th-text {
+  min-width: 0;
+}
+
+.th-title {
+  color: #fff;
+  font-size: 13px;
+}
+
+.th-meta {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11.5px;
+}
+
+.th-desc {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.th-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.th-actions .settings-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.th-install {
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.th-install-hint {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.th-install-btns {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.th-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #0a84ff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.th-sounds {
+  margin-top: 10px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}

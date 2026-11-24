@@ -173,6 +173,7 @@ export default function ContextMenu({ actions }) {
     <div
       ref={menuRef}
       className={`dt-menu${placement ? ' is-placed' : ''}`}
+      data-iw="menu"
       role="menu"
       style={placement || { left: menu.x, top: menu.y }}
       onKeyDown={onKeyDown}

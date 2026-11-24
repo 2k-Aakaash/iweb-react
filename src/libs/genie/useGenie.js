@@ -3,6 +3,8 @@ import { createGenie, prefersReducedMotion, targetRect } from './genie';
 import { warmBackdrop } from './backdrop';
 import { usePref } from '../prefs/storedPref.js';
 import { windowGeniePref } from '../dock/dockPrefs.js';
+import { easing as motionEasing } from '../theme/motion.js';
+import { playUiSound } from '../theme/sounds.js';
 
 /**
  * Keeps a modal mounted while it genies out of / into a dock icon.
@@ -23,7 +25,6 @@ import { windowGeniePref } from '../dock/dockPrefs.js';
  */
 const FADE_MS = 180;
 const SCALE_MS = 260;
-const SCALE_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
 
 // The transform that puts the window `r` on the icon `to`: uniformly scaled, centred on it.
 function onIcon(r, to) {
@@ -63,7 +64,7 @@ export function useGenie(open, { target, windowRef, overlayRef, closeEffectRef }
     // macOS close: fade and shrink in place, then unmount.
     if (!open && closeEffectRef?.current === 'fade' && !genieRef.current) {
       const overlay = overlayRef?.current;
-      const easing = 'cubic-bezier(0.4, 0, 1, 1)';
+      const easing = motionEasing('ease-in');
       const win = el.animate(
         [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.96)' }],
         { duration: FADE_MS, easing, fill: 'forwards' },
@@ -96,7 +97,7 @@ export function useGenie(open, { target, windowRef, overlayRef, closeEffectRef }
       const shown = { transform: 'none', opacity: 1 };
       const start = scaleFrom.current ?? (open ? icon : shown);
       scaleFrom.current = null;
-      const opts = { duration: SCALE_MS, easing: SCALE_EASE, fill: 'forwards' };
+      const opts = { duration: SCALE_MS, easing: motionEasing('ease'), fill: 'forwards' };
       const win = el.animate([{ transformOrigin: '0 0', ...start }, { transformOrigin: '0 0', ...(open ? shown : icon) }], opts);
       const dim = overlay?.animate([{ opacity: start.opacity }, { opacity: open ? 1 : 0 }], opts);
       let current = true;
@@ -140,6 +141,15 @@ export function useGenie(open, { target, windowRef, overlayRef, closeEffectRef }
       current = false;
     };
   }, [open, mounted, reduced, target, windowRef, overlayRef, closeEffectRef]);
+
+  // The theme's sound (libs/theme/sounds.js) as the window opens, closes or minimises.
+  // From closed: windows that mount already open (Notes, on first open) sound too.
+  const soundFor = useRef(false);
+  useEffect(() => {
+    if (soundFor.current === open) return;
+    soundFor.current = open;
+    playUiSound(open ? 'open' : closeEffectRef?.current === 'genie' ? 'minimize' : 'close');
+  }, [open, closeEffectRef]);
 
   // Decode the wallpaper early so the first run already has the glass backdrop (not needed
   // for the Scale effect).

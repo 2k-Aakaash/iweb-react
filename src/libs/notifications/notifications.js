@@ -10,6 +10,7 @@
 // rather than adding another. While Focus is on (Control Center) no banner shows; the
 // notification still goes to Notification Center, as in macOS.
 import { useSyncExternalStore } from 'react';
+import { playUiSound } from '../theme/sounds.js';
 
 const STORAGE_KEY = 'iweb:notifications';
 const MAX = 50;
@@ -70,6 +71,7 @@ export function notify({ app = 'iweb', title, body = '', action = null, key = nu
   const showBanner = banner && !quiet();
   setList([item, ...rest].slice(0, MAX), showBanner ? item : state.banner);
   if (showBanner) {
+    playUiSound('notification');
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => dismissBanner(id), BANNER_MS);
   }

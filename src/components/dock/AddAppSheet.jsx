@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import GlassSurface from '../glass/GlassSurface';
 import '../../styles/mac-alert.css';
 
+import { IWEB_LOGO } from '../../libs/theme/brand';
 // Add App, as a macOS 26 sheet: the alert card (mac-alert.css) with a name and an address.
 // `onAdd({ name, url })` returns an error sentence to show under the fields, or null when it
 // was added. Enter adds, Escape cancels.
 
-const IWEB_ICON = 'https://ik.imagekit.io/026k2i7ys/iWeb%20Favicon.svg?updatedAt=1700227200100';
+const IWEB_ICON = IWEB_LOGO;
 
 export default function AddAppSheet({ onAdd, onClose }) {
   const [name, setName] = useState('');
@@ -35,7 +36,7 @@ export default function AddAppSheet({ onAdd, onClose }) {
 
   return (
     <div className="ma-overlay" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <form className="ma-card ma-sheet glass-host" role="dialog" aria-modal="true" aria-labelledby="add-app-title" onSubmit={submit}>
+      <form className="ma-card ma-sheet glass-host" data-iw="dialog" role="dialog" aria-modal="true" aria-labelledby="add-app-title" onSubmit={submit}>
         <GlassSurface preset="window" />
         <img className="ma-icon" src={IWEB_ICON} alt="" draggable={false} />
         <h2 id="add-app-title" className="ma-title">Add App</h2>

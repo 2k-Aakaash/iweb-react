@@ -4,7 +4,7 @@
 // once the database has been upgraded.
 
 export const DB_NAME = 'iWebDB';
-export const DB_VERSION = 7;
+export const DB_VERSION = 8;
 
 export const STORES = {
   LOCAL: 'background_images',   // existing: { id (autoInc), blob, + v3 optional: thumb, name, type, size, hash, createdAt }
@@ -17,6 +17,7 @@ export const STORES = {
   NEWS_FEEDS: 'news_feeds',     // v6: { key, kind, edition, topic, query, fetchedAt, articleIds }
   CREATOR_ACCOUNTS: 'creator_accounts',   // v7: Creator widget accounts, keyed by id (src/libs/creator)
   CREATOR_SNAPSHOTS: 'creator_snapshots', // v7: { key, accountId, at, metrics }, index accountId
+  THEMES: 'themes',             // v8: installed themes, keyed by id (src/libs/theme)
 };
 
 // Deterministic, idempotent upgrade: only creates what is missing, never deletes data.
@@ -63,6 +64,10 @@ export function upgradeIwebDB(db, tx) {
     ? tx.objectStore(STORES.CREATOR_SNAPSHOTS)
     : db.createObjectStore(STORES.CREATOR_SNAPSHOTS, { keyPath: 'key' });
   if (!snapshots.indexNames.contains('accountId')) snapshots.createIndex('accountId', 'accountId');
+
+  if (!db.objectStoreNames.contains(STORES.THEMES)) {
+    db.createObjectStore(STORES.THEMES, { keyPath: 'id' });
+  }
 }
 
 let dbPromise = null;

@@ -151,7 +151,6 @@ function Tile({ id }) {
 
 /** `className` sizes it (default: the 22px sidebar tile). */
 export default function SettingsTabIcon({ id, className = 'settings-tab-icon' }) {
-  return MAC_ICON[id]
-    ? <MacAppIcon name={MAC_ICON[id]} className={className} fallback={<Tile id={id} />} />
-    : <span className={`${className} mac-app-icon`}><Tile id={id} /></span>;
+  // Panes without a macOS icon are `settings-<id>` for a theme (libs/theme/icons.js).
+  return <MacAppIcon name={MAC_ICON[id] ?? `settings-${id.replace(/_/g, '-')}`} className={className} fallback={<Tile id={id} />} />;
 }

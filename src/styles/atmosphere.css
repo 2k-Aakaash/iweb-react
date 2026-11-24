@@ -13,7 +13,7 @@
   padding: 24px;
   background: rgba(0, 0, 0, 0.28);
   color: #fff;
-  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--iw-font-medium);
   font-size: 13px;
   text-align: left;
   animation: atm-fade 0.25s ease both;
@@ -32,7 +32,7 @@
   height: min(680px, 100%);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 24px;
+  border-radius: var(--iw-radius-window);
   outline: none;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }

@@ -10,16 +10,8 @@
 // functions): close, minimize, toggleMaximize, open, windowRef and menus() for its own
 // menu-bar menus.
 import { useSyncExternalStore } from 'react';
+import { appName } from '../theme/names';
 
-export const APP_TITLES = Object.freeze({
-  notes: 'Notes',
-  music: 'Music',
-  settings: 'Settings',
-  markets: 'Markets',
-  news: 'News',
-  atmosphere: 'Atmosphere',
-  frontier: 'Frontier World',
-});
 
 const entries = new Map();
 const controllers = new Map();
@@ -38,7 +30,7 @@ function publish() {
 
 /** Updates a window's state; opening brings it to the front. */
 export function setWindowState(app, patch) {
-  const prev = entries.get(app) || { app, title: APP_TITLES[app] || app, state: 'closed', maximized: false, focusedAt: 0 };
+  const prev = entries.get(app) || { app, title: appName(app), state: 'closed', maximized: false, focusedAt: 0 };
   const next = { ...prev, ...patch };
   if (next.state === 'open' && prev.state !== 'open') next.focusedAt = ++clock;
   if (next.state === prev.state && next.maximized === prev.maximized && next.focusedAt === prev.focusedAt) return;

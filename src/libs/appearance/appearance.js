@@ -35,17 +35,36 @@ const subscribeSystem = (cb) => {
 /** 'light' or 'dark' for a setting and whether the system is dark. */
 export const resolveAppearance = (setting, isSystemDark) => (setting === 'auto' ? (isSystemDark ? 'dark' : 'light') : setting === 'light' ? 'light' : 'dark');
 
+// A theme made for one appearance only (libs/theme) holds iWeb to it while it's in use:
+// 'light' | 'dark', or null to follow the setting.
+let locked = null;
+const lockListeners = new Set();
+const subscribeLock = (cb) => {
+  lockListeners.add(cb);
+  return () => lockListeners.delete(cb);
+};
+export const getAppearanceLock = () => locked;
+export function setAppearanceLock(look) {
+  const next = look === 'light' || look === 'dark' ? look : null;
+  if (next === locked) return;
+  locked = next;
+  for (const cb of [...lockListeners]) cb();
+}
+/** The appearance a theme holds iWeb to ('light' | 'dark'), or null. */
+export const useAppearanceLock = () => useSyncExternalStore(subscribeLock, getAppearanceLock, () => null);
+
 /** The look in effect now: 'light' or 'dark'. */
 export function useResolvedAppearance() {
   const setting = usePref(appearancePref);
   const dark = useSyncExternalStore(subscribeSystem, systemDark, () => true);
-  return resolveAppearance(setting, dark);
+  const lock = useAppearanceLock();
+  return lock || resolveAppearance(setting, dark);
 }
 
 /** Keeps <html data-appearance> (and color-scheme) in step with the setting and the system. */
 export function startAppearance() {
   const apply = () => {
-    const look = resolveAppearance(appearancePref.get(), systemDark());
+    const look = locked || resolveAppearance(appearancePref.get(), systemDark());
     const root = document.documentElement;
     if (root.dataset.appearance !== look) root.dataset.appearance = look;
     root.style.colorScheme = look;
@@ -53,5 +72,6 @@ export function startAppearance() {
   apply();
   appearancePref.subscribe(apply);
   subscribeSystem(apply);
+  subscribeLock(apply);
   appearancePref.load?.();
 }

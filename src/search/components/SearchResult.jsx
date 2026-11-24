@@ -336,6 +336,7 @@ export const SearchResult = ({ isOpen, onClose }) => {
                 <Dialog.Content asChild>
                   <motion.div 
                     className="search-modal-content glass-host"
+                    data-iw="spotlight"
                     initial={{ scale: 0.95, y: 15, opacity: 0 }}
                     animate={{ scale: 1, y: 0, opacity: 1 }}
                     exit={{ scale: 0.95, y: 15, opacity: 0 }}

@@ -9,16 +9,16 @@
   flex-direction: column;
   align-items: center;
   color: #fff;
-  font-family: 'sf_pro_displaymedium', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--iw-font-medium);
   background: rgba(0, 0, 0, 0.32);
   -webkit-backdrop-filter: blur(40px) saturate(160%);
   backdrop-filter: blur(40px) saturate(160%);
-  animation: al-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: al-in 0.32s var(--iw-ease) both;
 }
 
 .al.is-closing {
   pointer-events: none;
-  animation: al-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+  animation: al-out 0.2s var(--iw-ease-in) both;
 }
 
 @keyframes al-in {
@@ -31,11 +31,11 @@
 
 /* The grid zooms in and out with it, as Launchpad did. */
 .al .al-scroll {
-  animation: al-zoom-in 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: al-zoom-in 0.38s var(--iw-ease) both;
 }
 
 .al.is-closing .al-scroll {
-  animation: al-zoom-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+  animation: al-zoom-out 0.2s var(--iw-ease-in) both;
 }
 
 @keyframes al-zoom-in {
@@ -155,7 +155,7 @@
 }
 
 .al-cell {
-  animation: al-cell-in 0.42s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: al-cell-in 0.42s var(--iw-ease) both;
   animation-delay: calc(min(var(--i, 0), 24) * 12ms);
 }
 
@@ -192,7 +192,7 @@
   width: 80px;
   height: 80px;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.3));
-  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.18s var(--iw-ease);
 }
 
 .al-item.is-active .al-icon {

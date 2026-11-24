@@ -104,7 +104,7 @@ function WidgetMenu({ anchor, items, onClose }) {
     }
   };
   return createPortal(
-    <div ref={ref} className={`dt-menu crw-menu${pos ? ' is-placed' : ''}`} role="menu" style={pos || { left: -9999, top: 0 }} onKeyDown={onKeyDown}>
+    <div ref={ref} className={`dt-menu crw-menu${pos ? ' is-placed' : ''}`} data-iw="menu" role="menu" style={pos || { left: -9999, top: 0 }} onKeyDown={onKeyDown}>
       {items.map((item, i) => {
         if (item.type === 'separator') return <div key={i} className="dt-menu-sep" role="separator" />;
         if (item.type === 'header') return <div key={i} className="dt-menu-header">{item.label}</div>;

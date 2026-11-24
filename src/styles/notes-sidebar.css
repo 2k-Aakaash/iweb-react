@@ -26,7 +26,7 @@
 
 .nsb-heading h2 {
   margin: 0;
-  font-family: "SFProDisplay-Heavy", system-ui, sans-serif;
+  font-family: var(--iw-font-heavy);
   font-size: 22px;
   line-height: 1.15;
   color: #fff;
@@ -123,7 +123,7 @@
 .nsb-group-title {
   margin: 0;
   padding: 6px 12px 4px;
-  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 12px;
   font-weight: 700;
   color: rgba(235, 235, 245, 0.55);
@@ -190,7 +190,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-family: "sf_pro_displaybold", system-ui, sans-serif;
+  font-family: var(--iw-font-bold);
   font-size: 13.5px;
   font-weight: 700;
   color: #fff;
@@ -206,7 +206,7 @@
 
 .nsb-row-date {
   flex-shrink: 0;
-  font-family: "sf_pro_displaymedium", system-ui, sans-serif;
+  font-family: var(--iw-font-medium);
   color: rgba(255, 255, 255, 0.82);
 }
 
@@ -214,7 +214,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-family: "sf_pro_displaymedium", system-ui, sans-serif;
+  font-family: var(--iw-font-medium);
   color: rgba(235, 235, 245, 0.5);
 }
 

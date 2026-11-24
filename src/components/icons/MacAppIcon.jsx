@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { themedIcons } from '../../libs/theme/icons';
 import '../../styles/mac-app-icon.css';
 
 // macOS 26 app icons, hosted on ImageKit (iweb-icons/). Each SVG is the full 1024px icon
@@ -19,24 +20,30 @@ const MAC_APP_ICONS = {
 };
 
 /**
- * A macOS app icon cropped to its rounded tile. `fallback` shows until the image has loaded,
- * and stays if it can't load (offline).
+ * An app icon: the theme's icon for `name` (libs/theme/icons.js), shown whole, or the macOS
+ * icon cropped to its rounded tile. `fallback` shows until the image has loaded, and stays if
+ * it can't load (offline) or there's no image for `name`.
  */
 export default function MacAppIcon({ name, className = '', fallback = null }) {
-  const [state, setState] = useState('loading'); // loading | loaded | failed
-  const src = MAC_APP_ICONS[name];
+  const themed = themedIcons.use()[name];
+  const src = themed || MAC_APP_ICONS[name];
+  // Per image, so a new theme's icon starts hidden again until it has loaded.
+  const [loaded, setLoaded] = useState(null);
+  const [failed, setFailed] = useState(null);
+  const state = loaded === src ? 'loaded' : failed === src ? 'failed' : 'loading';
   return (
-    <span className={`mac-app-icon ${className}`}>
+    <span className={`mac-app-icon${themed ? ' is-themed' : ''} ${className}`}>
       {state !== 'loaded' && fallback}
       {src && state !== 'failed' && (
         <img
+          key={src}
           src={src}
           alt=""
           draggable={false}
           decoding="async"
           className={state === 'loaded' ? 'is-loaded' : undefined}
-          onLoad={() => setState('loaded')}
-          onError={() => setState('failed')}
+          onLoad={() => setLoaded(src)}
+          onError={() => setFailed(src)}
         />
       )}
     </span>

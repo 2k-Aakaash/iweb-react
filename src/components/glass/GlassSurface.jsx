@@ -3,6 +3,7 @@ import { LIGHT_STATIC_PRESETS, STATIC_PRESETS } from './glassPresets';
 import { useResolvedAppearance } from '../../libs/appearance/appearance';
 import { loadedWallpaper, loadWallpaper, paintStaticGlass, staticGlassSupported, wallpaperUrl } from './staticGlass';
 import { bootRevealed, markBootReady } from '../../libs/boot/bootReveal';
+import { themedGlass } from '../../libs/theme/icons';
 import '../../styles/glass-surface.css';
 
 // Glass for every iWeb surface. <GlassSurface> goes inside a surface (the Dock, a window, a
@@ -241,8 +242,11 @@ export default function GlassSurface({ preset = 'panel', optics, radius, appeara
   // windows. Static glass only knows the wallpaper, so they use the browser's own backdrop
   // blur instead, which shows what's really behind them, with the same tint and rim light.
   // Without WebGL every surface does.
-  const backdrop = BACKDROP_PRESETS.has(preset) || !staticGlassSupported();
-  const canvasGlass = !backdrop;
+  // A theme can turn glass off entirely (tokens.json "glassEffect": "off"): no blur, no
+  // refraction, nothing rendered; the surface shows only its tint layer (the theme's material).
+  const glassOff = Boolean(themedGlass.use().off);
+  const backdrop = !glassOff && (BACKDROP_PRESETS.has(preset) || !staticGlassSupported());
+  const canvasGlass = !glassOff && !backdrop;
   // How much to brighten the backdrop blur (veilBrightness), measured once mounted.
   const [bright, setBright] = useState(1);
   const wallpaper = useWallpaperUrl();
@@ -257,7 +261,8 @@ export default function GlassSurface({ preset = 'panel', optics, radius, appeara
   }, []);
 
   const light = useResolvedAppearance() === 'light' && appearance !== 'dark';
-  const staticLook = { ...((light && LIGHT_STATIC_PRESETS[preset]) || STATIC_PRESETS[preset]), ...optics };
+  const themeGlass = themedGlass.use()[light ? 'light' : 'dark']?.[preset]; // the theme's look (libs/theme)
+  const staticLook = { ...((light && LIGHT_STATIC_PRESETS[preset]) || STATIC_PRESETS[preset]), ...themeGlass, ...optics };
   const staticKey = JSON.stringify(staticLook);
 
   // Static: draw for a box, now (within the frame's budget), unless it's the box and look

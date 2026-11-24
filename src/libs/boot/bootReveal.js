@@ -5,12 +5,13 @@
 //
 // The veil lifts once the app has rendered ('app'), the wallpaper is painted ('wallpaper') and
 // the glass of the surfaces on screen at start (the Dock, the search bar, the menu bar) has
-// rendered ('glass'), plus two frames; so the desktop is revealed with its glass already in
+// rendered ('glass') and the theme in use is applied ('theme', libs/theme/engine.js), plus two
+// frames; so the desktop is revealed with its glass and theme already in
 // place. It never waits longer than CAP_MS, so a slow wallpaper, storage or GPU can't hold up
 // the desktop.
 
 const CAP_MS = 600; // after the app's code starts
-const pending = new Set(['app', 'wallpaper', 'glass']);
+const pending = new Set(['app', 'wallpaper', 'glass', 'theme']);
 let revealed = false;
 
 function reveal() {
@@ -35,4 +36,12 @@ export function markBootReady(part) {
   requestAnimationFrame(() => requestAnimationFrame(reveal));
 }
 
-if (typeof window !== 'undefined') setTimeout(reveal, CAP_MS);
+const start = typeof performance !== 'undefined' ? performance.now() : 0;
+let capTimer = typeof window !== 'undefined' ? setTimeout(reveal, CAP_MS) : 0;
+
+/** Lets the veil wait up to `ms` after start instead (a theme loading its fonts). */
+export function extendBootCap(ms) {
+  if (revealed || typeof window === 'undefined') return;
+  clearTimeout(capTimer);
+  capTimer = setTimeout(reveal, Math.max(0, Math.max(ms, CAP_MS) - (performance.now() - start)));
+}

@@ -54,7 +54,7 @@ function AppIcon({ app }) {
 
 function NotificationCard({ n, now, onOpen, onClose, banner = false }) {
   return (
-    <div className={`nc-card glass-host${banner ? ' is-banner' : ''}`}>
+    <div className={`nc-card glass-host${banner ? ' is-banner' : ''}`} data-iw="notification">
       <GlassSurface preset="tile" />
       <button type="button" className="nc-card-main" onClick={() => onOpen(n)}>
         <AppIcon app={n.app} />
@@ -157,7 +157,7 @@ function Panel({ closing, onClose }) {
   return (
     <>
       <div className={`nc-backdrop${closing ? ' is-closing' : ''}`} aria-hidden="true" />
-      <aside className={`nc${closing ? ' is-closing' : ''}`} aria-label="Notification Center" role="dialog" tabIndex={-1}>
+      <aside className={`nc${closing ? ' is-closing' : ''}`} aria-label="Notification Center" data-iw="notification-center" role="dialog" tabIndex={-1}>
         <div className="nc-section-head">
           <h2>Notifications</h2>
           {list.length > 0 && <button type="button" className="nc-text-btn" onClick={clearAll}>Clear All</button>}
