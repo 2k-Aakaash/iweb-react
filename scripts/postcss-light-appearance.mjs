@@ -25,9 +25,11 @@ const SCOPES = [
   { file: /Dock\.module\.css$/, include: /dialog/i },
   // The News app, not the News widget on the desktop.
   { file: /styles[\\/]news\.css$/, exclude: /news-widget/ },
-  { file: /search[\\/]styles[\\/]search\.css$/ },
+  { file: /search[\\/]styles[\\/]search(-bar)?\.css$/ },
   // Control Center, but not the timer bubble beside the Dynamic Island.
-  { file: /styles[\\/]controlcenter\.css$/, exclude: /timer-bubble|cc-bubble/ },
+  // …nor the Display veil and Night Shift layer over the page: a dimmed wallpaper must stay
+  // dimmed in Light, not turn to fog.
+  { file: /styles[\\/]controlcenter\.css$/, exclude: /timer-bubble|cc-bubble|cc-wallpaper-veil|cc-night-shift/ },
   // The menu bar's menus and the Settings pop-up menus, not the bar over the wallpaper.
   { file: /styles[\\/]menubar\.css$/, include: /mb-menu|settings-select|settings-row-hint/ },
   // Right-click and pop-up menus, and the Edit Widgets toolbar.

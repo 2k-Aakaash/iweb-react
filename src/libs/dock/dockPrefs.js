@@ -53,6 +53,15 @@ export const dockMagnificationPref = createStoredPref({
   normalize: normalizeMagnification,
 });
 
+// How windows open from and minimise into their Dock icon: the genie (true), or a plain scale
+// (false: transform and opacity only, no window copies or wallpaper still, for slower PCs).
+export const windowGeniePref = createStoredPref({
+  key: 'dock_genie',
+  mirrorKey: 'iweb:dockGenie',
+  fallback: true,
+  normalize: (v) => (typeof v === 'boolean' ? v : null),
+});
+
 /** The hovered icon's extra size in px for an icon size and a magnification setting. */
 export function magnificationPx(size, magnification) {
   const factor = MAGNIFICATIONS.find((m) => m.id === magnification)?.factor ?? 0.5;

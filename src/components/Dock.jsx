@@ -53,7 +53,7 @@ export default function Dock({ bookmarks = [], setBookmarks, onChangeBg, onOpenN
   // Apps with an open or minimized window get the running dot under their icon (macOS).
   const [running, setRunning] = useState({});
   // Hover labels. Their glass is mounted only for the label showing and the one fading out,
-  // not for every icon (in Liquid mode each glass surface is a live WebGL pass).
+  // not for every icon.
   const [labelGlass, setLabelGlass] = useState([]);
   const showLabel = (key) =>
     setLabelGlass((prev) => (prev[0] === key ? prev : [key, ...prev.filter((k) => k !== key)].slice(0, 2)));

@@ -7,7 +7,6 @@ import { openIwebDB } from '../libs/wallpaper/db';
 import WallpaperSettings from './WallpaperSettings';
 import { useMacWindow } from '../libs/window/useMacWindow';
 import GlassSurface from './glass/GlassSurface';
-import { setGlassMode, useGlassMode } from './glass/glassMode';
 import { MENUBAR_MODES, setMenubarMode, useMenubarMode } from '../libs/menubar/menubarPrefs';
 import { CLOCK_STYLES, setClockStyle, useClockStyle } from '../libs/clock/clockStyle';
 import { usePref } from '../libs/prefs/storedPref';
@@ -19,6 +18,7 @@ import {
   MAGNIFICATIONS,
   dockMagnificationPref,
   dockSizePref,
+  windowGeniePref,
 } from '../libs/dock/dockPrefs';
 import ConfirmDialog from './wallpaper/ConfirmDialog';
 import MacSlider from './ui/MacSlider';
@@ -59,13 +59,13 @@ export default function SettingsModal({
   };
   const overlayRef = useRef(null);
   const windowRef = useRef(null);
-  const glassMode = useGlassMode();
   const menubarMode = useMenubarMode();
   const clockStyle = useClockStyle();
   const dockSize = usePref(dockSizePref);
   const appearance = usePref(appearancePref);
   const accent = usePref(accentPref);
   const dockMagnification = usePref(dockMagnificationPref);
+  const windowGenie = usePref(windowGeniePref);
 
   // Escape closes Settings, like the other macOS-style windows.
   useEffect(() => {
@@ -670,37 +670,6 @@ export default function SettingsModal({
                   </div>
                 </div>
 
-                <div className="settings-group-card-title">Glass Effect</div>
-                <div className="settings-group-card">
-                  <div className="settings-row" style={{ alignItems: 'flex-start' }}>
-                    <span className="settings-label" style={{ marginTop: '6px' }}>Glass</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                      <div role="radiogroup" aria-label="Glass effect" style={{ display: 'flex', gap: '8px' }}>
-                        {[
-                          { id: 'static', label: 'Static' },
-                          { id: 'liquid', label: 'Liquid' },
-                        ].map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={glassMode === option.id}
-                            className={`settings-btn${glassMode === option.id ? ' settings-btn-primary' : ''}`}
-                            onClick={() => setGlassMode(option.id)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                      <span style={{ fontSize: '11px', opacity: 0.6, maxWidth: '300px', textAlign: 'right' }}>
-                        {glassMode === 'static'
-                          ? 'Rendered once and reused. Smooth on every device.'
-                          : 'Live refraction. Uses more GPU while things animate.'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="settings-group-card-title">Clock</div>
                 <div className="settings-group-card">
                   <div className="settings-row">
@@ -774,6 +743,21 @@ export default function SettingsModal({
                         <option key={option.id} value={option.id}>{option.label}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="settings-row">
+                    <label className="settings-label" htmlFor="dock-genie">Genie effect</label>
+                    <input
+                      id="dock-genie"
+                      type="checkbox"
+                      className="settings-switch"
+                      checked={windowGenie}
+                      onChange={(e) => windowGeniePref.set(e.target.checked)}
+                    />
+                  </div>
+                  <div className="settings-row-hint">
+                    {windowGenie
+                      ? 'Apps open from and minimise into the Dock with the genie effect. Turn it off for smoother windows on slower computers.'
+                      : 'Apps simply scale to and from the Dock, which is lighter on slower computers.'}
                   </div>
                   <div className="settings-row-hint">
                     You can also drag the divider in the Dock up or down to resize it. When your apps don't fit the window, the Dock shrinks them so they all stay visible.

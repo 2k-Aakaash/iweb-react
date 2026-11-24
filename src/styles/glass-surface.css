@@ -39,6 +39,32 @@
   opacity: 0;
 }
 
+/* Windows and Spotlight: the browser blurs whatever is really behind them (the desktop's
+   clock and widgets, the Dock, other windows), tinted like the static glass, with its light
+   rim. Nothing to render or repaint: it follows moves and resizes by itself. */
+.glass-surface-backdrop {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(var(--gb-lift), var(--gb-lift)), var(--gb-tint);
+  -webkit-backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-saturate)) brightness(var(--gb-bright, 1));
+  backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-saturate)) brightness(var(--gb-bright, 1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.32 * var(--gb-rim))),
+    inset 0 0 0 1px rgba(255, 255, 255, calc(0.1 * var(--gb-rim))),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+}
+
+/* A window with this glass must not be a "backdrop root" itself (its own backdrop-filter, a
+   filter, or will-change on either): its glass would then see only the window, not the
+   desktop behind it (the Music window showed straight through). */
+.glass-host:has(> .glass-surface > .glass-surface-backdrop) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  will-change: transform !important;
+}
+
 /* Until the static glass has rendered (the wallpaper is still decoding), a plain CSS frost
    stands in so the surface is never empty. */
 .glass-surface.is-pending {
@@ -47,8 +73,6 @@
   backdrop-filter: blur(20px) saturate(160%);
 }
 
-/* The page background as the body paints it: the wallpaper cover-fit to the viewport over
-   the page colour. Positioned by GlassSurface so it lines up with the real page. */
 /* Optional colour over the glass, set by the host through --glass-tint. */
 .glass-surface-tint {
   position: absolute;
@@ -57,13 +81,4 @@
   background: var(--glass-tint, none);
   opacity: var(--glass-tint-opacity, 0.5);
   pointer-events: none;
-}
-
-.glass-surface-wallpaper {
-  position: absolute;
-  background-color: var(--glass-page-color, #0b0b10);
-  background-image: var(--page-bg-url, none);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
 }

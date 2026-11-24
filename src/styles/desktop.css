@@ -442,3 +442,9 @@ body:has(.dt-item .cw-expanded, .dt-item .weather-container.is-expanded) .dt-ite
 .dt-item-widget[data-size='medium'] .weather-container:not(.is-expanded) .forecast-item:nth-child(n + 6) {
   display: none;
 }
+
+/* The clock's chosen font is still loading (libs/fonts/clockFontBoot.js): the digits wait,
+   then appear in their own font instead of swapping from the default. */
+html.clock-font-pending #clock {
+  visibility: hidden;
+}

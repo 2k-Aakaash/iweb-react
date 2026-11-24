@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import GlassSurface from '../../components/glass/GlassSurface';
+import '../styles/search-bar.css';
 
 // The day's phrase comes from a long list (search-bar-text.js) that loads after the desktop
 // is up; the last one shown is kept, so the bar has its phrase on the first frame.

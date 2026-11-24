@@ -3,6 +3,8 @@ import { GRID, ITEMS, MARGIN, PITCH, WIDGET_SIZES, alignRect, topMargin } from '
 import { setEditing, updateItem, useDesktop } from '../../libs/desktop/layoutStore';
 import { setGuides } from '../../libs/desktop/guides';
 import { landingFor, occupiedRects } from '../../libs/desktop/placement';
+import { focusPref, widgetsHiddenPref } from '../../libs/controlcenter/ccPrefs';
+import { usePref } from '../../libs/prefs/storedPref';
 import '../../styles/desktop.css';
 
 // A movable item on the iWeb desktop (clock, search bar, widgets). Positioned by its anchors
@@ -92,6 +94,16 @@ export default function DesktopItem({ id, children, className = '' }) {
   const [dragging, setDragging] = useState(false);
   const [holding, setHolding] = useState(false);
 
+  // Focus (only the clock and search bar) and Widgets off hide items with CSS. An item that's
+  // hidden that way from the start isn't mounted at all, so it fetches and renders nothing
+  // until it's first shown; from then on it stays mounted and just fades (no reload).
+  const focus = usePref(focusPref);
+  const widgetsHidden = usePref(widgetsHiddenPref);
+  const parked = !editing && ((focus && id !== 'clock' && id !== 'search') || (widgetsHidden && def.kind === 'widget'));
+  const [shownOnce, setShownOnce] = useState(!parked);
+  if (!parked && !shownOnce) setShownOnce(true);
+  const deferred = parked && !shownOnce;
+
   const { style, shift } = anchorStyle(item);
   const transformFor = (extraX = 0, extraY = 0) =>
     `translate(calc(${shift[0]} + ${nudge.x + extraX}px), calc(${shift[1]} + ${nudge.y + extraY}px))`;
@@ -103,7 +115,7 @@ export default function DesktopItem({ id, children, className = '' }) {
   const centredY = item.ay === 'middle';
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || item.hidden) return undefined;
+    if (!el || item.hidden || deferred) return undefined;
     const fit = () => {
       if (dragRef.current) return;
       const w = el.offsetWidth;
@@ -124,7 +136,7 @@ export default function DesktopItem({ id, children, className = '' }) {
       observer.disconnect();
       window.removeEventListener('resize', fit);
     };
-  }, [item.ax, item.x, item.ay, item.y, item.size, item.hidden, centredX, centredY]);
+  }, [item.ax, item.x, item.ay, item.y, item.size, item.hidden, deferred, centredX, centredY]);
 
   // Settle: animate from where the item was dropped to its new resting place (FLIP).
   useLayoutEffect(() => {
@@ -162,7 +174,7 @@ export default function DesktopItem({ id, children, className = '' }) {
     if (editing) holdRef.current?.cancel();
   }, [editing]);
 
-  if (item.hidden) return null;
+  if (item.hidden || deferred) return null;
 
   const commitPos = (pos, visualFrom) => {
     flipFrom.current = visualFrom;

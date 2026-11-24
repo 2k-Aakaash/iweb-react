@@ -1,103 +1,7 @@
-// Optics presets for <GlassSurface> (@samasante/liquid-glass `optics`).
-//   panel  — the library's macOS notification look: milky veil, gentle rim bend.
-//   window — the same glass with a dark veil, for windows with white text.
-//   dock   — wide bars: no dome (a full-width lens would bloom into an oval, as the library
-//            warns) and per-axis strength, so the vertical bend stays proportional to the height.
-//   bar    — the dock look for slimmer bars (the search field).
-//   pill   — small capsules like the Dynamic Island.
-//   card   — widgets: a light frost under their colour tint.
-//   label  — small text labels: Dock icon names, the Unsplash credit.
-// `frost` is much stronger than a CSS blur radius: around 1–3 already frosts well.
-
-const panel = {
-  mapSize: 256,
-  clipToShape: true,
-  softEdge: true,
-  depth: 1,
-  curvature: 0.5,
-  dispersion: 0.6,
-  strength: 0.17,
-  bend: 0.7,
-  bendWidth: 0.12,
-  frost: 3,
-  brightness: 0.22,
-  specular: 1.3,
-  sheenAngle: 50,
-  glow: 0.32,
-  glowSpread: 1,
-  glowFalloff: 1,
-  sheen: 1.3,
-  sheenWidth: 3,
-}
-
-const dock = {
-  mapSize: 256,
-  clipToShape: true,
-  softEdge: true,
-  depth: 0.95,
-  curvature: 0.5,
-  dispersion: 0.6,
-  strength: 0.14,
-  bend: 0.4,
-  bendWidth: 0.7,
-  frost: 1,
-  brightness: 0.05,
-  specular: 1.3,
-  sheenAngle: 50,
-  glow: 0.15,
-  glowSpread: 1,
-  glowFalloff: 1,
-  sheen: 1.3,
-  sheenWidth: 2.5,
-}
-
-export const GLASS_PRESETS = {
-  panel,
-  window: {...panel, brightness: -0.3},
-  spotlight: {...panel, brightness: -0.55},
-  dock,
-  bar: {...dock, scaleX: 0.04, scaleY: 0.01, bendWidth: 0.35, brightness: 0.02},
-  pill: {
-    ...panel,
-    depth: 0.6,
-    curvature: 0.2,
-    dispersion: 0.4,
-    strength: 0.06,
-    bend: 0.8,
-    bendWidth: 0.25,
-    frost: 1.5,
-    brightness: -0.35,
-    glow: 0.2,
-    sheen: 1.1,
-    sheenWidth: 2,
-  },
-  card: {
-    ...panel,
-    depth: 0.6,
-    curvature: 0.2,
-    strength: 0.08,
-    bend: 0.8,
-    bendWidth: 0.18,
-    frost: 1.5,
-    brightness: 0,
-  },
-  label: {
-    ...panel,
-    depth: 0.5,
-    curvature: 0.2,
-    dispersion: 0.3,
-    strength: 0.05,
-    bend: 0.8,
-    bendWidth: 0.3,
-    frost: 2,
-    brightness: -0.25,
-    glow: 0.2,
-    sheen: 1.1,
-    sheenWidth: 2,
-  },
-}
-
-// Static glass (staticGlass.js) — the same surfaces, rendered once. Values: tint [r, g, b, a]
+// Glass looks for <GlassSurface> (staticGlass.js renders them once). Surfaces:
+//   panel, window, spotlight, dock, bar (the search field), pill (the Dynamic Island),
+//   label (Dock icon names, the Unsplash credit), card (widgets), tile (Control Center).
+// Values: tint [r, g, b, a]
 // over the glass, blur (body frost, px), edgeBlur (rim blur as a fraction of blur — lower
 // keeps the bending visible), refraction and bezel (rim lens strength and width, px),
 // chroma (rim colour split), lift (+ milky / − darker), saturate, specular (rim light).
@@ -181,18 +85,11 @@ export const STATIC_PRESETS = {
 }
 
 // Control Center's tiles: the widgets' clear glass in Dark, milky in Light.
-GLASS_PRESETS.tile = GLASS_PRESETS.card
 STATIC_PRESETS.tile = STATIC_PRESETS.card
 
 // Light appearance (Settings → Appearance). Presets not listed here look the same in both.
 // One light glass for every surface, the Control Center tiles' look: frosted, see-through to
 // the wallpaper, a little lift for dark text. Spotlight floats over everything: a touch denser.
-export const LIGHT_GLASS_PRESETS = {
-  window: { ...GLASS_PRESETS.window, brightness: 0.18 },
-  spotlight: { ...GLASS_PRESETS.spotlight, brightness: 0.16 },
-  tile: { ...GLASS_PRESETS.card, brightness: 0.12 },
-}
-
 export const LIGHT_STATIC_PRESETS = {
   // Windows hold the most text: a little more frost than the tiles, the same look.
   window: { ...STATIC_PRESETS.window, tint: [250, 250, 252, 0.38], lift: 0.05 },

@@ -10,10 +10,21 @@ import App from './App.jsx'
 import './libs/boot/bootReveal' // starts the veil's time limit
 import { startAppearance } from './libs/appearance/appearance'
 import { startAccent } from './libs/appearance/accent'
+import { startClockFont } from './libs/fonts/clockFontBoot'
 
 // Light / Dark / Auto (Settings → Appearance), on <html> before the first frame.
 startAppearance()
+// Control Center's Focus and Widgets off, likewise (DesktopModes keeps them in step after).
+try {
+  const on = (key) => localStorage.getItem(key) === 'true'
+  document.documentElement.classList.toggle('cc-focus', on('iweb:ccFocus'))
+  document.documentElement.classList.toggle('cc-widgets-hidden', on('iweb:ccWidgetsHidden'))
+} catch {
+  // storage blocked: DesktopModes sets them once the settings load
+}
 startAccent()
+// The clock's chosen font: loading now, the digits held back until it's ready.
+startClockFont()
 
 // Offline support for the website (PWA). Not in the extension, which has its own service
 // worker. This lives here, not inline in index.html: extension pages block inline scripts.

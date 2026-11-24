@@ -106,18 +106,34 @@ export function wallpaperUrl() {
 
 // Decoded wallpapers, shared by every surface: url -> Promise<HTMLImageElement|null>.
 const images = new Map();
+const decoded = new Map(); // url -> HTMLImageElement | null, once settled
 export function loadWallpaper(url) {
   if (!url) return Promise.resolve(null);
   if (!images.has(url)) {
     images.set(url, new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous'; // remote wallpapers must be readable by WebGL
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
+      img.onload = () => {
+        decoded.set(url, img);
+        resolve(img);
+      };
+      img.onerror = () => {
+        decoded.set(url, null);
+        resolve(null);
+      };
       img.src = url;
     }));
   }
   return images.get(url);
+}
+
+/**
+ * The wallpaper right now, without waiting: the image once decoded, null when there's none
+ * (or it failed), undefined while it's still loading. Lets glass repaint in the same frame.
+ */
+export function loadedWallpaper(url) {
+  if (!url) return null;
+  return decoded.has(url) ? decoded.get(url) : undefined;
 }
 
 function parseColor(css) {
@@ -198,9 +214,29 @@ function createRenderer() {
   const cache = new Map(); // blurred layers by wallpaper|viewport|blur
   const rim = { key: '', rect: [0, 0, 1, 1] };
   const body = { key: '', rect: [0, 0, 1, 1] };
+  const keyBase = (image, vw, vh, dpr) => `${image.src.length}:${image.src.slice(-64)}|${vw}x${vh}@${dpr}`;
+  // Building a blurred layer is CPU work over the whole viewport (hundreds of ms for a heavy
+  // blur), so a layer is kept for every look in use (the Dock, panels, windows…).
+  const layerFor = (key, image, vw, vh, blur, scale) => {
+    let layer = cache.get(key);
+    if (!layer) {
+      layer = blurredBackground(image, vw, vh, blur, scale);
+      cache.set(key, layer);
+      if (cache.size > 8) cache.delete(cache.keys().next().value);
+    }
+    return layer;
+  };
   return {
     canvas,
     gl,
+    /** Builds the blurred layer `opts` will need ('rim' or 'body'), so its first paint is quick. */
+    warm(image, opts, part) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const blur = part === 'rim' ? opts.blur * opts.edgeBlur : opts.blur;
+      layerFor(`${keyBase(image, vw, vh, dpr)}|${part}${blur}`, image, vw, vh, blur, scaleFor(blur));
+    },
     draw({ image, rect, radius, dpr, opts }) {
       const w = Math.max(1, Math.round(rect.width * dpr));
       const h = Math.max(1, Math.round(rect.height * dpr));
@@ -218,17 +254,12 @@ function createRenderer() {
         const dw = image.naturalWidth * s;
         const dh = image.naturalHeight * s;
         cover = [(vw - dw) / 2, (vh - dh) / 2, dw, dh];
-        const base = `${image.src.length}:${image.src.slice(-64)}|${vw}x${vh}@${dpr}`;
+        const base = keyBase(image, vw, vh, dpr);
         const upload = (unit, tex, key, current, blur, scale) => {
           gl.activeTexture(unit);
           gl.bindTexture(gl.TEXTURE_2D, tex);
           if (key === current.key) return;
-          let layer = cache.get(key);
-          if (!layer) {
-            layer = blurredBackground(image, vw, vh, blur, scale);
-            cache.set(key, layer);
-            if (cache.size > 4) cache.delete(cache.keys().next().value);
-          }
+          const layer = layerFor(key, image, vw, vh, blur, scale);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, layer.canvas);
           setParams();
           current.key = key;
@@ -287,4 +318,24 @@ export function paintStaticGlass(target, { image, rect, radius, opts }) {
   ctx.clearRect(0, 0, target.width, target.height);
   ctx.drawImage(source, 0, 0);
   return true;
+}
+
+/**
+ * Builds, at idle and one layer per idle moment, the blurred layers these looks will need (the
+ * windows' glass), so a window's first open doesn't build them while it genies out.
+ */
+export function warmStaticGlass(looks) {
+  if (typeof window === 'undefined' || !staticGlassSupported()) return;
+  const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 5000 }) : setTimeout(fn, 500));
+  loadWallpaper(wallpaperUrl()).then((image) => {
+    if (!image) return;
+    const jobs = looks.flatMap((opts) => [() => renderer.warm(image, opts, 'body'), () => renderer.warm(image, opts, 'rim')]);
+    const next = () => {
+      const job = jobs.shift();
+      if (!job) return;
+      try { job(); } catch { /* a warm-up only */ }
+      idle(next);
+    };
+    idle(next);
+  });
 }

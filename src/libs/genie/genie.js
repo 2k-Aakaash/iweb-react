@@ -9,7 +9,10 @@ import '../../styles/genie.css';
 // Measured from the real macOS minimise (~430ms from first bend to inside the icon).
 const CLOSE_MS = 440;
 const OPEN_MS = 420;
-const HANDOFF_MS = 160; // cross-fade from the strips back to the live window
+// Restored: the live window takes over from the strips, with their glass still under its own
+// glass for a moment while the browser draws its backdrop blur (see handBack).
+const SETTLE_MS = 120; // how long the still stays before fading (the blur is ready by then)
+const SETTLE_FADE_MS = 220;
 const MIN_ROWS = 16;
 const MAX_ROWS = 24;
 const ROW_PX = 24; // one strip per ~24px: each strip is an exact trapezoid, so this still traces the curve
@@ -105,6 +108,8 @@ export function createGenie(el, { getTarget, overlay = null }) {
   let settle = null;
   let handoff = 0;
   let starting = null; // waiting for the wallpaper before the first frame
+  let still = null; // the copies' glass still (background-image, size, colour)
+  let settleLayer = null; // the still shown under the live window's glass just after a restore
   let destroyed = false;
 
   function build() {
@@ -130,6 +135,12 @@ export function createGenie(el, { getTarget, overlay = null }) {
     template.style.setProperty('width', `${width}px`, 'important');
     template.style.setProperty('height', `${height}px`, 'important');
     paintGlass(template, el, win, overlay);
+    // The same still, for the live window's first moments after the hand-back (handBack).
+    still = {
+      image: template.style.getPropertyValue('background-image'),
+      size: template.style.getPropertyValue('background-size'),
+      color: template.style.getPropertyValue('background-color'),
+    };
 
     strips = [];
     for (let i = 0; i < rows; i++) {
@@ -206,15 +217,41 @@ export function createGenie(el, { getTarget, overlay = null }) {
   }
 
   // Restored: show the live window underneath and cross-fade the strips away.
+  // A window's backdrop blur isn't drawn while the strips cover it, and needs ~60–70 ms once
+  // it's uncovered: handing back plainly showed the desktop sharp through the window for that
+  // moment ("the glass goes off, then the blur comes back"). So the live window first gets
+  // the strips' own glass still underneath its glass layer (it looks exactly like the strips),
+  // the strips go in one step, and the still then fades away into the real blur, drawn by then.
   function handBack() {
+    if (still) { // the still, or without a wallpaper the copies' plain colour
+      settleLayer?.remove();
+      const under = document.createElement('div');
+      under.className = 'genie-settle';
+      under.setAttribute('aria-hidden', 'true');
+      if (still.image && still.image !== 'none') under.style.backgroundImage = still.image;
+      under.style.backgroundSize = still.size;
+      under.style.backgroundColor = still.color;
+      el.prepend(under);
+      settleLayer = under;
+    }
     el.classList.remove('genie-hidden');
     if (overlay) {
       overlay.classList.remove('genie-overlay');
       overlay.style.opacity = '';
     }
-    layer.style.transition = `opacity ${HANDOFF_MS}ms ease-out`;
-    layer.style.opacity = '0';
-    handoff = setTimeout(teardown, HANDOFF_MS + 20);
+    handoff = setTimeout(() => requestAnimationFrame(() => {
+      if (!layer || goal !== 0) return; // torn down, or reversed meanwhile
+      teardown();
+      const under = settleLayer;
+      if (!under) return;
+      setTimeout(() => {
+        under.style.opacity = '0';
+        setTimeout(() => {
+          under.remove();
+          if (settleLayer === under) settleLayer = null;
+        }, SETTLE_FADE_MS + 40);
+      }, SETTLE_MS);
+    }), 0);
   }
 
   function tick(now) {
@@ -247,6 +284,10 @@ export function createGenie(el, { getTarget, overlay = null }) {
         layer.style.transition = '';
         el.classList.add('genie-hidden');
         if (overlay) overlay.classList.add('genie-overlay');
+      }
+      if (settleLayer) {
+        settleLayer.remove();
+        settleLayer = null;
       }
       settle?.(null); // a reversed run supersedes the previous promise
       const promise = new Promise((resolve) => {

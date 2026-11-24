@@ -3,6 +3,7 @@ import Background from './components/Background';
 import Clock from './components/Clock';
 import Quote from './components/Quote';
 import DesktopModes from './components/controlcenter/DesktopModes';
+import { hasFontFace, storedClockFont } from './libs/fonts/clockFontBoot';
 import TimerBubble from './components/controlcenter/TimerBubble';
 import { markBootReady } from './libs/boot/bootReveal';
 import Dock from './components/Dock';
@@ -104,6 +105,15 @@ const YouTubeWidget = React.lazy(() => import('./components/creator/YouTubeWidge
 // Holds the widget's slot while its code loads, so nothing else is placed on top of it.
 const widgetSlot = <div aria-hidden="true" style={{ width: 'var(--widget-w)', height: 'var(--widget-h)' }} />;
 
+function readBookmarks() {
+  try {
+    const list = JSON.parse(localStorage.getItem('bookmarks')) || [];
+    return Array.isArray(list) ? [...list].sort((a, b) => (a.order || 0) - (b.order || 0)) : [];
+  } catch {
+    return [];
+  }
+}
+
 const whenIdle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 1500));
 
 function AppUnavailable({ setOpen }) {
@@ -115,7 +125,7 @@ function AppUnavailable({ setOpen }) {
 
 export default function App() {
   const [customName, setCustomName] = useState('');
-  const [clockFont, setClockFont] = useState('');
+  const [clockFont, setClockFont] = useState(storedClockFont); // right from the first frame
   const [clockColor, setClockColor] = useState('');
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -151,19 +161,17 @@ export default function App() {
   // Ref that Background.jsx will expose to trigger its file input (upload new BG)
   const changeBgUploadRef = useRef(null);
 
-  const [bookmarks, setBookmarks] = useState([]);
+  // The Dock's shortcuts, read on the first render: the Dock sizes itself (shrink to fit) by
+  // how many icons it has, so learning them a render later resized it, and its rounded glass,
+  // just after it appeared.
+  const [bookmarks, setBookmarks] = useState(readBookmarks);
 
   // Initial load of customization details
   useEffect(() => {
     const storedName = localStorage.getItem('customName');
     if (storedName) setCustomName(storedName);
 
-    const storedFont = localStorage.getItem('selectedFont');
-    if (storedFont) setClockFont(storedFont);
 
-    const storedBookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
-    storedBookmarks.sort((a, b) => (a.order || 0) - (b.order || 0));
-    setBookmarks(storedBookmarks);
 
     // Load custom fonts from IndexedDB
     openIwebDB().then((db) => {
@@ -173,7 +181,9 @@ export default function App() {
       const req = store.getAll();
       req.onsuccess = async (ev) => {
         const fonts = ev.target.result || [];
+        // The clock's own font is already there (clockFontBoot.js); these are for Settings.
         for (const font of fonts) {
+          if (hasFontFace(font.family)) continue;
           try {
             const fontUrl = URL.createObjectURL(font.blob);
             const fontFace = new FontFace(font.family, `url(${fontUrl})`);
@@ -183,11 +193,6 @@ export default function App() {
           } catch (err) {
             console.error(`Failed to load custom font ${font.name}:`, err);
           }
-        }
-        // Force refresh state in case the custom font was active
-        if (storedFont) {
-          setClockFont('');
-          setTimeout(() => setClockFont(storedFont), 50);
         }
       };
     }).catch((err) => {
@@ -220,6 +225,10 @@ export default function App() {
       loadSpotlight().catch(() => {});
       loadSettings().catch(() => {});
       preloadNotes().catch(() => {});
+      // The windows' glass, prepared so a window's first open paints it at once.
+      Promise.all([import('./components/glass/staticGlass'), import('./components/glass/glassPresets')])
+        .then(([glass, presets]) => glass.warmStaticGlass([presets.STATIC_PRESETS.window, presets.LIGHT_STATIC_PRESETS.window]))
+        .catch(() => {});
     });
   }, []);
 

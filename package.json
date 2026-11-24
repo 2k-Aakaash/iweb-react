@@ -13,7 +13,6 @@
   "dependencies": {
     "@headlessui/react": "^2.2.10",
     "@radix-ui/react-dialog": "^1.1.17",
-    "@samasante/liquid-glass": "^0.1.1",
     "browser-fs-access": "^0.38.0",
     "dexie": "^4.4.4",
     "dompurify": "^3.4.17",

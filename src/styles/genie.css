@@ -57,3 +57,15 @@
 .genie-overlay {
   animation: none !important;
 }
+
+/* Just after a restore: the strips' glass still under the live window's glass, fading into
+   the real backdrop blur once the browser has drawn it (genie.js handBack). */
+.genie-settle {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  background-size: 100% 100%;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
