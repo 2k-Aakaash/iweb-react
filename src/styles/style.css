@@ -5253,3 +5253,20 @@ svg {
   flex-shrink: 0 !important;
   flex-basis: auto !important;
 }
+
+/* The Weather widget's location and refresh buttons (Weather.jsx). */
+.weather-search button.get-weather.is-active {
+  color: #64b5ff;
+}
+
+.weather-search button.get-weather.is-busy svg {
+  animation: weather-spin 0.9s linear infinite;
+}
+
+.weather-search button.get-weather:disabled {
+  cursor: default;
+}
+
+@keyframes weather-spin {
+  to { transform: rotate(360deg); }
+}

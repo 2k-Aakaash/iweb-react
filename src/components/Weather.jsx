@@ -1,14 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { collapsedWidth, morphCard } from './widgets/shared/useCardExpand';
 import GlassSurface from './glass/GlassSurface';
 import { showAlert } from '../libs/dialogs/dialogs';
+import {
+  REFRESH_MS,
+  STALE_MS,
+  cachedWeather,
+  currentPlace,
+  fetchForecast,
+  findPlace,
+  nowIndex,
+  saveCity,
+  savedCity,
+  updatedLabel,
+} from '../libs/weather/weatherData';
 
 export default function Weather({ onExpandedChange }) {
-  const [weatherData, setWeatherData] = useState(null);
-  const [locationName, setLocationName] = useState('');
+  // The last forecast shows at once; a fresh one replaces it (libs/weather/weatherData.js).
+  const [weather, setWeather] = useState(cachedWeather); // { place, data, fetchedAt, current }
+  const weatherData = weather?.data || null;
+  const locationName = weather?.place.name || '';
+  const [busy, setBusy] = useState(false);
+  const [, setTick] = useState(0); // re-renders "Updated … ago" and the current hour
   const [searchInput, setSearchInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
-  const [backgroundGradient, setBackgroundGradient] = useState('');
   
   const containerRef = useRef(null);
   const searchRef = useRef(null);
@@ -23,9 +38,49 @@ export default function Weather({ onExpandedChange }) {
   const condTextRef = useRef(null);
   const hlTextRef = useRef(null);
 
-  useEffect(() => {
-    initWeather();
+  // Loads the weather: for the searched city, or where you are now. Only the latest request
+  // counts (a new search or refresh replaces one still running).
+  const request = useRef(null);
+  const load = useCallback(async ({ place = null } = {}) => {
+    request.current?.abort();
+    const ctl = new AbortController();
+    request.current = ctl;
+    setBusy(true);
+    try {
+      const city = place || savedCity();
+      const where = city || await currentPlace(ctl.signal);
+      const result = await fetchForecast(where, { current: !city }, ctl.signal);
+      if (!ctl.signal.aborted) setWeather(result);
+    } catch (err) {
+      if (err?.name !== 'AbortError') console.warn('[weather] Could not load the weather:', err);
+    } finally {
+      if (request.current === ctl) setBusy(false);
+    }
   }, []);
+
+  // At start, then every half hour, and when you come back to the tab after a while.
+  const weatherRef = useRef(weather);
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
+  useEffect(() => {
+    load(); // eslint-disable-line react-hooks/set-state-in-effect -- the first load, at start
+    const timer = setInterval(() => load(), REFRESH_MS);
+    const clock = setInterval(() => setTick((t) => t + 1), 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const at = weatherRef.current?.fetchedAt || 0;
+      if (Date.now() - at > STALE_MS) load();
+      else setTick((t) => t + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      clearInterval(clock);
+      document.removeEventListener('visibilitychange', onVisible);
+      request.current?.abort();
+    };
+  }, [load]);
 
   const formatConditionText = (symbolCode) => {
     if (!symbolCode) return "";
@@ -79,111 +134,31 @@ export default function Weather({ onExpandedChange }) {
     return 'linear-gradient(to top, rgba(60, 120, 195, 0.8), rgba(135, 185, 230, 0.85))';
   };
 
-  const initWeather = () => {
-    const cachedLocation = localStorage.getItem('weatherLocation');
-    if (cachedLocation) {
-      try {
-        const loc = JSON.parse(cachedLocation);
-        if (loc && loc.lat && loc.lon && loc.name) {
-          fetchWeatherData(loc.lat, loc.lon, loc.name);
-          return;
-        }
-      } catch (e) {
-        console.error("Error parsing cached weather location:", e);
-      }
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          const reverseGeocodeUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
-          fetch(reverseGeocodeUrl)
-            .then(res => res.json())
-            .then(geo => {
-              const city = geo.city || geo.locality || geo.principalSubdivision || "Current Location";
-              fetchWeatherData(lat, lon, city);
-            })
-            .catch(() => {
-              fetchWeatherData(lat, lon, "Current Location");
-            });
-        },
-        (error) => {
-          console.log("Geolocation error, falling back to IP:", error);
-          fetchIPLocation();
-        }
-      );
-    } else {
-      fetchIPLocation();
-    }
-  };
-
-  const fetchIPLocation = () => {
-    fetch("https://ipapi.co/json/")
-      .then(res => res.json())
-      .then(data => {
-        if (data.latitude && data.longitude) {
-          fetchWeatherData(data.latitude, data.longitude, data.city || "Current Location");
-        } else {
-          fetchWeatherData(40.7128, -74.0060, "New York");
-        }
-      })
-      .catch(error => {
-        console.error("Error fetching IP location:", error);
-        fetchWeatherData(40.7128, -74.0060, "New York");
-      });
-  };
-
-  const handleSearch = () => {
+  const handleSearch = async () => {
     const query = searchInput.trim();
     if (!query) return; // nothing typed yet
-
-    const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&email=admin@iweb-dashboard.local`;
-
-    fetch(geocodeUrl)
-      .then(response => response.json())
-      .then(data => {
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          const displayName = data[0].display_name.split(',')[0];
-          
-          localStorage.setItem('weatherLocation', JSON.stringify({ lat, lon, name: displayName }));
-          fetchWeatherData(lat, lon, displayName);
-          setSearchInput('');
-        } else {
-          showAlert({ title: `“${query}” wasn’t found`, message: 'Try another place name.' });
-        }
-      })
-      .catch(error => {
-        console.error('Geocoding error:', error);
-        showAlert({ title: 'The place couldn’t be looked up', message: 'Check your connection and try again.' });
-      });
+    let place;
+    try {
+      place = await findPlace(query);
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      showAlert({ title: 'The place couldn’t be looked up', message: 'Check your connection and try again.' });
+      return;
+    }
+    if (!place) {
+      showAlert({ title: `“${query}” wasn’t found`, message: 'Try another place name.' });
+      return;
+    }
+    saveCity(place);
+    setSearchInput('');
+    load({ place });
   };
 
-  const fetchWeatherData = (lat, lon, name) => {
-    const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat}&lon=${lon}`;
-
-    fetch(url)
-      .then(response => {
-        if (!response.ok) throw new Error("HTTP error " + response.status);
-        return response.json();
-      })
-      .then(data => {
-        setLocationName(name);
-        setWeatherData(data);
-        const timeseries = data.properties.timeseries;
-        if (timeseries && timeseries.length > 0) {
-          const next1H = timeseries[0].data.next_1_hours;
-          const next6H = timeseries[0].data.next_6_hours;
-          const currentSymbol = next1H ? next1H.summary.symbol_code : (next6H ? next6H.summary.symbol_code : 'clearsky_day');
-          setBackgroundGradient(getWeatherGradient(currentSymbol));
-        }
-      })
-      .catch(error => {
-        console.error('Weather API error:', error);
-      });
+  // Back to where you are now: forget the searched city.
+  const useCurrentLocation = () => {
+    saveCity(null);
+    setSearchInput('');
+    load();
   };
 
   // GSAP animation triggered by changes to isExpanded
@@ -257,6 +232,12 @@ export default function Weather({ onExpandedChange }) {
     return () => el.removeEventListener('wheel', handleWheel);
   }, [weatherData]);
 
+  // The background follows the current hour's weather.
+  const series = weatherData?.properties?.timeseries || [];
+  const nowAt = nowIndex(series);
+  const nowSymbol = series[nowAt]?.data.next_1_hours?.summary.symbol_code || series[nowAt]?.data.next_6_hours?.summary.symbol_code || 'clearsky_day';
+  const backgroundGradient = getWeatherGradient(nowSymbol);
+
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
   };
@@ -292,17 +273,15 @@ export default function Weather({ onExpandedChange }) {
   }
 
   // Current values
-  const currentInstant = timeseries[0].data.instant.details;
+  const currentInstant = timeseries[nowAt].data.instant.details;
   const currentTemp = Math.round(currentInstant.air_temperature);
-  const next1H = timeseries[0].data.next_1_hours;
-  const next6H = timeseries[0].data.next_6_hours;
-  const currentSymbol = next1H ? next1H.summary.symbol_code : (next6H ? next6H.summary.symbol_code : 'clearsky_day');
+  const currentSymbol = nowSymbol;
   const conditionText = formatConditionText(currentSymbol);
   const iconUrl = `https://cdn.jsdelivr.net/gh/metno/weathericons@master/weather/svg/${currentSymbol}.svg`;
 
   // High / Low temperatures
   const temps = [];
-  for (let i = 0; i < Math.min(24, timeseries.length); i++) {
+  for (let i = nowAt; i < Math.min(nowAt + 24, timeseries.length); i++) {
     const t = timeseries[i].data.instant.details.air_temperature;
     if (t !== undefined) {
       temps.push(t);
@@ -313,7 +292,7 @@ export default function Weather({ onExpandedChange }) {
 
   // Build horizontal hourly list (next 12 hours)
   const hourlyForecast = [];
-  for (let k = 1; k <= 12 && k < timeseries.length; k++) {
+  for (let k = nowAt + 1; k <= nowAt + 12 && k < timeseries.length; k++) {
     const item = timeseries[k];
     const date = new Date(item.time);
     const hour = date.getHours();
@@ -353,7 +332,32 @@ export default function Weather({ onExpandedChange }) {
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyUp={handleSearchKeyPress}
         />
-        <button className="get-weather" onClick={handleSearch}>
+        <button
+          type="button"
+          className={`get-weather${weather?.current ? ' is-active' : ''}`}
+          onClick={useCurrentLocation}
+          title={weather?.current ? 'Showing your current location' : 'Use my current location'}
+          aria-label="Use my current location"
+          aria-pressed={Boolean(weather?.current)}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={weather?.current ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polygon points="3 11 22 2 13 21 11 13 3 11" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`get-weather${busy ? ' is-busy' : ''}`}
+          onClick={() => load()}
+          disabled={busy}
+          title={weather ? `${updatedLabel(weather.fetchedAt)}. Refresh` : 'Refresh'}
+          aria-label="Refresh the weather"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-3-6.7" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
+        </button>
+        <button type="button" className="get-weather" onClick={handleSearch} aria-label="Search">
           <svg 
             width="14" 
             height="14" 
