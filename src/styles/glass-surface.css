@@ -62,7 +62,7 @@
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   filter: none !important;
-  will-change: transform !important;
+  will-change: auto !important; /* not transform: that keeps text rasterised at the opening animation's scale (blurry) */
 }
 
 /* Until the static glass has rendered (the wallpaper is still decoding), a plain CSS frost
